@@ -13,9 +13,6 @@ from app.core.clustering import cluster_firms_hotspots
 
 class APIRouter:
     def handle_request(self, method: str, path: str, query_params: Dict[str, List[str]], body_data: bytes) -> Tuple[int, Dict[str, str], bytes]:
-        """
-        Route HTTP requests to the appropriate handler and return (status_code, headers, response_bytes).
-        """
         headers = {
             "Content-Type": "application/json",
             "Access-Control-Allow-Origin": "*",
@@ -34,11 +31,11 @@ class APIRouter:
                 return self._handle_health(headers)
 
             # 2. Thermal Sources Listing (JSON)
-            elif parsed_path == "/api/v1/sources" and method == "GET":
+            elif parsed_path in ["/api/v1/sources", "/sources"] and method == "GET":
                 return self._handle_list_sources(query_params, headers)
 
             # 3. Direct GeoJSON Map Overlay
-            elif parsed_path == "/api/v1/sources/geojson" and method == "GET":
+            elif parsed_path in ["/api/v1/sources/geojson", "/geojson"] and method == "GET":
                 return self._handle_sources_geojson(query_params, headers)
 
             # 4. Single Thermal Source Detail
@@ -46,44 +43,44 @@ class APIRouter:
                 source_id = parsed_path.split("/")[-1]
                 return self._handle_source_detail(source_id, headers)
 
-            # 5. On-Demand Single Point Classification
-            elif parsed_path == "/api/v1/classify" and method == "POST":
-                return self._handle_classify_single(body_data, headers)
+            # 5. Live Prediction Endpoint (Matching Teammate Frontend BACKEND_URL: http://127.0.0.1:8000/predict)
+            elif parsed_path in ["/predict", "/api/v1/predict", "/api/v1/classify"] and method == "POST":
+                return self._handle_predict_single(body_data, headers)
 
             # 6. Batch CSV / JSON Classification Upload
-            elif parsed_path == "/api/v1/classify/batch" and method == "POST":
+            elif parsed_path in ["/api/v1/classify/batch", "/predict/batch"] and method == "POST":
                 return self._handle_classify_batch(body_data, headers)
 
-            # 7. OSM Industrial Infrastructure (JSON & GeoJSON)
-            elif parsed_path == "/api/v1/infrastructure" and method == "GET":
+            # 7. OSM Industrial Infrastructure
+            elif parsed_path in ["/api/v1/infrastructure", "/infrastructure"] and method == "GET":
                 data = osm_service.get_all_facilities()
                 return 200, headers, json.dumps({"count": len(data), "facilities": data}).encode("utf-8")
 
-            elif parsed_path == "/api/v1/infrastructure/geojson" and method == "GET":
+            elif parsed_path in ["/api/v1/infrastructure/geojson", "/infrastructure/geojson"] and method == "GET":
                 geojson = osm_service.get_geojson()
                 return 200, headers, json.dumps(geojson).encode("utf-8")
 
             # 8. Analytics & KPI Summary
-            elif parsed_path == "/api/v1/analytics/summary" and method == "GET":
+            elif parsed_path in ["/api/v1/analytics/summary", "/analytics"] and method == "GET":
                 stats = storage_service.get_analytics_summary()
                 return 200, headers, json.dumps(stats).encode("utf-8")
 
             # 9. Time-Series Timeline Breakdown
-            elif parsed_path == "/api/v1/analytics/timeline" and method == "GET":
+            elif parsed_path in ["/api/v1/analytics/timeline", "/timeline"] and method == "GET":
                 timeline = storage_service.get_timeline()
                 return 200, headers, json.dumps({"timeline": timeline}).encode("utf-8")
 
             # 10. Risk Alerts
-            elif parsed_path == "/api/v1/alerts" and method == "GET":
+            elif parsed_path in ["/api/v1/alerts", "/alerts"] and method == "GET":
                 alerts = storage_service.get_alerts()
                 return 200, headers, json.dumps({"count": len(alerts), "alerts": alerts}).encode("utf-8")
 
             # 11. Trigger NASA FIRMS Sync & Ingestion Pipeline
-            elif parsed_path == "/api/v1/firms/sync" and method == "POST":
+            elif parsed_path in ["/api/v1/firms/sync", "/firms/sync"] and method == "POST":
                 return self._handle_firms_sync(query_params, headers)
 
-            # 12. Export Report (CSV / JSON)
-            elif parsed_path == "/api/v1/export/report" and method == "GET":
+            # 12. Export Report (CSV / JSON) / Served for frontend predictions.csv
+            elif parsed_path in ["/api/v1/export/report", "/predictions.csv"] and method == "GET":
                 return self._handle_export_report(query_params, headers)
 
             # 13. OpenAPI Specification
@@ -132,7 +129,6 @@ class APIRouter:
         is_persistent = (query_params.get("is_persistent", [""])[0].lower() == "true") if "is_persistent" in query_params else None
         risk_level = query_params.get("risk_level", [None])[0]
         
-        # Bbox parameters
         min_lat = float(query_params.get("min_lat", [0])[0]) if "min_lat" in query_params else None
         min_lon = float(query_params.get("min_lon", [0])[0]) if "min_lon" in query_params else None
         max_lat = float(query_params.get("max_lat", [0])[0]) if "max_lat" in query_params else None
@@ -156,19 +152,23 @@ class APIRouter:
             return 404, headers, json.dumps({"error": f"Thermal source {source_id} not found"}).encode("utf-8")
         return 200, headers, json.dumps(source, indent=2).encode("utf-8")
 
-    def _handle_classify_single(self, body_data: bytes, headers: Dict[str, str]) -> Tuple[int, Dict[str, str], bytes]:
+    def _handle_predict_single(self, body_data: bytes, headers: Dict[str, str]) -> Tuple[int, Dict[str, str], bytes]:
+        """
+        Main Live Prediction Handler matching teammate frontend (http://127.0.0.1:8000/predict).
+        Supports both single object and nested requests.
+        """
         try:
             body = json.loads(body_data.decode("utf-8")) if body_data else {}
         except Exception:
             return 400, headers, json.dumps({"error": "Invalid JSON in request body"}).encode("utf-8")
 
-        lat = float(body.get("latitude", 0.0))
-        lon = float(body.get("longitude", 0.0))
-        frp = float(body.get("frp", 10.0))
-        brightness = float(body.get("brightness", 335.0))
-        detection_count = int(body.get("detection_count", 1))
-        active_days = int(body.get("active_days", 1))
-        landcover_class = body.get("landcover_class", None)
+        lat = float(body.get("latitude") or body.get("lat") or 0.0)
+        lon = float(body.get("longitude") or body.get("lon") or 0.0)
+        frp = float(body.get("frp") or body.get("mean_frp") or 10.0)
+        brightness = float(body.get("brightness") or body.get("mean_brightness") or 335.0)
+        detection_count = int(body.get("detection_count") or body.get("total_detections") or 1)
+        active_days = int(body.get("active_days") or 1)
+        landcover_class = body.get("landcover_class") or body.get("landcover")
 
         facilities = osm_service.get_all_facilities()
         
@@ -186,20 +186,40 @@ class APIRouter:
 
         # 2. AI Inference
         pred_res = ml_engine.predict_single(features)
+        conf = pred_res["confidence_pct"]
+        pred_type = pred_res["predicted_event_type"]
 
-        # 3. Anomaly & Risk Detection
+        # 3. SIH Alert Level Rule (Matching teammate app.js ALERT_RULES: Industrial + >=80 -> HIGH, >=60 -> MEDIUM)
+        if pred_type == "Industrial" and conf >= 80.0:
+            sih_alert_severity = "HIGH"
+        elif pred_type == "Industrial" and conf >= 60.0:
+            sih_alert_severity = "MEDIUM"
+        else:
+            sih_alert_severity = "LOW"
+
+        # 4. Anomaly & Risk Assessment
         risk_level, is_flare_anomaly, risk_desc = evaluate_thermal_risk(
-            pred_res["predicted_event_type"],
+            pred_type,
             features["min_distance_to_industry_km"],
             frp, frp, active_days, detection_count
         )
 
+        # Full response compatible with both frontend app.js and REST API standards
         response = {
+            "source_id": body.get("source_id", f"PRED_{int(lat*1000)}_{int(lon*1000)}"),
             "latitude": lat,
             "longitude": lon,
-            "predicted_event_type": pred_res["predicted_event_type"],
-            "confidence_pct": pred_res["confidence_pct"],
+            "event_type": pred_type,
+            "predicted_event_type": pred_type,
+            "confidence": conf,
+            "confidence_pct": conf,
             "probabilities": pred_res["probabilities"],
+            "probability_industrial": pred_res["probabilities"].get("Industrial", 0.0),
+            "probability_forest_natural": pred_res["probabilities"].get("Forest/Natural", 0.0),
+            "probability_agricultural": pred_res["probabilities"].get("Agricultural", 0.0),
+            "probability_other": pred_res["probabilities"].get("Other", 0.0),
+            "sih_alert_severity": sih_alert_severity,
+            "is_persistent": active_days >= 3 or detection_count >= 5,
             "is_persistent_thermal_source": active_days >= 3 or detection_count >= 5,
             "is_flare_anomaly": is_flare_anomaly,
             "risk_level": risk_level,
@@ -267,13 +287,8 @@ class APIRouter:
         country = query_params.get("country", ["IND"])[0]
         days = int(query_params.get("days", [1])[0])
 
-        # 1. Fetch live or simulated FIRMS hotspots
         raw_hotspots = firms_service.fetch_live_hotspots(country_code=country, days=days)
-
-        # 2. Spatio-temporal clustering (DBSCAN)
         clustered_sources = cluster_firms_hotspots(raw_hotspots, eps_km=1.5)
-
-        # 3. Feature extraction & ML classification for each cluster
         facilities = osm_service.get_all_facilities()
         synced_sources = []
 
@@ -306,7 +321,6 @@ class APIRouter:
             c["min_distance_to_industry_km"] = features["min_distance_to_industry_km"]
             c["landcover_class"] = features["landcover_class"]
 
-            # Save to storage
             storage_service.save_new_source(c)
             synced_sources.append(c)
 
@@ -325,13 +339,18 @@ class APIRouter:
         if fmt == "json":
             return 200, headers, json.dumps({"count": len(sources), "report": sources}, indent=2).encode("utf-8")
 
-        # CSV format export
+        # CSV format export matching exact predictions.csv structure
         output = io.StringIO()
         fieldnames = [
-            "source_id", "latitude", "longitude", "predicted_event_type", "confidence_pct",
-            "mean_frp", "max_frp", "active_days", "total_detections", "is_persistent",
-            "risk_level", "nearest_facility_name", "nearest_facility_type", "min_distance_to_industry_km",
-            "landcover_class", "first_detection", "last_detection"
+            "source_id", "latitude", "longitude", "nearest_refinery_km", "nearest_powerplant_km",
+            "nearest_mine_km", "nearest_industrial_area_km", "landcover_code", "landcover_class",
+            "mean_distance_to_industry_km", "min_distance_to_industry_km", "mean_industrial_facilities_1km",
+            "mean_industrial_facilities_5km", "industrial_land_ratio", "forest_land_ratio", "agricultural_land_ratio",
+            "nearest_facility_type", "first_detection", "last_detection", "total_detections", "active_days",
+            "mean_frp", "max_frp", "observation_span_days", "recurrence_rate", "detections_per_span_day",
+            "mean_gap_hours", "std_gap_hours", "median_gap_hours", "min_gap_hours", "max_gap_hours",
+            "temporal_regularity", "max_active_days_7d", "max_active_days_14d", "max_active_days_30d",
+            "observation_days", "event_type", "predicted_event_type", "confidence_pct"
         ]
         writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
         writer.writeheader()
@@ -340,7 +359,7 @@ class APIRouter:
 
         csv_headers = {
             "Content-Type": "text/csv",
-            "Content-Disposition": "attachment; filename=thermal_fire_classification_report.csv",
+            "Content-Disposition": "attachment; filename=predictions.csv",
             "Access-Control-Allow-Origin": "*"
         }
         return 200, csv_headers, output.getvalue().encode("utf-8")
@@ -349,22 +368,21 @@ class APIRouter:
         spec = {
             "openapi": "3.0.0",
             "info": {
-                "title": "NASA FIRMS & OSM AI-Based Industrial Fire Detection Backend",
+                "title": "SIH AI-Based Industrial Fire Detection Backend",
                 "version": "1.0.0",
                 "description": "Geospatial AI REST & GeoJSON backend for the identification and classification of Industrial Fires, Gas Flaring, Wildfires, and Agricultural burns."
             },
             "paths": {
                 "/api/v1/health": {"get": {"summary": "Health check & model status"}},
+                "/predict": {"post": {"summary": "Live AI Prediction endpoint matching teammate frontend"}},
                 "/api/v1/sources": {"get": {"summary": "List thermal sources with filters"}},
                 "/api/v1/sources/geojson": {"get": {"summary": "Direct RFC 7946 GeoJSON map overlay"}},
                 "/api/v1/classify": {"post": {"summary": "On-demand real-time coordinate classification"}},
-                "/api/v1/classify/batch": {"post": {"summary": "Batch classification upload"}},
                 "/api/v1/infrastructure/geojson": {"get": {"summary": "OSM Industrial infrastructure map layer"}},
                 "/api/v1/analytics/summary": {"get": {"summary": "Aggregated statistics & KPI counts"}},
-                "/api/v1/analytics/timeline": {"get": {"summary": "Time-series daily trend data"}},
                 "/api/v1/alerts": {"get": {"summary": "Industrial risk and explosion alerts"}},
                 "/api/v1/firms/sync": {"post": {"summary": "Trigger NASA FIRMS live sync and clustering"}},
-                "/api/v1/export/report": {"get": {"summary": "Download classification report CSV/JSON"}}
+                "/predictions.csv": {"get": {"summary": "Predictions CSV file for frontend loading"}}
             }
         }
         return 200, headers, json.dumps(spec, indent=2).encode("utf-8")
