@@ -43,12 +43,12 @@ class APIRouter:
                 source_id = parsed_path.split("/")[-1]
                 return self._handle_source_detail(source_id, headers)
 
-            # 5. Live Prediction Endpoint (Matching Teammate Frontend BACKEND_URL: http://127.0.0.1:8000/predict)
-            elif parsed_path in ["/predict", "/api/v1/predict", "/api/v1/classify"] and method == "POST":
-                return self._handle_predict_single(body_data, headers)
+            # 5. Live Prediction Endpoint (Supports GET & POST for /predict)
+            elif parsed_path in ["/predict", "/api/v1/predict", "/api/v1/classify"] and method in ["GET", "POST"]:
+                return self._handle_predict_single(method, query_params, body_data, headers)
 
             # 6. Batch CSV / JSON Classification Upload
-            elif parsed_path in ["/api/v1/classify/batch", "/predict/batch"] and method == "POST":
+            elif parsed_path in ["/api/v1/classify/batch", "/predict/batch"] and method in ["GET", "POST"]:
                 return self._handle_classify_batch(body_data, headers)
 
             # 7. OSM Industrial Infrastructure
@@ -76,7 +76,7 @@ class APIRouter:
                 return 200, headers, json.dumps({"count": len(alerts), "alerts": alerts}).encode("utf-8")
 
             # 11. Trigger NASA FIRMS Sync & Ingestion Pipeline
-            elif parsed_path in ["/api/v1/firms/sync", "/firms/sync"] and method == "POST":
+            elif parsed_path in ["/api/v1/firms/sync", "/firms/sync"] and method in ["GET", "POST"]:
                 return self._handle_firms_sync(query_params, headers)
 
             # 12. Export Report (CSV / JSON) / Served for frontend predictions.csv
@@ -152,23 +152,25 @@ class APIRouter:
             return 404, headers, json.dumps({"error": f"Thermal source {source_id} not found"}).encode("utf-8")
         return 200, headers, json.dumps(source, indent=2).encode("utf-8")
 
-    def _handle_predict_single(self, body_data: bytes, headers: Dict[str, str]) -> Tuple[int, Dict[str, str], bytes]:
+    def _handle_predict_single(self, method: str, query_params: Dict[str, List[str]], body_data: bytes, headers: Dict[str, str]) -> Tuple[int, Dict[str, str], bytes]:
         """
         Main Live Prediction Handler matching teammate frontend (http://127.0.0.1:8000/predict).
-        Supports both single object and nested requests.
+        Supports both GET (with query parameters or default demo) and POST (JSON body).
         """
-        try:
-            body = json.loads(body_data.decode("utf-8")) if body_data else {}
-        except Exception:
-            return 400, headers, json.dumps({"error": "Invalid JSON in request body"}).encode("utf-8")
+        body = {}
+        if method == "POST" and body_data:
+            try:
+                body = json.loads(body_data.decode("utf-8"))
+            except Exception:
+                pass
 
-        lat = float(body.get("latitude") or body.get("lat") or 0.0)
-        lon = float(body.get("longitude") or body.get("lon") or 0.0)
-        frp = float(body.get("frp") or body.get("mean_frp") or 10.0)
-        brightness = float(body.get("brightness") or body.get("mean_brightness") or 335.0)
-        detection_count = int(body.get("detection_count") or body.get("total_detections") or 1)
-        active_days = int(body.get("active_days") or 1)
-        landcover_class = body.get("landcover_class") or body.get("landcover")
+        lat = float(body.get("latitude") or body.get("lat") or query_params.get("latitude", [query_params.get("lat", [29.46148])[0]])[0])
+        lon = float(body.get("longitude") or body.get("lon") or query_params.get("longitude", [query_params.get("lon", [76.86364])[0]])[0])
+        frp = float(body.get("frp") or body.get("mean_frp") or query_params.get("frp", [25.0])[0])
+        brightness = float(body.get("brightness") or body.get("mean_brightness") or query_params.get("brightness", [335.0])[0])
+        detection_count = int(body.get("detection_count") or body.get("total_detections") or query_params.get("detection_count", [1])[0])
+        active_days = int(body.get("active_days") or query_params.get("active_days", [4])[0])
+        landcover_class = body.get("landcover_class") or body.get("landcover") or query_params.get("landcover_class", [None])[0]
 
         facilities = osm_service.get_all_facilities()
         
@@ -204,7 +206,6 @@ class APIRouter:
             frp, frp, active_days, detection_count
         )
 
-        # Full response compatible with both frontend app.js and REST API standards
         response = {
             "source_id": body.get("source_id", f"PRED_{int(lat*1000)}_{int(lon*1000)}"),
             "latitude": lat,
@@ -339,7 +340,6 @@ class APIRouter:
         if fmt == "json":
             return 200, headers, json.dumps({"count": len(sources), "report": sources}, indent=2).encode("utf-8")
 
-        # CSV format export matching exact predictions.csv structure
         output = io.StringIO()
         fieldnames = [
             "source_id", "latitude", "longitude", "nearest_refinery_km", "nearest_powerplant_km",
@@ -374,7 +374,7 @@ class APIRouter:
             },
             "paths": {
                 "/api/v1/health": {"get": {"summary": "Health check & model status"}},
-                "/predict": {"post": {"summary": "Live AI Prediction endpoint matching teammate frontend"}},
+                "/predict": {"get": {"summary": "Live AI Prediction endpoint"}, "post": {"summary": "Live AI Prediction endpoint matching teammate frontend"}},
                 "/api/v1/sources": {"get": {"summary": "List thermal sources with filters"}},
                 "/api/v1/sources/geojson": {"get": {"summary": "Direct RFC 7946 GeoJSON map overlay"}},
                 "/api/v1/classify": {"post": {"summary": "On-demand real-time coordinate classification"}},

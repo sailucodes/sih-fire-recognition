@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query, Body, HTTPException
+from fastapi import FastAPI, Query, Body, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, Response
 from pathlib import Path
@@ -49,17 +49,25 @@ async def health_check():
         "osm_facilities_indexed": len(osm_service.facilities)
     }
 
+@app.get("/predict")
 @app.post("/predict")
+@app.get("/api/v1/predict")
 @app.post("/api/v1/predict")
 @app.post("/api/v1/classify")
-async def predict_point(payload: Dict[str, Any] = Body(...)):
-    lat = float(payload.get("latitude") or payload.get("lat") or 0.0)
-    lon = float(payload.get("longitude") or payload.get("lon") or 0.0)
-    frp = float(payload.get("frp") or payload.get("mean_frp") or 10.0)
-    brightness = float(payload.get("brightness") or payload.get("mean_brightness") or 335.0)
-    active_days = int(payload.get("active_days") or 1)
-    detection_count = int(payload.get("detection_count") or payload.get("total_detections") or 1)
-    landcover_class = payload.get("landcover_class") or payload.get("landcover")
+async def predict_point(request: Request, payload: Optional[Dict[str, Any]] = Body(None)):
+    if payload is None:
+        payload = {}
+    
+    # Check query params if GET request
+    q_params = dict(request.query_params)
+    
+    lat = float(payload.get("latitude") or payload.get("lat") or q_params.get("latitude") or q_params.get("lat") or 29.46148)
+    lon = float(payload.get("longitude") or payload.get("lon") or q_params.get("longitude") or q_params.get("lon") or 76.86364)
+    frp = float(payload.get("frp") or payload.get("mean_frp") or q_params.get("frp") or 25.0)
+    brightness = float(payload.get("brightness") or payload.get("mean_brightness") or q_params.get("brightness") or 335.0)
+    active_days = int(payload.get("active_days") or q_params.get("active_days") or 4)
+    detection_count = int(payload.get("detection_count") or payload.get("total_detections") or q_params.get("detection_count") or 1)
+    landcover_class = payload.get("landcover_class") or payload.get("landcover") or q_params.get("landcover_class")
 
     facilities = osm_service.get_all_facilities()
     features = extract_features_for_point(
@@ -143,24 +151,3 @@ async def get_predictions_csv():
     for s in sources:
         writer.writerow(s)
     return Response(content=output.getvalue(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=predictions.csv"})
-
-@app.get("/api/v1/sources")
-async def list_sources(event_type: Optional[str] = None, min_frp: Optional[float] = None, limit: int = 200):
-    sources = storage_service.list_sources(event_type=event_type, min_frp=min_frp, limit=limit)
-    return {"count": len(sources), "sources": sources}
-
-@app.get("/api/v1/sources/geojson")
-async def get_sources_geojson(event_type: Optional[str] = None, min_frp: Optional[float] = None):
-    return storage_service.get_geojson(event_type=event_type, min_frp=min_frp)
-
-@app.get("/api/v1/infrastructure/geojson")
-async def get_infrastructure_geojson():
-    return osm_service.get_geojson()
-
-@app.get("/api/v1/analytics/summary")
-async def get_analytics_summary():
-    return storage_service.get_analytics_summary()
-
-@app.get("/api/v1/alerts")
-async def get_alerts():
-    return {"alerts": storage_service.get_alerts()}
