@@ -1,4 +1,4 @@
-﻿import os
+import os
 import pandas as pd
 from pathlib import Path
 from typing import List, Dict, Any, Optional
@@ -8,14 +8,15 @@ from app.core.anomaly_detector import evaluate_thermal_risk
 from app.services.osm_service import osm_service
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
-CSV_PATH = BASE_DIR / "data" / "event_classification_features.csv"
+CSV_PATH = BASE_DIR / "data" / "predictions.csv"
+if not os.path.exists(CSV_PATH):
+    CSV_PATH = BASE_DIR / "data" / "event_classification_features.csv"
 
-# Category color mapping for Map overlays
 CATEGORY_COLOR_MAP = {
-    "Industrial": "#e63946",       # Bright Red / Orange-Red for Industrial
-    "Forest/Natural": "#2a9d8f",   # Teal / Forest Green for Wildfires
-    "Agricultural": "#e76f51",     # Amber / Terracotta for Crop Residue
-    "Other": "#457b9d"             # Slate Blue for Other/Urban
+    "Industrial": "#e63946",
+    "Forest/Natural": "#2a9d8f",
+    "Agricultural": "#e76f51",
+    "Other": "#457b9d"
 }
 
 class ThermalStorageService:
@@ -25,7 +26,6 @@ class ThermalStorageService:
         self._initialize_database()
 
     def _initialize_database(self):
-        """Load and enrich baseline thermal sources from dataset."""
         if not os.path.exists(CSV_PATH):
             print(f"Notice: CSV data file {CSV_PATH} not found yet.")
             return
@@ -42,34 +42,47 @@ class ThermalStorageService:
             
             mean_frp = float(row.get("mean_frp", 5.0) or 5.0)
             max_frp = float(row.get("max_frp", mean_frp) or mean_frp)
+            mean_bright = float(row.get("mean_brightness", 330.0) or 330.0)
+            max_bright = float(row.get("max_brightness", mean_bright) or mean_bright)
+            
             active_days = int(row.get("active_days", 1) or 1)
             total_detections = int(row.get("total_detections", 1) or 1)
             min_dist_ind = float(row.get("min_distance_to_industry_km", 20.0) or 20.0)
+            conf_pct = float(row.get("confidence_pct", 85.0) or 85.0)
             
             risk_level, is_flare_anomaly, risk_desc = evaluate_thermal_risk(
                 pred_event_type, min_dist_ind, mean_frp, max_frp, active_days, total_detections
             )
+
+            # SIH Alert Rule matching teammate app.js
+            if pred_event_type == "Industrial" and conf_pct >= 80.0:
+                sih_alert = "HIGH"
+            elif pred_event_type == "Industrial" and conf_pct >= 60.0:
+                sih_alert = "MEDIUM"
+            else:
+                sih_alert = "LOW"
             
-            # Find closest facility name
             nearest_fac_name = "Industrial Facility"
             for fac in facilities:
                 if haversine_distance(lat, lon, fac["latitude"], fac["longitude"]) <= min_dist_ind + 0.5:
                     nearest_fac_name = fac["name"]
                     break
 
-            confidence_pct = 96.5 if pred_event_type == event_type else 84.0
-            
             source_obj = {
                 "source_id": s_id,
                 "latitude": lat,
                 "longitude": lon,
                 "event_type": event_type,
                 "predicted_event_type": pred_event_type,
-                "confidence_pct": confidence_pct,
+                "confidence": conf_pct,
+                "confidence_pct": conf_pct,
+                "sih_alert_severity": sih_alert,
                 "total_detections": total_detections,
                 "active_days": active_days,
                 "mean_frp": round(mean_frp, 2),
                 "max_frp": round(max_frp, 2),
+                "mean_brightness": round(mean_bright, 2),
+                "max_brightness": round(max_bright, 2),
                 "nearest_facility_type": str(row.get("nearest_facility_type", "industrial_area")),
                 "nearest_facility_name": nearest_fac_name,
                 "min_distance_to_industry_km": round(min_dist_ind, 2),
@@ -77,6 +90,8 @@ class ThermalStorageService:
                 "nearest_powerplant_km": round(float(row.get("nearest_powerplant_km", 50.0) or 50.0), 2),
                 "nearest_mine_km": round(float(row.get("nearest_mine_km", 50.0) or 50.0), 2),
                 "nearest_industrial_area_km": round(float(row.get("nearest_industrial_area_km", 50.0) or 50.0), 2),
+                "mean_industrial_facilities_1km": int(row.get("mean_industrial_facilities_1km", 0) or 0),
+                "mean_industrial_facilities_5km": int(row.get("mean_industrial_facilities_5km", 0) or 0),
                 "landcover_class": str(row.get("landcover_class", "Built-up")),
                 "first_detection": str(row.get("first_detection", "2026-08-19 00:00:00+00:00")),
                 "last_detection": str(row.get("last_detection", "2026-08-25 00:00:00+00:00")),
@@ -89,8 +104,7 @@ class ThermalStorageService:
             
             self.sources[s_id] = source_obj
             
-            # Generate alerts for High/Critical risks
-            if risk_level in ["Critical", "High"]:
+            if sih_alert in ["HIGH", "MEDIUM"]:
                 self.alerts.append({
                     "alert_id": f"ALERT_{len(self.alerts) + 1:04d}",
                     "source_id": s_id,
@@ -98,10 +112,12 @@ class ThermalStorageService:
                     "latitude": lat,
                     "longitude": lon,
                     "event_type": pred_event_type,
-                    "severity": risk_level.upper(),
-                    "title": f"High Risk Thermal Anomaly at {nearest_fac_name}",
+                    "confidence": conf_pct,
+                    "confidence_pct": conf_pct,
+                    "severity": sih_alert,
+                    "title": f"{sih_alert} Alert: Industrial Thermal Anomaly near {nearest_fac_name}",
                     "message": risk_desc,
-                    "facility_context": f"{source_obj['nearest_facility_type'].title()} ({min_dist_ind:.2f} km away), Max FRP: {max_frp:.1f} MW"
+                    "facility_context": f"{source_obj['nearest_facility_type'].title()} ({min_dist_ind:.2f} km away), FRP: {max_frp:.1f} MW"
                 })
 
         print(f"[OK] In-Memory GIS Storage ready: {len(self.sources)} thermal sources loaded, {len(self.alerts)} active alerts.")
@@ -119,9 +135,8 @@ class ThermalStorageService:
         min_lon: Optional[float] = None,
         max_lat: Optional[float] = None,
         max_lon: Optional[float] = None,
-        limit: int = 200
+        limit: int = 1000
     ) -> List[Dict[str, Any]]:
-        """Filter thermal sources with spatial and attribute criteria."""
         results = []
         for s in self.sources.values():
             if event_type and s["predicted_event_type"].lower() != event_type.lower():
@@ -151,7 +166,6 @@ class ThermalStorageService:
         max_lat: Optional[float] = None,
         max_lon: Optional[float] = None
     ) -> Dict[str, Any]:
-        """Generate GeoJSON FeatureCollection for Map Overlays."""
         filtered = self.list_sources(
             event_type=event_type,
             min_frp=min_frp,
@@ -176,9 +190,13 @@ class ThermalStorageService:
                     "source_id": s["source_id"],
                     "event_type": s["event_type"],
                     "predicted_event_type": s["predicted_event_type"],
+                    "confidence": s["confidence_pct"],
                     "confidence_pct": s["confidence_pct"],
+                    "sih_alert_severity": s["sih_alert_severity"],
                     "mean_frp": s["mean_frp"],
                     "max_frp": s["max_frp"],
+                    "mean_brightness": s["mean_brightness"],
+                    "max_brightness": s["max_brightness"],
                     "active_days": s["active_days"],
                     "total_detections": s["total_detections"],
                     "is_persistent": s["is_persistent"],
@@ -201,14 +219,13 @@ class ThermalStorageService:
         }
 
     def get_analytics_summary(self) -> Dict[str, Any]:
-        """Calculate statistical summaries across all thermal sources."""
         total = len(self.sources)
         if total == 0:
             return {}
 
         counts = defaultdict(int)
         persistent_count = 0
-        high_risk_count = 0
+        high_risk_count = len(self.alerts)
         all_mean_frps = []
         all_max_frps = []
 
@@ -217,8 +234,6 @@ class ThermalStorageService:
             counts[cat] += 1
             if s["is_persistent"]:
                 persistent_count += 1
-            if s["risk_level"] in ["Critical", "High"]:
-                high_risk_count += 1
             all_mean_frps.append(s["mean_frp"])
             all_max_frps.append(s["max_frp"])
 
@@ -239,9 +254,7 @@ class ThermalStorageService:
         }
 
     def get_timeline(self) -> List[Dict[str, Any]]:
-        """Get daily aggregate distribution of events."""
         timeline_dict = defaultdict(lambda: {"Industrial": 0, "Forest/Natural": 0, "Agricultural": 0, "Other": 0, "total_frp": 0.0})
-        
         for s in self.sources.values():
             d_str = s["last_detection"][:10]
             cat = s["predicted_event_type"]
@@ -271,5 +284,4 @@ class ThermalStorageService:
         self.sources[s_id] = source_obj
         return s_id
 
-# Global singleton
 storage_service = ThermalStorageService()
