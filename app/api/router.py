@@ -26,74 +26,45 @@ class APIRouter:
         parsed_path = path.rstrip("/")
 
         try:
-            # 1. Health Check
             if parsed_path == "/api/v1/health" and method == "GET":
                 return self._handle_health(headers)
-
-            # 2. Thermal Sources Listing (JSON)
             elif parsed_path in ["/api/v1/sources", "/sources"] and method == "GET":
                 return self._handle_list_sources(query_params, headers)
-
-            # 3. Direct GeoJSON Map Overlay
             elif parsed_path in ["/api/v1/sources/geojson", "/geojson"] and method == "GET":
                 return self._handle_sources_geojson(query_params, headers)
-
-            # 4. Single Thermal Source Detail
             elif parsed_path.startswith("/api/v1/sources/") and method == "GET":
                 source_id = parsed_path.split("/")[-1]
                 return self._handle_source_detail(source_id, headers)
-
-            # 5. Live Prediction Endpoint (Supports GET & POST for /predict)
             elif parsed_path in ["/predict", "/api/v1/predict", "/api/v1/classify"] and method in ["GET", "POST"]:
                 return self._handle_predict_single(method, query_params, body_data, headers)
-
-            # 6. Batch CSV / JSON Classification Upload
             elif parsed_path in ["/api/v1/classify/batch", "/predict/batch"] and method in ["GET", "POST"]:
                 return self._handle_classify_batch(body_data, headers)
-
-            # 7. OSM Industrial Infrastructure
             elif parsed_path in ["/api/v1/infrastructure", "/infrastructure"] and method == "GET":
                 data = osm_service.get_all_facilities()
                 return 200, headers, json.dumps({"count": len(data), "facilities": data}).encode("utf-8")
-
             elif parsed_path in ["/api/v1/infrastructure/geojson", "/infrastructure/geojson"] and method == "GET":
                 geojson = osm_service.get_geojson()
                 return 200, headers, json.dumps(geojson).encode("utf-8")
-
-            # 8. Analytics & KPI Summary
             elif parsed_path in ["/api/v1/analytics/summary", "/analytics"] and method == "GET":
                 stats = storage_service.get_analytics_summary()
                 return 200, headers, json.dumps(stats).encode("utf-8")
-
-            # 9. Time-Series Timeline Breakdown
             elif parsed_path in ["/api/v1/analytics/timeline", "/timeline"] and method == "GET":
                 timeline = storage_service.get_timeline()
                 return 200, headers, json.dumps({"timeline": timeline}).encode("utf-8")
-
-            # 10. Risk Alerts
             elif parsed_path in ["/api/v1/alerts", "/alerts"] and method == "GET":
                 alerts = storage_service.get_alerts()
                 return 200, headers, json.dumps({"count": len(alerts), "alerts": alerts}).encode("utf-8")
-
-            # 11. Trigger NASA FIRMS Sync & Ingestion Pipeline
             elif parsed_path in ["/api/v1/firms/sync", "/firms/sync"] and method in ["GET", "POST"]:
                 return self._handle_firms_sync(query_params, headers)
-
-            # 12. Export Report (CSV / JSON) / Served for frontend predictions.csv
             elif parsed_path in ["/api/v1/export/report", "/predictions.csv"] and method == "GET":
                 return self._handle_export_report(query_params, headers)
-
-            # 13. OpenAPI Specification
             elif parsed_path == "/api/v1/openapi.json" and method == "GET":
                 return self._handle_openapi(headers)
-
             else:
                 return 404, headers, json.dumps({"error": "Endpoint not found", "path": path}).encode("utf-8")
 
         except Exception as e:
             return 500, headers, json.dumps({"error": str(e)}).encode("utf-8")
-
-    # ---------------- HANDLERS ---------------- #
 
     def _handle_health(self, headers: Dict[str, str]) -> Tuple[int, Dict[str, str], bytes]:
         data = {
@@ -135,14 +106,8 @@ class APIRouter:
         max_lon = float(query_params.get("max_lon", [0])[0]) if "max_lon" in query_params else None
 
         geojson = storage_service.get_geojson(
-            event_type=event_type,
-            min_frp=min_frp,
-            is_persistent=is_persistent,
-            risk_level=risk_level,
-            min_lat=min_lat,
-            min_lon=min_lon,
-            max_lat=max_lat,
-            max_lon=max_lon
+            event_type=event_type, min_frp=min_frp, is_persistent=is_persistent,
+            risk_level=risk_level, min_lat=min_lat, min_lon=min_lon, max_lat=max_lat, max_lon=max_lon
         )
         return 200, headers, json.dumps(geojson).encode("utf-8")
 
@@ -153,10 +118,6 @@ class APIRouter:
         return 200, headers, json.dumps(source, indent=2).encode("utf-8")
 
     def _handle_predict_single(self, method: str, query_params: Dict[str, List[str]], body_data: bytes, headers: Dict[str, str]) -> Tuple[int, Dict[str, str], bytes]:
-        """
-        Main Live Prediction Handler matching teammate frontend (http://127.0.0.1:8000/predict).
-        Supports both GET (with query parameters or default demo) and POST (JSON body).
-        """
         body = {}
         if method == "POST" and body_data:
             try:
@@ -166,32 +127,48 @@ class APIRouter:
 
         lat = float(body.get("latitude") or body.get("lat") or query_params.get("latitude", [query_params.get("lat", [29.46148])[0]])[0])
         lon = float(body.get("longitude") or body.get("lon") or query_params.get("longitude", [query_params.get("lon", [76.86364])[0]])[0])
-        frp = float(body.get("frp") or body.get("mean_frp") or query_params.get("frp", [25.0])[0])
-        brightness = float(body.get("brightness") or body.get("mean_brightness") or query_params.get("brightness", [335.0])[0])
-        detection_count = int(body.get("detection_count") or body.get("total_detections") or query_params.get("detection_count", [1])[0])
-        active_days = int(body.get("active_days") or query_params.get("active_days", [4])[0])
-        landcover_class = body.get("landcover_class") or body.get("landcover") or query_params.get("landcover_class", [None])[0]
+        mean_frp = float(body.get("mean_frp") or body.get("frp") or query_params.get("mean_frp", [query_params.get("frp", [25.0])[0]])[0])
+        max_frp = float(body.get("max_frp") or mean_frp)
+        mean_bright = float(body.get("mean_brightness") or body.get("brightness") or 330.0)
+        max_bright = float(body.get("max_brightness") or mean_bright)
+        
+        detection_count = int(body.get("total_detections") or body.get("detection_count") or 1)
+        active_days = int(body.get("active_days") or 1)
+        obs_span = int(body.get("observation_span") or body.get("observation_span_days") or 1)
+        
+        fac_type = body.get("nearest_facility_type")
+        if fac_type:
+            fac_type = fac_type.lower().replace(" ", "_")
+            
+        dist_industry = body.get("distance_to_nearest_industry") or body.get("min_distance_to_industry_km")
+        dist_industry = float(dist_industry) if dist_industry is not None else None
+
+        fac_1km = body.get("industrial_facilities_1km") or body.get("facilities_1km")
+        fac_1km = int(fac_1km) if fac_1km is not None else None
+
+        fac_5km = body.get("industrial_facilities_5km") or body.get("facilities_5km")
+        fac_5km = int(fac_5km) if fac_5km is not None else None
+
+        landcover_class = body.get("landcover_class") or body.get("landcover")
 
         facilities = osm_service.get_all_facilities()
         
-        # 1. Feature Engineering
         features = extract_features_for_point(
-            lat=lat,
-            lon=lon,
-            frp=frp,
-            brightness=brightness,
-            detection_count=detection_count,
-            active_days=active_days,
-            facilities=facilities,
-            landcover_class=landcover_class
+            lat=lat, lon=lon, frp=mean_frp, max_frp=max_frp,
+            brightness=mean_bright, max_brightness=max_bright,
+            detection_count=detection_count, active_days=active_days,
+            facilities=facilities, landcover_class=landcover_class,
+            observation_span_days=obs_span,
+            override_nearest_type=fac_type,
+            override_min_dist=dist_industry,
+            facilities_1km=fac_1km,
+            facilities_5km=fac_5km
         )
 
-        # 2. AI Inference
         pred_res = ml_engine.predict_single(features)
         conf = pred_res["confidence_pct"]
         pred_type = pred_res["predicted_event_type"]
 
-        # 3. SIH Alert Level Rule (Matching teammate app.js ALERT_RULES: Industrial + >=80 -> HIGH, >=60 -> MEDIUM)
         if pred_type == "Industrial" and conf >= 80.0:
             sih_alert_severity = "HIGH"
         elif pred_type == "Industrial" and conf >= 60.0:
@@ -199,11 +176,9 @@ class APIRouter:
         else:
             sih_alert_severity = "LOW"
 
-        # 4. Anomaly & Risk Assessment
         risk_level, is_flare_anomaly, risk_desc = evaluate_thermal_risk(
-            pred_type,
-            features["min_distance_to_industry_km"],
-            frp, frp, active_days, detection_count
+            pred_type, features["min_distance_to_industry_km"],
+            mean_frp, max_frp, active_days, detection_count
         )
 
         response = {
@@ -249,7 +224,6 @@ class APIRouter:
 
         facilities = osm_service.get_all_facilities()
         results = []
-
         for item in items:
             lat = float(item.get("latitude", 0.0))
             lon = float(item.get("longitude", 0.0))
@@ -269,7 +243,6 @@ class APIRouter:
                 features["min_distance_to_industry_km"],
                 frp, frp, active_days, total_detections
             )
-
             results.append({
                 "source_id": item.get("source_id", "ANON_SOURCE"),
                 "latitude": lat,
@@ -281,7 +254,6 @@ class APIRouter:
                 "nearest_facility": features["nearest_facility_name"],
                 "min_distance_km": features["min_distance_to_industry_km"]
             })
-
         return 200, headers, json.dumps({"total_processed": len(results), "results": results}).encode("utf-8")
 
     def _handle_firms_sync(self, query_params: Dict[str, List[str]], headers: Dict[str, str]) -> Tuple[int, Dict[str, str], bytes]:
@@ -295,18 +267,13 @@ class APIRouter:
 
         for c in clustered_sources:
             features = extract_features_for_point(
-                lat=c["latitude"],
-                lon=c["longitude"],
-                frp=c["mean_frp"],
-                detection_count=c["total_detections"],
-                active_days=c["active_days"],
-                facilities=facilities,
-                observation_span_days=c["observation_span_days"]
+                lat=c["latitude"], lon=c["longitude"], frp=c["mean_frp"],
+                detection_count=c["total_detections"], active_days=c["active_days"],
+                facilities=facilities, observation_span_days=c["observation_span_days"]
             )
             pred_res = ml_engine.predict_single(features)
             risk_level, is_flare_anomaly, risk_desc = evaluate_thermal_risk(
-                pred_res["predicted_event_type"],
-                features["min_distance_to_industry_km"],
+                pred_res["predicted_event_type"], features["min_distance_to_industry_km"],
                 c["mean_frp"], c["max_frp"], c["active_days"], c["total_detections"]
             )
 
