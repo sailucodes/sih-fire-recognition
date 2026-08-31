@@ -1,0 +1,11 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+.vscode/
+.idea/
+.ipynb_checkpoints/
+*.log
+scratch_train.py

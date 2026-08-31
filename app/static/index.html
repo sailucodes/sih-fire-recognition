@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AeroThermal AI | Industrial Fire & Thermal Source Monitoring</title>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --panel-bg: rgba(30, 41, 59, 0.85);
+      --border-color: rgba(255, 255, 255, 0.1);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --industrial-color: #ef4444;
+      --forest-color: #10b981;
+      --agri-color: #f59e0b;
+      --other-color: #6366f1;
+      --accent: #38bdf8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', sans-serif;
+    }
+
+    body, html {
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      background: var(--bg-dark);
+      color: var(--text-main);
+    }
+
+    #app-container {
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* Sidebar */
+    #sidebar {
+      width: 420px;
+      height: 100%;
+      background: var(--panel-bg);
+      backdrop-filter: blur(16px);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      z-index: 1000;
+      box-shadow: 4px 0 24px rgba(0,0,0,0.5);
+    }
+
+    .header-bar {
+      padding: 20px;
+      border-bottom: 1px solid var(--border-color);
+      background: rgba(15, 23, 42, 0.6);
+    }
+
+    .logo-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      font-size: 24px;
+      color: #f97316;
+      background: rgba(249, 115, 22, 0.15);
+      padding: 10px;
+      border-radius: 12px;
+      border: 1px solid rgba(249, 115, 22, 0.3);
+    }
+
+    .logo-title h1 {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .logo-title p {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      padding: 15px 20px;
+      background: rgba(15, 23, 42, 0.4);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .metric-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+
+    .metric-card .label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .metric-card .value {
+      font-size: 18px;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+
+    .metric-industrial { color: var(--industrial-color); }
+    .metric-forest { color: var(--forest-color); }
+    .metric-agri { color: var(--agri-color); }
+    .metric-alerts { color: #f43f5e; }
+
+    /* Scrollable Section */
+    .sidebar-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+    }
+
+    .sidebar-content::-webkit-scrollbar {
+      width: 6px;
+    }
+    .sidebar-content::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.15);
+      border-radius: 3px;
+    }
+
+    .section-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Filters */
+    .filter-group {
+      margin-bottom: 20px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 14px;
+    }
+
+    .checkbox-row {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .badge-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .slider-row {
+      margin-top: 12px;
+    }
+
+    .slider-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    input[type=range] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    /* Inspection Card */
+    #inspection-card {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 20px;
+      display: none;
+    }
+
+    .inspection-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .tag-badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 8px;
+      border-radius: 6px;
+      text-transform: uppercase;
+    }
+
+    .tag-industrial { background: rgba(239, 68, 68, 0.2); color: var(--industrial-color); border: 1px solid var(--industrial-color); }
+    .tag-forest { background: rgba(16, 185, 129, 0.2); color: var(--forest-color); border: 1px solid var(--forest-color); }
+    .tag-agri { background: rgba(245, 158, 11, 0.2); color: var(--agri-color); border: 1px solid var(--agri-color); }
+    .tag-other { background: rgba(99, 102, 241, 0.2); color: var(--other-color); border: 1px solid var(--other-color); }
+
+    .data-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      font-size: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .data-row .key { color: var(--text-muted); }
+    .data-row .val { font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+
+    /* Action Buttons */
+    .btn-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 15px;
+    }
+
+    .btn {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #0284c7, #0369a1);
+      border: none;
+      grid-column: span 2;
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #0369a1, #075985);
+    }
+
+    /* Map container */
+    #map {
+      flex: 1;
+      height: 100%;
+      width: 100%;
+      background: #090d16;
+    }
+
+    /* Map Legend */
+    .map-legend {
+      position: absolute;
+      bottom: 24px;
+      right: 24px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 14px 18px;
+      z-index: 1000;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+
+    .map-legend h4 {
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    /* AI Test Modal */
+    #classify-modal {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #1e293b;
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 24px;
+      width: 480px;
+      z-index: 2000;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+      display: none;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px);
+      z-index: 1999;
+      display: none;
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .form-group input {
+      width: 100%;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: #fff;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="app-container">
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <div class="header-bar">
+      <div class="logo-title">
+        <i class="fa-solid fa-fire-flame-curved logo-icon"></i>
+        <div>
+          <h1>AeroThermal AI</h1>
+          <p>NASA FIRMS + OSM Industrial Fire Classifier</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Metrics KPI Grid -->
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="label">Industrial Fires</div>
+        <div class="value metric-industrial" id="kpi-industrial">--</div>
+      </div>
+      <div class="metric-card">
+        <div class="label">Forest / Natural</div>
+        <div class="value metric-forest" id="kpi-forest">--</div>
+      </div>
+      <div class="metric-card">
+        <div class="label">Agricultural Burn</div>
+        <div class="value metric-agri" id="kpi-agri">--</div>
+      </div>
+      <div class="metric-card">
+        <div class="label">Risk Alerts</div>
+        <div class="value metric-alerts" id="kpi-alerts">--</div>
+      </div>
+    </div>
+
+    <!-- Sidebar Content -->
+    <div class="sidebar-content">
+      <!-- Inspector Card -->
+      <div id="inspection-card">
+        <div class="inspection-header">
+          <span style="font-weight: 700; font-size: 14px;" id="ins-id">SOURCE_0001</span>
+          <span class="tag-badge" id="ins-badge">Industrial</span>
+        </div>
+        <div class="data-row">
+          <span class="key">AI Confidence</span>
+          <span class="val" id="ins-conf">98.5%</span>
+        </div>
+        <div class="data-row">
+          <span class="key">Nearest Facility</span>
+          <span class="val" id="ins-fac-name">Panipat Refinery</span>
+        </div>
+        <div class="data-row">
+          <span class="key">Facility Distance</span>
+          <span class="val" id="ins-fac-dist">0.15 km</span>
+        </div>
+        <div class="data-row">
+          <span class="key">Peak FRP</span>
+          <span class="val" id="ins-frp">18.5 MW</span>
+        </div>
+        <div class="data-row">
+          <span class="key">Persistence</span>
+          <span class="val" id="ins-persist">5 Active Days</span>
+        </div>
+        <div class="data-row">
+          <span class="key">Hazard Risk</span>
+          <span class="val" id="ins-risk" style="color: #f87171;">Monitored Flaring</span>
+        </div>
+        <div style="margin-top: 10px; font-size: 11px; color: #94a3b8; background: rgba(255,255,255,0.04); padding: 8px; border-radius: 6px;" id="ins-expl">
+          Located within 0.15 km of refinery flare stack with 5 recurring detections.
+        </div>
+      </div>
+
+      <!-- Filter Controls -->
+      <div class="section-title">
+        <span>Map Overlay Filters</span>
+        <i class="fa-solid fa-sliders"></i>
+      </div>
+      <div class="filter-group">
+        <div class="checkbox-row">
+          <label class="checkbox-label">
+            <input type="checkbox" id="flt-industrial" checked onchange="reloadLayers()">
+            <span class="badge-dot" style="background: var(--industrial-color);"></span>
+            <span>Industrial Fires & Flaring</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="flt-forest" checked onchange="reloadLayers()">
+            <span class="badge-dot" style="background: var(--forest-color);"></span>
+            <span>Forest / Natural Wildfires</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="flt-agri" checked onchange="reloadLayers()">
+            <span class="badge-dot" style="background: var(--agri-color);"></span>
+            <span>Agricultural Stubble Burning</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="flt-other" checked onchange="reloadLayers()">
+            <span class="badge-dot" style="background: var(--other-color);"></span>
+            <span>Other / Unclassified</span>
+          </label>
+          <label class="checkbox-label" style="margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border-color);">
+            <input type="checkbox" id="flt-osm" checked onchange="toggleOSMLayer()">
+            <i class="fa-solid fa-industry" style="color: #a855f7;"></i>
+            <span>OSM Industrial Landmarks</span>
+          </label>
+        </div>
+
+        <div class="slider-row">
+          <div class="slider-label">
+            <span style="color: var(--text-muted);">Min Radiative Power (FRP):</span>
+            <span id="frp-val" style="font-weight: 600;">0 MW</span>
+          </div>
+          <input type="range" id="frp-slider" min="0" max="50" value="0" oninput="document.getElementById('frp-val').innerText = this.value + ' MW'; reloadLayers();">
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="section-title">
+        <span>Backend Actions & Tools</span>
+        <i class="fa-solid fa-bolt"></i>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="openClassifyModal()">
+          <i class="fa-solid fa-microchip"></i> Test AI Classifier on Custom Coords
+        </button>
+        <button class="btn" onclick="syncNASAData()">
+          <i class="fa-solid fa-satellite"></i> Ingest Live NASA FIRMS
+        </button>
+        <button class="btn" onclick="downloadReport()">
+          <i class="fa-solid fa-file-csv"></i> Export GIS Report
+        </button>
+        <button class="btn" style="grid-column: span 2;" onclick="window.open('/docs', '_blank')">
+          <i class="fa-solid fa-book"></i> Interactive Swagger API Docs
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaflet Map -->
+  <div id="map"></div>
+
+  <!-- Legend -->
+  <div class="map-legend">
+    <h4>Overlay Legend</h4>
+    <div class="legend-item"><span class="badge-dot" style="background: var(--industrial-color);"></span> Industrial Thermal Anomaly</div>
+    <div class="legend-item"><span class="badge-dot" style="background: var(--forest-color);"></span> Forest / Natural Fire</div>
+    <div class="legend-item"><span class="badge-dot" style="background: var(--agri-color);"></span> Agricultural Stubble Fire</div>
+    <div class="legend-item"><span class="badge-dot" style="background: var(--other-color);"></span> Other / Urban Source</div>
+    <div class="legend-item"><i class="fa-solid fa-industry" style="color: #a855f7; font-size: 11px;"></i> OSM Industrial Facility</div>
+  </div>
+</div>
+
+<!-- On-demand Classification Modal -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeClassifyModal()"></div>
+<div id="classify-modal">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+    <h3 style="font-size: 16px; font-weight: 700;"><i class="fa-solid fa-microchip" style="color: var(--accent);"></i> Real-Time AI Fire Classifier</h3>
+    <i class="fa-solid fa-xmark" style="cursor: pointer;" onclick="closeClassifyModal()"></i>
+  </div>
+  <div class="form-group">
+    <label>Latitude:</label>
+    <input type="number" id="test-lat" step="0.0001" value="22.3423">
+  </div>
+  <div class="form-group">
+    <label>Longitude:</label>
+    <input type="number" id="test-lon" step="0.0001" value="69.8711">
+  </div>
+  <div class="form-group">
+    <label>Fire Radiative Power (MW):</label>
+    <input type="number" id="test-frp" step="0.1" value="18.5">
+  </div>
+  <div class="form-group">
+    <label>Recurring Active Days:</label>
+    <input type="number" id="test-days" value="4">
+  </div>
+  <button class="btn btn-primary" style="margin-top: 10px; width: 100%;" onclick="runRealtimeClassification()">
+    <i class="fa-solid fa-play"></i> Run M3 AI Classification
+  </button>
+  <div id="modal-result" style="margin-top: 16px; padding: 12px; background: rgba(0,0,0,0.3); border-radius: 8px; font-size: 12px; display: none;"></div>
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+  let map, sourcesLayerGroup, osmLayerGroup;
+  let allFeatures = [];
+
+  function initMap() {
+    map = L.map('map', { zoomControl: false }).setView([22.5937, 78.9629], 5);
+    L.control.zoom({ position: 'topright' }).addTo(map);
+
+    // Dark Matter tile layer
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap &copy; CARTO &copy; NASA FIRMS',
+      maxZoom: 19
+    }).addTo(map);
+
+    sourcesLayerGroup = L.layerGroup().addTo(map);
+    osmLayerGroup = L.layerGroup().addTo(map);
+
+    loadAnalyticsSummary();
+    loadSourcesGeoJSON();
+    loadOSMInfrastructure();
+
+    // Click map to copy coords to test modal
+    map.on('click', function(e) {
+      document.getElementById('test-lat').value = e.latlng.lat.toFixed(5);
+      document.getElementById('test-lon').value = e.latlng.lng.toFixed(5);
+    });
+  }
+
+  async function loadAnalyticsSummary() {
+    try {
+      const res = await fetch('/api/v1/analytics/summary');
+      const data = await res.json();
+      document.getElementById('kpi-industrial').innerText = data.industrial_sources + ` (${data.industrial_percentage}%)`;
+      document.getElementById('kpi-forest').innerText = data.forest_natural_sources + ` (${data.forest_percentage}%)`;
+      document.getElementById('kpi-agri').innerText = data.agricultural_sources + ` (${data.agricultural_percentage}%)`;
+      document.getElementById('kpi-alerts').innerText = data.high_risk_anomalies_count;
+    } catch(e) { console.error(e); }
+  }
+
+  async function loadSourcesGeoJSON() {
+    try {
+      const res = await fetch('/api/v1/sources/geojson');
+      const geojson = await res.json();
+      allFeatures = geojson.features || [];
+      renderSources(allFeatures);
+    } catch(e) { console.error(e); }
+  }
+
+  function renderSources(features) {
+    sourcesLayerGroup.clearLayers();
+    const showInd = document.getElementById('flt-industrial').checked;
+    const showForest = document.getElementById('flt-forest').checked;
+    const showAgri = document.getElementById('flt-agri').checked;
+    const showOther = document.getElementById('flt-other').checked;
+    const minFrp = parseFloat(document.getElementById('frp-slider').value) || 0;
+
+    features.forEach(f => {
+      const p = f.properties;
+      const type = p.predicted_event_type;
+
+      if (type === 'Industrial' && !showInd) return;
+      if (type === 'Forest/Natural' && !showForest) return;
+      if (type === 'Agricultural' && !showAgri) return;
+      if (type === 'Other' && !showOther) return;
+      if (p.max_frp < minFrp) return;
+
+      const [lon, lat] = f.geometry.coordinates;
+      const marker = L.circleMarker([lat, lon], {
+        radius: p.marker_radius || 8,
+        fillColor: p.marker_color || '#ef4444',
+        color: '#ffffff',
+        weight: 1.5,
+        opacity: 0.9,
+        fillOpacity: 0.75
+      });
+
+      marker.on('click', () => inspectSource(p));
+      sourcesLayerGroup.addLayer(marker);
+    });
+  }
+
+  function inspectSource(p) {
+    document.getElementById('inspection-card').style.display = 'block';
+    document.getElementById('ins-id').innerText = p.source_id;
+    document.getElementById('ins-badge').innerText = p.predicted_event_type;
+    
+    // Style badge
+    const badge = document.getElementById('ins-badge');
+    badge.className = 'tag-badge ' + (
+      p.predicted_event_type === 'Industrial' ? 'tag-industrial' :
+      p.predicted_event_type === 'Forest/Natural' ? 'tag-forest' :
+      p.predicted_event_type === 'Agricultural' ? 'tag-agri' : 'tag-other'
+    );
+
+    document.getElementById('ins-conf').innerText = p.confidence_pct + '%';
+    document.getElementById('ins-fac-name').innerText = p.nearest_facility_name || 'Industrial Zone';
+    document.getElementById('ins-fac-dist').innerText = p.min_distance_to_industry_km + ' km';
+    document.getElementById('ins-frp').innerText = p.max_frp + ' MW (Mean: ' + p.mean_frp + ' MW)';
+    document.getElementById('ins-persist').innerText = p.active_days + ' Active Days (' + p.total_detections + ' Detections)';
+    document.getElementById('ins-risk').innerText = p.risk_level;
+    document.getElementById('ins-expl').innerText = p.risk_description || 'Monitored thermal source signature.';
+  }
+
+  async function loadOSMInfrastructure() {
+    try {
+      const res = await fetch('/api/v1/infrastructure/geojson');
+      const geojson = await res.json();
+      osmLayerGroup.clearLayers();
+
+      geojson.features.forEach(f => {
+        const p = f.properties;
+        const [lon, lat] = f.geometry.coordinates;
+
+        const icon = L.divIcon({
+          className: 'custom-div-icon',
+          html: `<div style="background:#7c3aed; width:22px; height:22px; border-radius:6px; display:flex; align-items:center; justify-content:center; color:#fff; border:1px solid #fff; box-shadow:0 0 8px #7c3aed;"><i class="fa-solid fa-industry" style="font-size:11px;"></i></div>`,
+          iconSize: [22, 22],
+          iconAnchor: [11, 11]
+        });
+
+        const marker = L.marker([lat, lon], { icon: icon });
+        marker.bindPopup(`<b>${p.name}</b><br><span style="font-size:11px; color:#a78bfa;">${p.type.toUpperCase()} | ${p.capacity}</span>`);
+        osmLayerGroup.addLayer(marker);
+      });
+    } catch(e) { console.error(e); }
+  }
+
+  function reloadLayers() {
+    renderSources(allFeatures);
+  }
+
+  function toggleOSMLayer() {
+    const checked = document.getElementById('flt-osm').checked;
+    if (checked) {
+      map.addLayer(osmLayerGroup);
+    } else {
+      map.removeLayer(osmLayerGroup);
+    }
+  }
+
+  async function syncNASAData() {
+    alert('Triggering NASA FIRMS live synchronization & DBSCAN clustering...');
+    try {
+      const res = await fetch('/api/v1/firms/sync', { method: 'POST' });
+      const data = await res.json();
+      alert(data.message);
+      loadAnalyticsSummary();
+      loadSourcesGeoJSON();
+    } catch(e) { alert('Sync error: ' + e); }
+  }
+
+  function downloadReport() {
+    window.location.href = '/api/v1/export/report?format=csv';
+  }
+
+  function openClassifyModal() {
+    document.getElementById('modal-overlay').style.display = 'block';
+    document.getElementById('classify-modal').style.display = 'block';
+  }
+
+  function closeClassifyModal() {
+    document.getElementById('modal-overlay').style.display = 'none';
+    document.getElementById('classify-modal').style.display = 'none';
+  }
+
+  async function runRealtimeClassification() {
+    const lat = parseFloat(document.getElementById('test-lat').value);
+    const lon = parseFloat(document.getElementById('test-lon').value);
+    const frp = parseFloat(document.getElementById('test-frp').value);
+    const active_days = parseInt(document.getElementById('test-days').value);
+
+    try {
+      const res = await fetch('/api/v1/classify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ latitude: lat, longitude: lon, frp: frp, active_days: active_days })
+      });
+      const data = await res.json();
+
+      const resDiv = document.getElementById('modal-result');
+      resDiv.style.display = 'block';
+      resDiv.innerHTML = `
+        <div style="font-weight:700; font-size:14px; margin-bottom:6px; color:#38bdf8;">Classification Result: ${data.predicted_event_type} (${data.confidence_pct}%)</div>
+        <div>Nearest Infrastructure: <b>${data.nearest_facility_name || 'Industrial Facility'}</b> (${data.nearest_facility_distance_km} km away)</div>
+        <div>Hazard Severity: <b>${data.risk_level}</b></div>
+        <div style="margin-top:6px; color:#94a3b8;">${data.explanation.join(' &bull; ')}</div>
+      `;
+
+      // Also pan map
+      map.setView([lat, lon], 10);
+      L.circleMarker([lat, lon], { radius: 12, color: '#38bdf8', fillColor: '#38bdf8', fillOpacity: 0.8 }).addTo(map)
+        .bindPopup(`<b>AI Classified: ${data.predicted_event_type}</b><br>Confidence: ${data.confidence_pct}%`).openPopup();
+    } catch(e) { alert('Classification error: ' + e); }
+  }
+
+  window.onload = initMap;
+</script>
+</body>
+</html>

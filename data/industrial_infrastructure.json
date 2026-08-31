@@ -1,0 +1,167 @@
+[
+  {
+    "id": "INFRA_001",
+    "name": "Reliance Jamnagar Refinery Complex",
+    "type": "refinery",
+    "latitude": 22.34236,
+    "longitude": 69.87119,
+    "state": "Gujarat",
+    "country": "India",
+    "risk_category": "High Hazard - Flaring",
+    "capacity": "1.24 million bpd"
+  },
+  {
+    "id": "INFRA_002",
+    "name": "IOCL Panipat Refinery & Petrochemical Complex",
+    "type": "refinery",
+    "latitude": 29.46148,
+    "longitude": 76.86364,
+    "state": "Haryana",
+    "country": "India",
+    "risk_category": "High Hazard - Flaring",
+    "capacity": "300,000 bpd"
+  },
+  {
+    "id": "INFRA_003",
+    "name": "HMEL Bathinda (Guru Gobind Singh) Refinery",
+    "type": "refinery",
+    "latitude": 29.91172,
+    "longitude": 74.95081,
+    "state": "Punjab",
+    "country": "India",
+    "risk_category": "High Hazard - Flaring",
+    "capacity": "230,000 bpd"
+  },
+  {
+    "id": "INFRA_004",
+    "name": "IOCL Paradip Refinery",
+    "type": "refinery",
+    "latitude": 20.2644,
+    "longitude": 86.6667,
+    "state": "Odisha",
+    "country": "India",
+    "risk_category": "High Hazard - Flaring",
+    "capacity": "300,000 bpd"
+  },
+  {
+    "id": "INFRA_005",
+    "name": "IOCL Haldia Refinery Complex",
+    "type": "refinery",
+    "latitude": 22.05706,
+    "longitude": 88.12335,
+    "state": "West Bengal",
+    "country": "India",
+    "risk_category": "High Hazard - Flaring",
+    "capacity": "150,000 bpd"
+  },
+  {
+    "id": "INFRA_006",
+    "name": "NTPC Korba Super Thermal Power Plant",
+    "type": "powerplant",
+    "latitude": 22.35731,
+    "longitude": 82.30456,
+    "state": "Chhattisgarh",
+    "country": "India",
+    "risk_category": "Thermal Energy Generation",
+    "capacity": "2,600 MW"
+  },
+  {
+    "id": "INFRA_007",
+    "name": "NTPC Ramagundam Super Thermal Power Station",
+    "type": "powerplant",
+    "latitude": 18.7561,
+    "longitude": 79.4673,
+    "state": "Telangana",
+    "country": "India",
+    "risk_category": "Thermal Energy Generation",
+    "capacity": "2,600 MW"
+  },
+  {
+    "id": "INFRA_008",
+    "name": "NTPC Talcher Thermal Power Station",
+    "type": "powerplant",
+    "latitude": 20.95314,
+    "longitude": 86.04453,
+    "state": "Odisha",
+    "country": "India",
+    "risk_category": "Thermal Energy Generation",
+    "capacity": "3,000 MW"
+  },
+  {
+    "id": "INFRA_009",
+    "name": "Jharia Coalfields & Opencast Mining Zone",
+    "type": "mine",
+    "latitude": 23.75207,
+    "longitude": 86.41506,
+    "state": "Jharkhand",
+    "country": "India",
+    "risk_category": "Subsurface / Spontaneous Coal Fires",
+    "capacity": "Major Coking Coal Reserve"
+  },
+  {
+    "id": "INFRA_010",
+    "name": "Bokaro Steel Industrial Area & Coal Complex",
+    "type": "industrial_area",
+    "latitude": 23.6814,
+    "longitude": 86.09103,
+    "state": "Jharkhand",
+    "country": "India",
+    "risk_category": "Steel & Metallurgical Smelting",
+    "capacity": "Steel Authority of India"
+  },
+  {
+    "id": "INFRA_011",
+    "name": "Jamshedpur (Tata Steel) Industrial Hub",
+    "type": "industrial_area",
+    "latitude": 22.79715,
+    "longitude": 86.19865,
+    "state": "Jharkhand",
+    "country": "India",
+    "risk_category": "Heavy Industrial & Smelting",
+    "capacity": "Steel & Heavy Engineering"
+  },
+  {
+    "id": "INFRA_012",
+    "name": "Durgapur Steel Plant & Industrial Belt",
+    "type": "industrial_area",
+    "latitude": 23.55093,
+    "longitude": 87.24238,
+    "state": "West Bengal",
+    "country": "India",
+    "risk_category": "Alloy & Pig Iron Smelting",
+    "capacity": "Integrated Steel Plant"
+  },
+  {
+    "id": "INFRA_013",
+    "name": "Visakhapatnam Steel Plant & Industrial Zone",
+    "type": "industrial_area",
+    "latitude": 17.60995,
+    "longitude": 83.20184,
+    "state": "Andhra Pradesh",
+    "country": "India",
+    "risk_category": "Petrochemical & Metallurgical",
+    "capacity": "RINL Coastal Steel Plant"
+  },
+  {
+    "id": "INFRA_014",
+    "name": "Bhilai Steel Industrial Complex",
+    "type": "industrial_area",
+    "latitude": 21.19596,
+    "longitude": 81.41667,
+    "state": "Chhattisgarh",
+    "country": "India",
+    "risk_category": "Primary Steel Production",
+    "capacity": "SAIL Bhilai Plant"
+  },
+  {
+    "id": "INFRA_015",
+    "name": "Angul Industrial & Smelting Belt",
+    "type": "industrial_area",
+    "latitude": 20.89102,
+    "longitude": 84.9829,
+    "state": "Odisha",
+    "country": "India",
+    "risk_category": "Aluminum Smelting & Heavy Metal",
+    "capacity": "NALCO Smelter Complex"
+  }
+]
