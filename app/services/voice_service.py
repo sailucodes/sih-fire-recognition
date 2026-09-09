@@ -2,11 +2,34 @@ import re
 from typing import Dict, Any
 
 STATE_ALIASES = {
-    "odisha": ["odisha", "orissa", "ओडिशा", "उड़ीसा", "ఒడిశా", "ஒடிசா"],
-    "jharkhand": ["jharkhand", "झारखंड", "ఝార్ఖండ్", "ஜார்கண்ட்"],
-    "chhattisgarh": ["chhattisgarh", "छत्तीसगढ़", "ఛత్తీస్‌గఢ్", "சத்தீஸ்கர்"],
-    "maharashtra": ["maharashtra", "महाराष्ट्र", "మహారాష్ట్ర", "மகாராஷ்டிரா"],
-    "karnataka": ["karnataka", "कर्नाटक", "కర్ణాటక", "கர்நாடகா"]
+    "Andhra Pradesh": ["andhra pradesh", "andhra", "आंध्र प्रदेश", "ఆంధ్రప్రదేశ్", "ஆந்திரப் பிரதேசம்"],
+    "Arunachal Pradesh": ["arunachal pradesh", "arunachal", "अरुणाचल प्रदेश", "అరుణాచల్ ప్రదేశ్", "அருணாச்சலப் பிரதேசம்"],
+    "Assam": ["assam", "asom", "असम", "అస్సాం", "அசாம்"],
+    "Bihar": ["bihar", "बिहार", "బీహార్", "பீகார்"],
+    "Chhattisgarh": ["chhattisgarh", "chattisgarh", "छत्तीसगढ़", "ఛత్తీస్‌గఢ్", "சத்தீஸ்கர்"],
+    "Goa": ["goa", "गोवा", "గోవా", "கோவா"],
+    "Gujarat": ["gujarat", "गुजरात", "గుజరాత్", "குஜராத்"],
+    "Haryana": ["haryana", "हरियाणा", "హర్యానా", "ஹரியானா"],
+    "Himachal Pradesh": ["himachal pradesh", "himachal", "हिमाचल प्रदेश", "హిమాచల్ ప్రదేశ్", "இமாச்சலப் பிரதேசம்"],
+    "Jharkhand": ["jharkhand", "झारखंड", "ఝార్ఖండ్", "ஜார்கண்ட்"],
+    "Karnataka": ["karnataka", "कर्नाटक", "కర్ణాటక", "கர்நாடகா"],
+    "Kerala": ["kerala", "केरल", "కేరళ", "கேரளா"],
+    "Madhya Pradesh": ["madhya pradesh", "mp", "मध्य प्रदेश", "మధ్యప్రదేశ్", "மத்தியப் பிரதேசம்"],
+    "Maharashtra": ["maharashtra", "महाराष्ट्र", "మహారాష్ట్ర", "மகாராஷ்டிரா"],
+    "Manipur": ["manipur", "मणिपुर", "మణిపూర్", "மணிப்பூர்"],
+    "Meghalaya": ["meghalaya", "मेघालय", "మేఘాలయ", "மேகாலயா"],
+    "Mizoram": ["mizoram", "मिजोरम", "మిజోరం", "மிசோரம்"],
+    "Nagaland": ["nagaland", "नागालैंड", "నాగాలాండ్", "நாகாலாந்து"],
+    "Odisha": ["odisha", "orissa", "ओडिशा", "उड़ीसा", "ఒడిశా", "ஒடிசா"],
+    "Punjab": ["punjab", "पंजाब", "పంజాబ్", "பஞ்சாப்"],
+    "Rajasthan": ["rajasthan", "राजस्थान", "రాజస్థాన్", "ராஜஸ்தான்"],
+    "Sikkim": ["sikkim", "सिक्किम", "సిక్కిం", "சிக்கிம்"],
+    "Tamil Nadu": ["tamil nadu", "tamilnadu", "तमिलनाडु", "తమిళనాడు", "தமிழ்நாடு"],
+    "Telangana": ["telangana", "तेलंगाना", "తెలంగాణ", "தெலுங்கானா"],
+    "Tripura": ["tripura", "त्रिपुरा", "త్రిపుర", "திரிபுரா"],
+    "Uttar Pradesh": ["uttar pradesh", "up", "उत्तर प्रदेश", "ఉత్తరప్రదేశ్", "உத்தரப் பிரதேசம்"],
+    "Uttarakhand": ["uttarakhand", "उत्तराखंड", "ఉత్తరాఖండ్", "உத்தரகண்ட்"],
+    "West Bengal": ["west bengal", "bengal", "पश्चिम बंगाल", "పశ్చిమ బెంగాల్", "மேற்கு வங்காளம்"]
 }
 
 TYPE_ALIASES = {

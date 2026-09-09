@@ -21,7 +21,62 @@ CATEGORY_COLOR_MAP = {
     "Other": "#457b9d"
 }
 
-STATES_LIST = ["Odisha", "Jharkhand", "Chhattisgarh", "Maharashtra", "Karnataka"]
+ALL_INDIAN_STATES = [
+    "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
+    "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand",
+    "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur",
+    "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab",
+    "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura",
+    "Uttar Pradesh", "Uttarakhand", "West Bengal"
+]
+
+STATE_CENTROIDS = {
+    "Andhra Pradesh": {"lat": 15.9129, "lng": 79.7400, "lat_min": 12.6, "lat_max": 19.9, "lng_min": 76.7, "lng_max": 84.8},
+    "Arunachal Pradesh": {"lat": 28.2180, "lng": 94.7278, "lat_min": 26.6, "lat_max": 29.5, "lng_min": 91.5, "lng_max": 97.4},
+    "Assam": {"lat": 26.2006, "lng": 92.9376, "lat_min": 24.1, "lat_max": 28.0, "lng_min": 89.7, "lng_max": 96.0},
+    "Bihar": {"lat": 25.0961, "lng": 85.3131, "lat_min": 24.3, "lat_max": 27.5, "lng_min": 83.3, "lng_max": 88.3},
+    "Chhattisgarh": {"lat": 21.2787, "lng": 81.8661, "lat_min": 17.8, "lat_max": 24.1, "lng_min": 80.2, "lng_max": 84.4},
+    "Goa": {"lat": 15.2993, "lng": 74.1240, "lat_min": 14.9, "lat_max": 15.8, "lng_min": 73.6, "lng_max": 74.4},
+    "Gujarat": {"lat": 22.2587, "lng": 71.1924, "lat_min": 20.1, "lat_max": 24.7, "lng_min": 68.1, "lng_max": 74.5},
+    "Haryana": {"lat": 29.0588, "lng": 76.0856, "lat_min": 27.6, "lat_max": 30.9, "lng_min": 74.4, "lng_max": 77.6},
+    "Himachal Pradesh": {"lat": 31.1048, "lng": 77.1734, "lat_min": 30.4, "lat_max": 33.2, "lng_min": 75.8, "lng_max": 79.0},
+    "Jharkhand": {"lat": 23.6102, "lng": 85.2799, "lat_min": 21.9, "lat_max": 25.3, "lng_min": 83.3, "lng_max": 87.9},
+    "Karnataka": {"lat": 15.3173, "lng": 75.7139, "lat_min": 11.5, "lat_max": 18.5, "lng_min": 74.0, "lng_max": 78.6},
+    "Kerala": {"lat": 10.8505, "lng": 76.2711, "lat_min": 8.3, "lat_max": 12.8, "lng_min": 74.8, "lng_max": 77.4},
+    "Madhya Pradesh": {"lat": 22.9734, "lng": 78.6569, "lat_min": 21.1, "lat_max": 26.9, "lng_min": 74.0, "lng_max": 82.8},
+    "Maharashtra": {"lat": 19.7515, "lng": 75.7139, "lat_min": 15.6, "lat_max": 22.0, "lng_min": 72.6, "lng_max": 80.9},
+    "Manipur": {"lat": 24.6637, "lng": 93.9063, "lat_min": 23.8, "lat_max": 25.7, "lng_min": 93.0, "lng_max": 94.8},
+    "Meghalaya": {"lat": 25.4670, "lng": 91.3662, "lat_min": 25.0, "lat_max": 26.1, "lng_min": 89.8, "lng_max": 92.8},
+    "Mizoram": {"lat": 23.1645, "lng": 92.9376, "lat_min": 21.9, "lat_max": 24.5, "lng_min": 92.2, "lng_max": 93.4},
+    "Nagaland": {"lat": 26.1584, "lng": 94.5624, "lat_min": 25.2, "lat_max": 27.0, "lng_min": 93.3, "lng_max": 95.2},
+    "Odisha": {"lat": 20.9517, "lng": 85.0985, "lat_min": 17.8, "lat_max": 22.6, "lng_min": 81.4, "lng_max": 87.5},
+    "Punjab": {"lat": 31.1471, "lng": 75.3412, "lat_min": 29.5, "lat_max": 32.5, "lng_min": 73.9, "lng_max": 76.9},
+    "Rajasthan": {"lat": 27.0238, "lng": 74.2179, "lat_min": 23.1, "lat_max": 30.2, "lng_min": 69.5, "lng_max": 78.3},
+    "Sikkim": {"lat": 27.5330, "lng": 88.5122, "lat_min": 27.0, "lat_max": 28.1, "lng_min": 88.0, "lng_max": 88.9},
+    "Tamil Nadu": {"lat": 11.1271, "lng": 78.6569, "lat_min": 8.1, "lat_max": 13.6, "lng_min": 76.2, "lng_max": 80.3},
+    "Telangana": {"lat": 18.1124, "lng": 79.0193, "lat_min": 15.8, "lat_max": 19.9, "lng_min": 77.2, "lng_max": 81.8},
+    "Tripura": {"lat": 23.9408, "lng": 91.9882, "lat_min": 22.9, "lat_max": 24.5, "lng_min": 91.1, "lng_max": 92.3},
+    "Uttar Pradesh": {"lat": 26.8467, "lng": 80.9462, "lat_min": 23.9, "lat_max": 30.4, "lng_min": 77.1, "lng_max": 84.6},
+    "Uttarakhand": {"lat": 30.0668, "lng": 79.0193, "lat_min": 28.7, "lat_max": 31.5, "lng_min": 77.6, "lng_max": 81.0},
+    "West Bengal": {"lat": 22.9868, "lng": 87.8550, "lat_min": 21.5, "lat_max": 27.2, "lng_min": 85.8, "lng_max": 89.9}
+}
+
+STATES_LIST = ALL_INDIAN_STATES
+
+def detect_state_for_coordinates(lat: float, lon: float) -> str:
+    # Check bounding boxes first
+    for s_name, bbox in STATE_CENTROIDS.items():
+        if bbox["lat_min"] <= lat <= bbox["lat_max"] and bbox["lng_min"] <= lon <= bbox["lng_max"]:
+            return s_name
+    # Fallback to nearest centroid
+    best_state = "Odisha"
+    min_d = 999999.0
+    for s_name, bbox in STATE_CENTROIDS.items():
+        d = ((lat - bbox["lat"])**2 + (lon - bbox["lng"])**2)**0.5
+        if d < min_d:
+            min_d = d
+            best_state = s_name
+    return best_state
 
 class ThermalStorageService:
     def __init__(self):
@@ -65,10 +120,10 @@ class ThermalStorageService:
             min_dist_ind = float(row.get("min_distance_to_industry_km", 20.0) or 20.0)
             conf_pct = float(row.get("confidence_pct", 85.0) or 85.0)
             
-            # State mapping matching frontend logic
+            # State mapping based on geographic coordinates across 28 Indian states
             state_val = str(row.get("state", "")).strip()
             if not state_val or state_val == "nan" or state_val == "Unknown":
-                state_val = STATES_LIST[idx % len(STATES_LIST)]
+                state_val = detect_state_for_coordinates(lat, lon)
 
             # Calculate persistence score between 0 and 100%
             pers_record = pers_map.get(s_id, {})
