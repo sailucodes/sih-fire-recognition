@@ -12,12 +12,16 @@ CSV_PATH = BASE_DIR / "data" / "predictions.csv"
 if not os.path.exists(CSV_PATH):
     CSV_PATH = BASE_DIR / "data" / "event_classification_features.csv"
 
+PERSISTENCE_CSV_PATH = BASE_DIR / "data" / "source_persistence_features.csv"
+
 CATEGORY_COLOR_MAP = {
     "Industrial": "#e63946",
     "Forest/Natural": "#2a9d8f",
     "Agricultural": "#e76f51",
     "Other": "#457b9d"
 }
+
+STATES_LIST = ["Odisha", "Jharkhand", "Chhattisgarh", "Maharashtra", "Karnataka"]
 
 class ThermalStorageService:
     def __init__(self):
@@ -33,8 +37,18 @@ class ThermalStorageService:
         df = pd.read_csv(CSV_PATH)
         facilities = osm_service.get_all_facilities()
         
-        for _, row in df.iterrows():
-            s_id = str(row.get("source_id", f"SOURCE_{_ + 1:04d}"))
+        # Load persistence records if available
+        pers_map = {}
+        if os.path.exists(PERSISTENCE_CSV_PATH):
+            try:
+                p_df = pd.read_csv(PERSISTENCE_CSV_PATH)
+                for _, p_row in p_df.iterrows():
+                    pers_map[str(p_row.get("source_id", "")).strip()] = p_row.to_dict()
+            except Exception:
+                pass
+        
+        for idx, row in df.iterrows():
+            s_id = str(row.get("source_id", f"SOURCE_{idx + 1:04d}")).strip()
             lat = float(row.get("latitude", 0.0))
             lon = float(row.get("longitude", 0.0))
             event_type = str(row.get("event_type", "Other"))
@@ -47,22 +61,38 @@ class ThermalStorageService:
             
             active_days = int(row.get("active_days", 1) or 1)
             total_detections = int(row.get("total_detections", 1) or 1)
+            obs_span = max(1, int(row.get("observation_span_days", 7) or 7))
             min_dist_ind = float(row.get("min_distance_to_industry_km", 20.0) or 20.0)
             conf_pct = float(row.get("confidence_pct", 85.0) or 85.0)
             
+            # State mapping matching frontend logic
+            state_val = str(row.get("state", "")).strip()
+            if not state_val or state_val == "nan" or state_val == "Unknown":
+                state_val = STATES_LIST[idx % len(STATES_LIST)]
+
+            # Calculate persistence score between 0 and 100%
+            pers_record = pers_map.get(s_id, {})
+            if "persistence_score" in pers_record:
+                raw_p = float(pers_record["persistence_score"])
+                pers_score = round(raw_p * 100, 1) if raw_p <= 1.0 else round(raw_p, 1)
+            else:
+                pers_score = min(100.0, round((active_days / obs_span) * 100, 1))
+
             risk_level, is_flare_anomaly, risk_desc = evaluate_thermal_risk(
                 pred_event_type, min_dist_ind, mean_frp, max_frp, active_days, total_detections
             )
 
-            # SIH Alert Rule matching teammate app.js
-            if pred_event_type == "Industrial" and conf_pct >= 80.0:
+            # SIH Alert Rule matching frontend ALERT_RULES: CRITICAL >= 88, HIGH >= 75, MEDIUM >= 60
+            if conf_pct >= 88.0:
+                sih_alert = "CRITICAL"
+            elif conf_pct >= 75.0:
                 sih_alert = "HIGH"
-            elif pred_event_type == "Industrial" and conf_pct >= 60.0:
+            elif conf_pct >= 60.0:
                 sih_alert = "MEDIUM"
             else:
                 sih_alert = "LOW"
             
-            nearest_fac_name = "Industrial Facility"
+            nearest_fac_name = "Industrial Complex"
             for fac in facilities:
                 if haversine_distance(lat, lon, fac["latitude"], fac["longitude"]) <= min_dist_ind + 0.5:
                     nearest_fac_name = fac["name"]
@@ -70,15 +100,18 @@ class ThermalStorageService:
 
             source_obj = {
                 "source_id": s_id,
+                "state": state_val,
                 "latitude": lat,
                 "longitude": lon,
                 "event_type": event_type,
                 "predicted_event_type": pred_event_type,
                 "confidence": conf_pct,
                 "confidence_pct": conf_pct,
+                "persistence_score": pers_score,
                 "sih_alert_severity": sih_alert,
                 "total_detections": total_detections,
                 "active_days": active_days,
+                "observation_span_days": obs_span,
                 "mean_frp": round(mean_frp, 2),
                 "max_frp": round(max_frp, 2),
                 "mean_brightness": round(mean_bright, 2),
@@ -104,18 +137,20 @@ class ThermalStorageService:
             
             self.sources[s_id] = source_obj
             
-            if sih_alert in ["HIGH", "MEDIUM"]:
+            if sih_alert in ["CRITICAL", "HIGH", "MEDIUM"]:
                 self.alerts.append({
                     "alert_id": f"ALERT_{len(self.alerts) + 1:04d}",
                     "source_id": s_id,
+                    "state": state_val,
                     "timestamp": source_obj["last_detection"],
                     "latitude": lat,
                     "longitude": lon,
                     "event_type": pred_event_type,
                     "confidence": conf_pct,
                     "confidence_pct": conf_pct,
+                    "persistence_score": pers_score,
                     "severity": sih_alert,
-                    "title": f"{sih_alert} Alert: Industrial Thermal Anomaly near {nearest_fac_name}",
+                    "title": f"{sih_alert} Alert: {pred_event_type} Anomaly in {state_val} ({nearest_fac_name})",
                     "message": risk_desc,
                     "facility_context": f"{source_obj['nearest_facility_type'].title()} ({min_dist_ind:.2f} km away), FRP: {max_frp:.1f} MW"
                 })
@@ -127,6 +162,7 @@ class ThermalStorageService:
 
     def list_sources(
         self,
+        state: Optional[str] = None,
         event_type: Optional[str] = None,
         min_frp: Optional[float] = None,
         is_persistent: Optional[bool] = None,
@@ -139,7 +175,9 @@ class ThermalStorageService:
     ) -> List[Dict[str, Any]]:
         results = []
         for s in self.sources.values():
-            if event_type and s["predicted_event_type"].lower() != event_type.lower():
+            if state and state.upper() != "ALL" and s["state"].lower() != state.lower():
+                continue
+            if event_type and event_type.upper() != "ALL" and s["predicted_event_type"].lower() != event_type.lower():
                 continue
             if min_frp is not None and s["max_frp"] < min_frp:
                 continue
@@ -157,6 +195,7 @@ class ThermalStorageService:
 
     def get_geojson(
         self,
+        state: Optional[str] = None,
         event_type: Optional[str] = None,
         min_frp: Optional[float] = None,
         is_persistent: Optional[bool] = None,
@@ -167,6 +206,7 @@ class ThermalStorageService:
         max_lon: Optional[float] = None
     ) -> Dict[str, Any]:
         filtered = self.list_sources(
+            state=state,
             event_type=event_type,
             min_frp=min_frp,
             is_persistent=is_persistent,
@@ -188,10 +228,12 @@ class ThermalStorageService:
                 },
                 "properties": {
                     "source_id": s["source_id"],
+                    "state": s["state"],
                     "event_type": s["event_type"],
                     "predicted_event_type": s["predicted_event_type"],
                     "confidence": s["confidence_pct"],
                     "confidence_pct": s["confidence_pct"],
+                    "persistence_score": s["persistence_score"],
                     "sih_alert_severity": s["sih_alert_severity"],
                     "mean_frp": s["mean_frp"],
                     "max_frp": s["max_frp"],
@@ -218,69 +260,54 @@ class ThermalStorageService:
             "features": features
         }
 
-    def get_analytics_summary(self) -> Dict[str, Any]:
-        total = len(self.sources)
+    def get_analytics_summary(self, state: Optional[str] = None) -> Dict[str, Any]:
+        sources = self.list_sources(state=state, limit=10000)
+        total = len(sources)
         if total == 0:
-            return {}
+            return {
+                "total_thermal_sources": 0, "industrial_sources": 0, "forest_natural_sources": 0,
+                "agricultural_sources": 0, "other_sources": 0, "active_alerts": 0
+            }
 
         counts = defaultdict(int)
         persistent_count = 0
-        high_risk_count = len(self.alerts)
-        all_mean_frps = []
-        all_max_frps = []
+        critical_count = 0
+        high_count = 0
 
-        for s in self.sources.values():
+        for s in sources:
             cat = s["predicted_event_type"]
             counts[cat] += 1
             if s["is_persistent"]:
                 persistent_count += 1
-            all_mean_frps.append(s["mean_frp"])
-            all_max_frps.append(s["max_frp"])
+            if s["sih_alert_severity"] == "CRITICAL":
+                critical_count += 1
+            elif s["sih_alert_severity"] == "HIGH":
+                high_count += 1
 
         return {
             "total_thermal_sources": total,
+            "state_jurisdiction": state or "National",
             "industrial_sources": counts["Industrial"],
-            "industrial_percentage": round((counts["Industrial"] / total) * 100, 2),
             "forest_natural_sources": counts["Forest/Natural"],
-            "forest_percentage": round((counts["Forest/Natural"] / total) * 100, 2),
             "agricultural_sources": counts["Agricultural"],
-            "agricultural_percentage": round((counts["Agricultural"] / total) * 100, 2),
             "other_sources": counts["Other"],
-            "other_percentage": round((counts["Other"] / total) * 100, 2),
             "persistent_sources_count": persistent_count,
-            "high_risk_anomalies_count": high_risk_count,
-            "average_mean_frp": round(sum(all_mean_frps) / len(all_mean_frps), 2),
-            "max_recorded_frp": round(max(all_max_frps), 2) if all_max_frps else 0.0
+            "critical_alerts_count": critical_count,
+            "high_alerts_count": high_count,
+            "total_alerts": critical_count + high_count
         }
 
-    def get_timeline(self) -> List[Dict[str, Any]]:
-        timeline_dict = defaultdict(lambda: {"Industrial": 0, "Forest/Natural": 0, "Agricultural": 0, "Other": 0, "total_frp": 0.0})
-        for s in self.sources.values():
-            d_str = s["last_detection"][:10]
-            cat = s["predicted_event_type"]
-            timeline_dict[d_str][cat] += 1
-            timeline_dict[d_str]["total_frp"] += s["max_frp"]
-            
-        timeline = []
-        for d in sorted(timeline_dict.keys()):
-            item = timeline_dict[d]
-            timeline.append({
-                "date": d,
-                "industrial_count": item["Industrial"],
-                "forest_count": item["Forest/Natural"],
-                "agricultural_count": item["Agricultural"],
-                "other_count": item["Other"],
-                "total_frp": round(item["total_frp"], 2)
-            })
-        return timeline
-
-    def get_alerts(self) -> List[Dict[str, Any]]:
-        return self.alerts
+    def get_alerts(self, state: Optional[str] = None) -> List[Dict[str, Any]]:
+        if not state or state.upper() == "ALL":
+            return self.alerts
+        return [a for a in self.alerts if a.get("state", "").lower() == state.lower()]
 
     def save_new_source(self, source_obj: Dict[str, Any]) -> str:
         s_id = source_obj.get("source_id") or f"SOURCE_{len(self.sources) + 1:04d}"
         source_obj["source_id"] = s_id
         source_obj["marker_color"] = CATEGORY_COLOR_MAP.get(source_obj.get("predicted_event_type", "Other"), "#457b9d")
+        if "state" not in source_obj or not source_obj["state"]:
+            source_obj["state"] = "Odisha"
         self.sources[s_id] = source_obj
         return s_id
 

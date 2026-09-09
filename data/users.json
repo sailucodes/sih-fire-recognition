@@ -1,0 +1,26 @@
+{
+  "admin@sih.gov.in": {
+    "email": "admin@sih.gov.in",
+    "name": "NDMA Disaster Response Chief",
+    "password_hash": "4a628fab5de4fe042edb78e09584e0fa803e0d288d20e1f9d783d94f2ec0a098",
+    "role": "National Authority",
+    "organization": "National Disaster Management Authority (NDMA)",
+    "created_at": "2026-09-09 19:38:47"
+  },
+  "analyst@sih.gov.in": {
+    "email": "analyst@sih.gov.in",
+    "name": "State Operations Officer",
+    "password_hash": "ccf0bad2775fcf2fbec1e3064920b5c89d0fb55817b1ecc77df0fb81aa36fbc8",
+    "role": "State Emergency Analyst",
+    "organization": "Odisha Disaster Rapid Action Force (ODRAF)",
+    "created_at": "2026-09-09 19:38:47"
+  },
+  "officer.odisha@gov.in": {
+    "email": "officer.odisha@gov.in",
+    "name": "Odisha EOC Officer",
+    "password_hash": "14baab42e73a9293cb7d253e4c35cd0a97244802eac00ad093e472bc5762b2f9",
+    "role": "Analyst",
+    "organization": "State Emergency Operations",
+    "created_at": "2026-09-09 19:39:14"
+  }
+}
