@@ -1,753 +1,423 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AeroThermal AI | Industrial Fire & Thermal Source Monitoring</title>
-  
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <!-- FontAwesome -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-  <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-
-  <style>
-    :root {
-      --bg-dark: #0f172a;
-      --panel-bg: rgba(30, 41, 59, 0.85);
-      --border-color: rgba(255, 255, 255, 0.1);
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
-      --industrial-color: #ef4444;
-      --forest-color: #10b981;
-      --agri-color: #f59e0b;
-      --other-color: #6366f1;
-      --accent: #38bdf8;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: 'Inter', sans-serif;
-    }
-
-    body, html {
-      height: 100%;
-      width: 100%;
-      overflow: hidden;
-      background: var(--bg-dark);
-      color: var(--text-main);
-    }
-
-    #app-container {
-      display: flex;
-      height: 100vh;
-      width: 100vw;
-    }
-
-    /* Sidebar */
-    #sidebar {
-      width: 420px;
-      height: 100%;
-      background: var(--panel-bg);
-      backdrop-filter: blur(16px);
-      border-right: 1px solid var(--border-color);
-      display: flex;
-      flex-direction: column;
-      z-index: 1000;
-      box-shadow: 4px 0 24px rgba(0,0,0,0.5);
-    }
-
-    .header-bar {
-      padding: 20px;
-      border-bottom: 1px solid var(--border-color);
-      background: rgba(15, 23, 42, 0.6);
-    }
-
-    .logo-title {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .logo-icon {
-      font-size: 24px;
-      color: #f97316;
-      background: rgba(249, 115, 22, 0.15);
-      padding: 10px;
-      border-radius: 12px;
-      border: 1px solid rgba(249, 115, 22, 0.3);
-    }
-
-    .logo-title h1 {
-      font-size: 18px;
-      font-weight: 700;
-      letter-spacing: -0.5px;
-    }
-
-    .logo-title p {
-      font-size: 12px;
-      color: var(--text-muted);
-    }
-
-    .metrics-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 10px;
-      padding: 15px 20px;
-      background: rgba(15, 23, 42, 0.4);
-      border-bottom: 1px solid var(--border-color);
-    }
-
-    .metric-card {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid var(--border-color);
-      border-radius: 10px;
-      padding: 10px 12px;
-    }
-
-    .metric-card .label {
-      font-size: 11px;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      font-weight: 600;
-    }
-
-    .metric-card .value {
-      font-size: 18px;
-      font-weight: 700;
-      margin-top: 4px;
-    }
-
-    .metric-industrial { color: var(--industrial-color); }
-    .metric-forest { color: var(--forest-color); }
-    .metric-agri { color: var(--agri-color); }
-    .metric-alerts { color: #f43f5e; }
-
-    /* Scrollable Section */
-    .sidebar-content {
-      flex: 1;
-      overflow-y: auto;
-      padding: 20px;
-    }
-
-    .sidebar-content::-webkit-scrollbar {
-      width: 6px;
-    }
-    .sidebar-content::-webkit-scrollbar-thumb {
-      background: rgba(255,255,255,0.15);
-      border-radius: 3px;
-    }
-
-    .section-title {
-      font-size: 12px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--text-muted);
-      margin-bottom: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    /* Filters */
-    .filter-group {
-      margin-bottom: 20px;
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid var(--border-color);
-      border-radius: 12px;
-      padding: 14px;
-    }
-
-    .checkbox-row {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      margin-top: 8px;
-    }
-
-    .checkbox-label {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 13px;
-      cursor: pointer;
-    }
-
-    .badge-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-    }
-
-    .slider-row {
-      margin-top: 12px;
-    }
-
-    .slider-label {
-      display: flex;
-      justify-content: space-between;
-      font-size: 12px;
-      margin-bottom: 6px;
-    }
-
-    input[type=range] {
-      width: 100%;
-      accent-color: var(--accent);
-    }
-
-    /* Inspection Card */
-    #inspection-card {
-      background: rgba(15, 23, 42, 0.8);
-      border: 1px solid var(--border-color);
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 20px;
-      display: none;
-    }
-
-    .inspection-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-    }
-
-    .tag-badge {
-      font-size: 11px;
-      font-weight: 600;
-      padding: 4px 8px;
-      border-radius: 6px;
-      text-transform: uppercase;
-    }
-
-    .tag-industrial { background: rgba(239, 68, 68, 0.2); color: var(--industrial-color); border: 1px solid var(--industrial-color); }
-    .tag-forest { background: rgba(16, 185, 129, 0.2); color: var(--forest-color); border: 1px solid var(--forest-color); }
-    .tag-agri { background: rgba(245, 158, 11, 0.2); color: var(--agri-color); border: 1px solid var(--agri-color); }
-    .tag-other { background: rgba(99, 102, 241, 0.2); color: var(--other-color); border: 1px solid var(--other-color); }
-
-    .data-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 6px 0;
-      font-size: 12px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    }
-
-    .data-row .key { color: var(--text-muted); }
-    .data-row .val { font-weight: 600; font-family: 'JetBrains Mono', monospace; }
-
-    /* Action Buttons */
-    .btn-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-top: 15px;
-    }
-
-    .btn {
-      background: rgba(255, 255, 255, 0.08);
-      color: var(--text-main);
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      padding: 10px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      transition: all 0.2s;
-    }
-
-    .btn:hover {
-      background: rgba(255, 255, 255, 0.15);
-      border-color: rgba(255, 255, 255, 0.3);
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, #0284c7, #0369a1);
-      border: none;
-      grid-column: span 2;
-    }
-
-    .btn-primary:hover {
-      background: linear-gradient(135deg, #0369a1, #075985);
-    }
-
-    /* Map container */
-    #map {
-      flex: 1;
-      height: 100%;
-      width: 100%;
-      background: #090d16;
-    }
-
-    /* Map Legend */
-    .map-legend {
-      position: absolute;
-      bottom: 24px;
-      right: 24px;
-      background: rgba(15, 23, 42, 0.85);
-      backdrop-filter: blur(12px);
-      border: 1px solid var(--border-color);
-      border-radius: 12px;
-      padding: 14px 18px;
-      z-index: 1000;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    }
-
-    .map-legend h4 {
-      font-size: 12px;
-      font-weight: 700;
-      margin-bottom: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--text-muted);
-    }
-
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 12px;
-      margin-bottom: 6px;
-    }
-
-    /* AI Test Modal */
-    #classify-modal {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: #1e293b;
-      border: 1px solid var(--border-color);
-      border-radius: 16px;
-      padding: 24px;
-      width: 480px;
-      z-index: 2000;
-      box-shadow: 0 20px 50px rgba(0,0,0,0.8);
-      display: none;
-    }
-
-    .modal-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: rgba(0,0,0,0.7);
-      backdrop-filter: blur(4px);
-      z-index: 1999;
-      display: none;
-    }
-
-    .form-group {
-      margin-bottom: 14px;
-    }
-
-    .form-group label {
-      display: block;
-      font-size: 12px;
-      color: var(--text-muted);
-      margin-bottom: 6px;
-    }
-
-    .form-group input {
-      width: 100%;
-      background: rgba(0,0,0,0.3);
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      padding: 8px 12px;
-      color: #fff;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 13px;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Thermal Event Intelligence Dashboard</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <!-- Custom Stylesheet -->
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<div id="app-container">
-  <!-- Sidebar -->
-  <div id="sidebar">
-    <div class="header-bar">
-      <div class="logo-title">
-        <i class="fa-solid fa-fire-flame-curved logo-icon"></i>
-        <div>
-          <h1>AeroThermal AI</h1>
-          <p>NASA FIRMS + OSM Industrial Fire Classifier</p>
+    <!-- RETRACTABLE SIDEBAR NAVIGATION -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="brand-icon"><i class="fa-solid fa-fire-flame-curved"></i></div>
+            <span class="brand-title">THERMAL-AI</span>
+            <button class="toggle-btn" id="sidebar-toggle" aria-label="Toggle Navigation"><i class="fa-solid fa-bars"></i></button>
         </div>
-      </div>
+
+        <nav class="sidebar-menu">
+            <a href="#dashboard-section" class="nav-item active" data-target="dashboard-section"><i class="fa-solid fa-chart-line"></i><span id="nav-dash">Dashboard</span></a>
+            <a href="#map-section" class="nav-item" data-target="map-section"><i class="fa-solid fa-earth-americas"></i><span id="nav-map">Geospatial Map</span></a>
+            <a href="#prediction-section" class="nav-item" data-target="prediction-section"><i class="fa-solid fa-wand-magic-sparkles"></i><span id="nav-predict">AI Predictor</span></a>
+            <a href="#alerts-section" class="nav-item" data-target="alerts-section"><i class="fa-solid fa-bell"></i><span id="nav-alerts">Alerts Center</span></a>
+            <a href="#database-section" class="nav-item" data-target="database-section"><i class="fa-solid fa-database"></i><span id="nav-db">Event Database</span></a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <button class="btn-login-modal" id="open-auth-btn">
+                <i class="fa-solid fa-right-to-bracket"></i>
+                <span id="nav-login">Login / Register</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- MAIN DASHBOARD CONTENT -->
+    <main class="main-content" id="main-content">
+        
+        <!-- TOP APP HEADER WITH MULTILINGUAL & VOICE ASSISTANT -->
+        <header class="top-header">
+            <div class="header-left">
+                <h1 id="app-heading">AI THERMAL EVENT INTELLIGENCE</h1>
+                <p id="app-subheading">NASA FIRMS • OSM • SATELLITE MULTI-MODAL DETECTION</p>
+            </div>
+            
+            <div class="header-right">
+                <!-- Multilingual Controls -->
+                <div class="voice-lang-container">
+                    <select id="language-select" class="lang-dropdown">
+                        <option value="en-US">English</option>
+                        <option value="hi-IN">हिन्दी (Hindi)</option>
+                        <option value="ta-IN">தமிழ் (Tamil)</option>
+                        <option value="te-IN">తెలుగు (Telugu)</option>
+                    </select>
+                    <button id="mic-btn" class="btn-voice-mic">
+                        <i class="fa-solid fa-microphone"></i>
+                        <span id="mic-label">Voice Control</span>
+                    </button>
+                </div>
+
+                <button class="theme-toggle-btn" id="theme-toggle" aria-label="Toggle Dark/Light Mode">
+                    <i class="fa-solid fa-moon" id="theme-icon"></i>
+                </button>
+                
+                <div class="system-status">
+                    <span class="status-indicator"><i class="live-dot"></i> <span id="txt-sys-online">SYSTEM ONLINE</span></span>
+                    <span class="status-sub" id="database-status">DATABASE READY</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- VOICE ASSISTANT TRANSCRIPT FEEDBACK BOX -->
+        <div class="voice-transcript-banner" id="voice-transcript-banner">
+            <i class="fa-solid fa-waveform-lines"></i>
+            <span id="transcript-text">Press Voice Control and say a command (e.g. "Show Odisha", "Filter Industrial")...</span>
+        </div>
+
+        <div class="dashboard-container">
+
+            <!-- MAIN DASHBOARD VIEW -->
+            <div id="dashboard-section" class="view-section active-view">
+                
+                <!-- METRIC CARDS -->
+                <section class="stats-grid">
+                    <div class="stat-card total-card">
+                        <div class="stat-icon"><i class="fa-solid fa-satellite-dish"></i></div>
+                        <div>
+                            <span class="stat-label" id="lbl-total-sources">TOTAL THERMAL SOURCES</span>
+                            <strong id="total-sources">563</strong>
+                        </div>
+                    </div>
+                    <div class="stat-card industrial-card">
+                        <div class="stat-icon"><i class="fa-solid fa-industry"></i></div>
+                        <div>
+                            <span class="stat-label" id="lbl-ind-fires"><i class="fa-solid fa-industry"></i> INDUSTRIAL FIRES</span>
+                            <strong id="industrial-count">123</strong>
+                        </div>
+                    </div>
+                    <div class="stat-card forest-card">
+                        <div class="stat-icon"><i class="fa-solid fa-tree"></i></div>
+                        <div>
+                            <span class="stat-label" id="lbl-forest-fires">FOREST / NATURAL</span>
+                            <strong id="forest-count">212</strong>
+                        </div>
+                    </div>
+                    <div class="stat-card agricultural-card">
+                        <div class="stat-icon"><i class="fa-solid fa-wheat-awn"></i></div>
+                        <div>
+                            <span class="stat-label" id="lbl-agri-fires">AGRICULTURAL</span>
+                            <strong id="agricultural-count">123</strong>
+                        </div>
+                    </div>
+                    <div class="stat-card other-card">
+                        <div class="stat-icon"><i class="fa-solid fa-circle-question"></i></div>
+                        <div>
+                            <span class="stat-label" id="lbl-other-fires">OTHER / UNKNOWN</span>
+                            <strong id="other-count">105</strong>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- FILTERS AND CONTROLS PANEL (STATE & EVENT FILTERS) -->
+                <section class="control-panel">
+                    <div class="filter-grid">
+                        <div class="filter-group">
+                            <label for="state-filter" id="lbl-select-state">Select Jurisdiction / State</label>
+                            <select id="state-filter">
+                                <option value="ALL">All States (National View)</option>
+                                <option value="Odisha">Odisha</option>
+                                <option value="Jharkhand">Jharkhand</option>
+                                <option value="Chhattisgarh">Chhattisgarh</option>
+                                <option value="Maharashtra">Maharashtra</option>
+                                <option value="Karnataka">Karnataka</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="type-filter" id="lbl-event-type">Event Type</label>
+                            <select id="type-filter">
+                                <option value="ALL">All Event Types</option>
+                                <option value="Industrial">Industrial</option>
+                                <option value="Forest/Natural">Forest/Natural</option>
+                                <option value="Agricultural">Agricultural</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="confidence-filter" id="lbl-min-conf">Min Confidence Score (%)</label>
+                            <div class="range-container">
+                                <input type="range" id="confidence-filter" min="0" max="100" value="0">
+                                <output id="confidence-output">0%</output>
+                            </div>
+                        </div>
+                        <div class="filter-group">
+                            <label for="landcover-filter" id="lbl-landcover">Landcover Class</label>
+                            <select id="landcover-filter">
+                                <option value="ALL">All Land Covers</option>
+                                <option value="Built-up">Built-up</option>
+                                <option value="Bare / sparse vegetation">Bare / sparse vegetation</option>
+                                <option value="Grassland">Grassland</option>
+                                <option value="Tree cover">Tree cover</option>
+                                <option value="Cropland">Cropland</option>
+                                <option value="Permanent water bodies">Permanent water bodies</option>
+                                <option value="Shrubland">Shrubland</option>
+                            </select>
+                        </div>
+                        <div class="filter-group search-group">
+                            <label for="search-input" id="lbl-search-id">Search ID / Region</label>
+                            <input type="text" id="search-input" placeholder="e.g. SOURCE_0001">
+                        </div>
+                        <div class="filter-group button-group">
+                            <label>&nbsp;</label>
+                            <button id="reset-btn" class="btn-secondary"><i class="fa-solid fa-rotate-right"></i> <span id="lbl-reset-btn">Reset Filters</span></button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- GEOSPATIAL MAP PANEL -->
+                <section class="map-panel" id="map-section">
+                    <div class="panel-header">
+                        <div>
+                            <span class="panel-kicker">GIS MONITORING</span>
+                            <h2 id="lbl-map-heading">Spatial Distribution & Active Hotspots</h2>
+                        </div>
+                        <span id="visible-count" class="badge">0 EVENTS</span>
+                    </div>
+                    <div id="map" class="map-container"></div>
+                </section>
+
+                <!-- AI PREDICTION ENGINE FORM -->
+                <section class="prediction-panel" id="prediction-section">
+                    <div class="panel-header">
+                        <div>
+                            <span class="panel-kicker">ML ENGINE</span>
+                            <h2 id="lbl-predict-heading">Run AI Classification & Thermal Persistence Analysis</h2>
+                        </div>
+                    </div>
+                    <form id="prediction-form" class="prediction-content">
+                        <div class="input-grid">
+                            <div class="input-group-custom">
+                                <label for="latitude">Latitude</label>
+                                <input type="number" step="any" id="latitude" placeholder="e.g. 20.7957" required>
+                            </div>
+                            <div class="input-group-custom">
+                                <label for="longitude">Longitude</label>
+                                <input type="number" step="any" id="longitude" placeholder="e.g. 85.2547" required>
+                            </div>
+                            <div class="input-group-custom">
+                                <label for="mean_frp">Mean FRP (MW)</label>
+                                <input type="number" step="any" id="mean_frp" placeholder="e.g. 15.4" required>
+                            </div>
+                            <div class="input-group-custom">
+                                <label for="max_frp">Max FRP (MW)</label>
+                                <input type="number" step="any" id="max_frp" placeholder="e.g. 42.1" required>
+                            </div>
+                            <div class="input-group-custom">
+                                <label for="mean_brightness">Mean Brightness (K)</label>
+                                <input type="number" step="any" id="mean_brightness" placeholder="e.g. 325.2" required>
+                            </div>
+                            <div class="input-group-custom">
+                                <label for="max_brightness">Max Brightness (K)</label>
+                                <input type="number" step="any" id="max_brightness" placeholder="e.g. 348.2" required>
+                            </div>
+                            <div class="input-group-custom">
+                                <label for="facility_type">Facility Type</label>
+                                <select id="facility_type">
+                                    <option value="Refinery">Refinery</option>
+                                    <option value="Power Plant">Power Plant</option>
+                                    <option value="Mine">Mine</option>
+                                    <option value="Industrial Area">Industrial Area</option>
+                                    <option value="None">None / Unknown</option>
+                                </select>
+                            </div>
+                            <div class="input-group-custom">
+                                <label for="distance_industry">Distance to Industry (km)</label>
+                                <input type="number" step="any" id="distance_industry" placeholder="e.g. 0.4" required>
+                            </div>
+                            <div class="input-group-custom">
+                                <label for="facilities_1km">Facilities ≤1km</label>
+                                <input type="number" id="facilities_1km" placeholder="e.g. 2" required>
+                            </div>
+                            <div class="input-group-custom">
+                                <label for="facilities_5km">Facilities ≤5km</label>
+                                <input type="number" id="facilities_5km" placeholder="e.g. 5" required>
+                            </div>
+                            <div class="input-group-custom">
+                                <label for="total_detections">Total Detections</label>
+                                <input type="number" id="total_detections" placeholder="e.g. 14" required>
+                            </div>
+                            <div class="input-group-custom">
+                                <label for="active_days">Active Days</label>
+                                <input type="number" id="active_days" placeholder="e.g. 10" required>
+                            </div>
+                            <div class="input-group-custom">
+                                <label for="observation_span">Observation Span (Days)</label>
+                                <input type="number" id="observation_span" placeholder="e.g. 12" required>
+                            </div>
+                        </div>
+                        <button type="submit" id="predict-button" class="btn-primary">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> <span id="lbl-predict-btn">PREDICT & SAVE EVENT</span>
+                        </button>
+                    </form>
+
+                    <div id="prediction-result" class="prediction-result-box hidden">
+                        <div class="result-header">
+                            <i class="fa-solid fa-shield-halved" id="result-icon"></i>
+                            <div>
+                                <span class="panel-kicker">ANALYSIS RESULT</span>
+                                <h3 id="result-type">Industrial Fire</h3>
+                            </div>
+                        </div>
+                        <p id="result-message">Event successfully categorized and added to spatial database.</p>
+                        <div class="score-bars">
+                            <div class="score-item">
+                                <div class="score-info">
+                                    <span>Confidence Score</span>
+                                    <strong id="result-confidence-value">0%</strong>
+                                </div>
+                                <div class="progress-bar">
+                                    <div id="result-confidence-fill" class="progress-fill"></div>
+                                </div>
+                            </div>
+                            <div class="score-item">
+                                <div class="score-info">
+                                    <span>Persistence Score</span>
+                                    <strong id="result-persistence-value">0%</strong>
+                                </div>
+                                <div class="progress-bar">
+                                    <div id="result-persistence-fill" class="progress-fill persistence"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- CRITICAL ALERTS & NATIONAL AUTHORITY DISPATCH -->
+                <section class="alert-center" id="alerts-section">
+                    <div class="panel-header">
+                        <div>
+                            <span class="panel-kicker">EARLY WARNING & AUTHORITY DISPATCH</span>
+                            <h2><i class="fa-solid fa-bell"></i> <span id="lbl-alerts-heading">Thermal Event Alerts</span></h2>
+                        </div>
+                        <button id="send-national-alert-btn" class="btn-authority">
+                            <i class="fa-solid fa-paper-plane"></i> <span id="lbl-dispatch-btn">Dispatch National Authority Alert</span>
+                        </button>
+                    </div>
+                    <div class="alert-summary">
+                        <div class="alert-summary-item high">Critical: <span id="critical-alert-count">0</span></div>
+                        <div class="alert-summary-item medium">High: <span id="high-alert-count">0</span></div>
+                        <div class="alert-summary-item normal">Monitored: <span id="monitor-alert-count">0</span></div>
+                    </div>
+                    <div id="alerts-list" class="alert-list"></div>
+                </section>
+
+                <!-- INSPECTION PANEL -->
+                <section class="details-panel" id="details-panel">
+                    <div class="panel-header">
+                        <div>
+                            <span class="panel-kicker">INSPECTION</span>
+                            <h2>Selected Event Metrics</h2>
+                        </div>
+                    </div>
+                    <div id="details-content">
+                        <p style="text-align: center; color: var(--muted); padding: 20px;">
+                            Select an event from the map or database registry to review diagnostic parameters.
+                        </p>
+                    </div>
+                </section>
+            </div>
+
+            <!-- SEPARATE EVENT DATABASE VIEW SECTION -->
+            <div id="database-section" class="view-section hidden">
+                <section class="table-panel">
+                    <div class="panel-header">
+                        <div>
+                            <span class="panel-kicker">EVENT DATABASE</span>
+                            <h2 id="lbl-db-heading">Detected Thermal Sources Registry</h2>
+                        </div>
+                        <span id="database-count-badge" class="badge">0 TOTAL RECORDS</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Source ID</th>
+                                    <th>State</th>
+                                    <th>Type</th>
+                                    <th>Confidence</th>
+                                    <th>Persistence</th>
+                                    <th>Latitude</th>
+                                    <th>Longitude</th>
+                                    <th>Mean FRP</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-body"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- AUTHENTICATION MODAL -->
+    <div class="auth-modal" id="auth-modal">
+        <div class="auth-card">
+            <button class="auth-close" id="close-auth-btn" aria-label="Close Modal"><i class="fa-solid fa-xmark"></i></button>
+            <div class="auth-tabs">
+                <button class="auth-tab active" id="tab-login">Login</button>
+                <button class="auth-tab" id="tab-register">Register</button>
+            </div>
+
+            <button type="button" class="btn-google" id="google-auth-btn">
+                <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"/><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.7-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"/><path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15s.7 5.3 1.9 7.7l3.7-2.9c-.2-.7-.4-1.5-.4-2.3z"/><path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16c1.8 3.7 5.6 7 10.1 7z"/></svg>
+                Continue with Google
+            </button>
+
+            <div class="auth-divider"><span>OR</span></div>
+            
+            <form id="login-form" class="auth-form">
+                <div class="input-group-custom">
+                    <label>Email Address</label>
+                    <input type="email" required placeholder="user@agency.gov">
+                </div>
+                <div class="input-group-custom">
+                    <label>Password</label>
+                    <input type="password" required placeholder="••••••••">
+                </div>
+                <button type="submit" class="btn-primary">Sign In</button>
+            </form>
+
+            <form id="register-form" class="auth-form hidden">
+                <div class="input-group-custom">
+                    <label>Full Name</label>
+                    <input type="text" required placeholder="John Doe">
+                </div>
+                <div class="input-group-custom">
+                    <label>Email Address</label>
+                    <input type="email" required placeholder="user@agency.gov">
+                </div>
+                <div class="input-group-custom">
+                    <label>Password</label>
+                    <input type="password" required placeholder="••••••••">
+                </div>
+                <button type="submit" class="btn-primary">Create Account</button>
+            </form>
+        </div>
     </div>
 
-    <!-- Live Metrics KPI Grid -->
-    <div class="metrics-grid">
-      <div class="metric-card">
-        <div class="label">Industrial Fires</div>
-        <div class="value metric-industrial" id="kpi-industrial">--</div>
-      </div>
-      <div class="metric-card">
-        <div class="label">Forest / Natural</div>
-        <div class="value metric-forest" id="kpi-forest">--</div>
-      </div>
-      <div class="metric-card">
-        <div class="label">Agricultural Burn</div>
-        <div class="value metric-agri" id="kpi-agri">--</div>
-      </div>
-      <div class="metric-card">
-        <div class="label">Risk Alerts</div>
-        <div class="value metric-alerts" id="kpi-alerts">--</div>
-      </div>
-    </div>
+    <!-- TOAST POPUP NOTIFICATIONS -->
+    <div id="toast-container" class="toast-container"></div>
 
-    <!-- Sidebar Content -->
-    <div class="sidebar-content">
-      <!-- Inspector Card -->
-      <div id="inspection-card">
-        <div class="inspection-header">
-          <span style="font-weight: 700; font-size: 14px;" id="ins-id">SOURCE_0001</span>
-          <span class="tag-badge" id="ins-badge">Industrial</span>
-        </div>
-        <div class="data-row">
-          <span class="key">AI Confidence</span>
-          <span class="val" id="ins-conf">98.5%</span>
-        </div>
-        <div class="data-row">
-          <span class="key">Nearest Facility</span>
-          <span class="val" id="ins-fac-name">Panipat Refinery</span>
-        </div>
-        <div class="data-row">
-          <span class="key">Facility Distance</span>
-          <span class="val" id="ins-fac-dist">0.15 km</span>
-        </div>
-        <div class="data-row">
-          <span class="key">Peak FRP</span>
-          <span class="val" id="ins-frp">18.5 MW</span>
-        </div>
-        <div class="data-row">
-          <span class="key">Persistence</span>
-          <span class="val" id="ins-persist">5 Active Days</span>
-        </div>
-        <div class="data-row">
-          <span class="key">Hazard Risk</span>
-          <span class="val" id="ins-risk" style="color: #f87171;">Monitored Flaring</span>
-        </div>
-        <div style="margin-top: 10px; font-size: 11px; color: #94a3b8; background: rgba(255,255,255,0.04); padding: 8px; border-radius: 6px;" id="ins-expl">
-          Located within 0.15 km of refinery flare stack with 5 recurring detections.
-        </div>
-      </div>
-
-      <!-- Filter Controls -->
-      <div class="section-title">
-        <span>Map Overlay Filters</span>
-        <i class="fa-solid fa-sliders"></i>
-      </div>
-      <div class="filter-group">
-        <div class="checkbox-row">
-          <label class="checkbox-label">
-            <input type="checkbox" id="flt-industrial" checked onchange="reloadLayers()">
-            <span class="badge-dot" style="background: var(--industrial-color);"></span>
-            <span>Industrial Fires & Flaring</span>
-          </label>
-          <label class="checkbox-label">
-            <input type="checkbox" id="flt-forest" checked onchange="reloadLayers()">
-            <span class="badge-dot" style="background: var(--forest-color);"></span>
-            <span>Forest / Natural Wildfires</span>
-          </label>
-          <label class="checkbox-label">
-            <input type="checkbox" id="flt-agri" checked onchange="reloadLayers()">
-            <span class="badge-dot" style="background: var(--agri-color);"></span>
-            <span>Agricultural Stubble Burning</span>
-          </label>
-          <label class="checkbox-label">
-            <input type="checkbox" id="flt-other" checked onchange="reloadLayers()">
-            <span class="badge-dot" style="background: var(--other-color);"></span>
-            <span>Other / Unclassified</span>
-          </label>
-          <label class="checkbox-label" style="margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border-color);">
-            <input type="checkbox" id="flt-osm" checked onchange="toggleOSMLayer()">
-            <i class="fa-solid fa-industry" style="color: #a855f7;"></i>
-            <span>OSM Industrial Landmarks</span>
-          </label>
-        </div>
-
-        <div class="slider-row">
-          <div class="slider-label">
-            <span style="color: var(--text-muted);">Min Radiative Power (FRP):</span>
-            <span id="frp-val" style="font-weight: 600;">0 MW</span>
-          </div>
-          <input type="range" id="frp-slider" min="0" max="50" value="0" oninput="document.getElementById('frp-val').innerText = this.value + ' MW'; reloadLayers();">
-        </div>
-      </div>
-
-      <!-- Action Buttons -->
-      <div class="section-title">
-        <span>Backend Actions & Tools</span>
-        <i class="fa-solid fa-bolt"></i>
-      </div>
-      <div class="btn-row">
-        <button class="btn btn-primary" onclick="openClassifyModal()">
-          <i class="fa-solid fa-microchip"></i> Test AI Classifier on Custom Coords
-        </button>
-        <button class="btn" onclick="syncNASAData()">
-          <i class="fa-solid fa-satellite"></i> Ingest Live NASA FIRMS
-        </button>
-        <button class="btn" onclick="downloadReport()">
-          <i class="fa-solid fa-file-csv"></i> Export GIS Report
-        </button>
-        <button class="btn" style="grid-column: span 2;" onclick="window.open('/docs', '_blank')">
-          <i class="fa-solid fa-book"></i> Interactive Swagger API Docs
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Leaflet Map -->
-  <div id="map"></div>
-
-  <!-- Legend -->
-  <div class="map-legend">
-    <h4>Overlay Legend</h4>
-    <div class="legend-item"><span class="badge-dot" style="background: var(--industrial-color);"></span> Industrial Thermal Anomaly</div>
-    <div class="legend-item"><span class="badge-dot" style="background: var(--forest-color);"></span> Forest / Natural Fire</div>
-    <div class="legend-item"><span class="badge-dot" style="background: var(--agri-color);"></span> Agricultural Stubble Fire</div>
-    <div class="legend-item"><span class="badge-dot" style="background: var(--other-color);"></span> Other / Urban Source</div>
-    <div class="legend-item"><i class="fa-solid fa-industry" style="color: #a855f7; font-size: 11px;"></i> OSM Industrial Facility</div>
-  </div>
-</div>
-
-<!-- On-demand Classification Modal -->
-<div class="modal-overlay" id="modal-overlay" onclick="closeClassifyModal()"></div>
-<div id="classify-modal">
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-    <h3 style="font-size: 16px; font-weight: 700;"><i class="fa-solid fa-microchip" style="color: var(--accent);"></i> Real-Time AI Fire Classifier</h3>
-    <i class="fa-solid fa-xmark" style="cursor: pointer;" onclick="closeClassifyModal()"></i>
-  </div>
-  <div class="form-group">
-    <label>Latitude:</label>
-    <input type="number" id="test-lat" step="0.0001" value="22.3423">
-  </div>
-  <div class="form-group">
-    <label>Longitude:</label>
-    <input type="number" id="test-lon" step="0.0001" value="69.8711">
-  </div>
-  <div class="form-group">
-    <label>Fire Radiative Power (MW):</label>
-    <input type="number" id="test-frp" step="0.1" value="18.5">
-  </div>
-  <div class="form-group">
-    <label>Recurring Active Days:</label>
-    <input type="number" id="test-days" value="4">
-  </div>
-  <button class="btn btn-primary" style="margin-top: 10px; width: 100%;" onclick="runRealtimeClassification()">
-    <i class="fa-solid fa-play"></i> Run M3 AI Classification
-  </button>
-  <div id="modal-result" style="margin-top: 16px; padding: 12px; background: rgba(0,0,0,0.3); border-radius: 8px; font-size: 12px; display: none;"></div>
-</div>
-
-<!-- Leaflet JS -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<script>
-  let map, sourcesLayerGroup, osmLayerGroup;
-  let allFeatures = [];
-
-  function initMap() {
-    map = L.map('map', { zoomControl: false }).setView([22.5937, 78.9629], 5);
-    L.control.zoom({ position: 'topright' }).addTo(map);
-
-    // Dark Matter tile layer
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap &copy; CARTO &copy; NASA FIRMS',
-      maxZoom: 19
-    }).addTo(map);
-
-    sourcesLayerGroup = L.layerGroup().addTo(map);
-    osmLayerGroup = L.layerGroup().addTo(map);
-
-    loadAnalyticsSummary();
-    loadSourcesGeoJSON();
-    loadOSMInfrastructure();
-
-    // Click map to copy coords to test modal
-    map.on('click', function(e) {
-      document.getElementById('test-lat').value = e.latlng.lat.toFixed(5);
-      document.getElementById('test-lon').value = e.latlng.lng.toFixed(5);
-    });
-  }
-
-  async function loadAnalyticsSummary() {
-    try {
-      const res = await fetch('/api/v1/analytics/summary');
-      const data = await res.json();
-      document.getElementById('kpi-industrial').innerText = data.industrial_sources + ` (${data.industrial_percentage}%)`;
-      document.getElementById('kpi-forest').innerText = data.forest_natural_sources + ` (${data.forest_percentage}%)`;
-      document.getElementById('kpi-agri').innerText = data.agricultural_sources + ` (${data.agricultural_percentage}%)`;
-      document.getElementById('kpi-alerts').innerText = data.high_risk_anomalies_count;
-    } catch(e) { console.error(e); }
-  }
-
-  async function loadSourcesGeoJSON() {
-    try {
-      const res = await fetch('/api/v1/sources/geojson');
-      const geojson = await res.json();
-      allFeatures = geojson.features || [];
-      renderSources(allFeatures);
-    } catch(e) { console.error(e); }
-  }
-
-  function renderSources(features) {
-    sourcesLayerGroup.clearLayers();
-    const showInd = document.getElementById('flt-industrial').checked;
-    const showForest = document.getElementById('flt-forest').checked;
-    const showAgri = document.getElementById('flt-agri').checked;
-    const showOther = document.getElementById('flt-other').checked;
-    const minFrp = parseFloat(document.getElementById('frp-slider').value) || 0;
-
-    features.forEach(f => {
-      const p = f.properties;
-      const type = p.predicted_event_type;
-
-      if (type === 'Industrial' && !showInd) return;
-      if (type === 'Forest/Natural' && !showForest) return;
-      if (type === 'Agricultural' && !showAgri) return;
-      if (type === 'Other' && !showOther) return;
-      if (p.max_frp < minFrp) return;
-
-      const [lon, lat] = f.geometry.coordinates;
-      const marker = L.circleMarker([lat, lon], {
-        radius: p.marker_radius || 8,
-        fillColor: p.marker_color || '#ef4444',
-        color: '#ffffff',
-        weight: 1.5,
-        opacity: 0.9,
-        fillOpacity: 0.75
-      });
-
-      marker.on('click', () => inspectSource(p));
-      sourcesLayerGroup.addLayer(marker);
-    });
-  }
-
-  function inspectSource(p) {
-    document.getElementById('inspection-card').style.display = 'block';
-    document.getElementById('ins-id').innerText = p.source_id;
-    document.getElementById('ins-badge').innerText = p.predicted_event_type;
-    
-    // Style badge
-    const badge = document.getElementById('ins-badge');
-    badge.className = 'tag-badge ' + (
-      p.predicted_event_type === 'Industrial' ? 'tag-industrial' :
-      p.predicted_event_type === 'Forest/Natural' ? 'tag-forest' :
-      p.predicted_event_type === 'Agricultural' ? 'tag-agri' : 'tag-other'
-    );
-
-    document.getElementById('ins-conf').innerText = p.confidence_pct + '%';
-    document.getElementById('ins-fac-name').innerText = p.nearest_facility_name || 'Industrial Zone';
-    document.getElementById('ins-fac-dist').innerText = p.min_distance_to_industry_km + ' km';
-    document.getElementById('ins-frp').innerText = p.max_frp + ' MW (Mean: ' + p.mean_frp + ' MW)';
-    document.getElementById('ins-persist').innerText = p.active_days + ' Active Days (' + p.total_detections + ' Detections)';
-    document.getElementById('ins-risk').innerText = p.risk_level;
-    document.getElementById('ins-expl').innerText = p.risk_description || 'Monitored thermal source signature.';
-  }
-
-  async function loadOSMInfrastructure() {
-    try {
-      const res = await fetch('/api/v1/infrastructure/geojson');
-      const geojson = await res.json();
-      osmLayerGroup.clearLayers();
-
-      geojson.features.forEach(f => {
-        const p = f.properties;
-        const [lon, lat] = f.geometry.coordinates;
-
-        const icon = L.divIcon({
-          className: 'custom-div-icon',
-          html: `<div style="background:#7c3aed; width:22px; height:22px; border-radius:6px; display:flex; align-items:center; justify-content:center; color:#fff; border:1px solid #fff; box-shadow:0 0 8px #7c3aed;"><i class="fa-solid fa-industry" style="font-size:11px;"></i></div>`,
-          iconSize: [22, 22],
-          iconAnchor: [11, 11]
-        });
-
-        const marker = L.marker([lat, lon], { icon: icon });
-        marker.bindPopup(`<b>${p.name}</b><br><span style="font-size:11px; color:#a78bfa;">${p.type.toUpperCase()} | ${p.capacity}</span>`);
-        osmLayerGroup.addLayer(marker);
-      });
-    } catch(e) { console.error(e); }
-  }
-
-  function reloadLayers() {
-    renderSources(allFeatures);
-  }
-
-  function toggleOSMLayer() {
-    const checked = document.getElementById('flt-osm').checked;
-    if (checked) {
-      map.addLayer(osmLayerGroup);
-    } else {
-      map.removeLayer(osmLayerGroup);
-    }
-  }
-
-  async function syncNASAData() {
-    alert('Triggering NASA FIRMS live synchronization & DBSCAN clustering...');
-    try {
-      const res = await fetch('/api/v1/firms/sync', { method: 'POST' });
-      const data = await res.json();
-      alert(data.message);
-      loadAnalyticsSummary();
-      loadSourcesGeoJSON();
-    } catch(e) { alert('Sync error: ' + e); }
-  }
-
-  function downloadReport() {
-    window.location.href = '/api/v1/export/report?format=csv';
-  }
-
-  function openClassifyModal() {
-    document.getElementById('modal-overlay').style.display = 'block';
-    document.getElementById('classify-modal').style.display = 'block';
-  }
-
-  function closeClassifyModal() {
-    document.getElementById('modal-overlay').style.display = 'none';
-    document.getElementById('classify-modal').style.display = 'none';
-  }
-
-  async function runRealtimeClassification() {
-    const lat = parseFloat(document.getElementById('test-lat').value);
-    const lon = parseFloat(document.getElementById('test-lon').value);
-    const frp = parseFloat(document.getElementById('test-frp').value);
-    const active_days = parseInt(document.getElementById('test-days').value);
-
-    try {
-      const res = await fetch('/api/v1/classify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ latitude: lat, longitude: lon, frp: frp, active_days: active_days })
-      });
-      const data = await res.json();
-
-      const resDiv = document.getElementById('modal-result');
-      resDiv.style.display = 'block';
-      resDiv.innerHTML = `
-        <div style="font-weight:700; font-size:14px; margin-bottom:6px; color:#38bdf8;">Classification Result: ${data.predicted_event_type} (${data.confidence_pct}%)</div>
-        <div>Nearest Infrastructure: <b>${data.nearest_facility_name || 'Industrial Facility'}</b> (${data.nearest_facility_distance_km} km away)</div>
-        <div>Hazard Severity: <b>${data.risk_level}</b></div>
-        <div style="margin-top:6px; color:#94a3b8;">${data.explanation.join(' &bull; ')}</div>
-      `;
-
-      // Also pan map
-      map.setView([lat, lon], 10);
-      L.circleMarker([lat, lon], { radius: 12, color: '#38bdf8', fillColor: '#38bdf8', fillOpacity: 0.8 }).addTo(map)
-        .bindPopup(`<b>AI Classified: ${data.predicted_event_type}</b><br>Confidence: ${data.confidence_pct}%`).openPopup();
-    } catch(e) { alert('Classification error: ' + e); }
-  }
-
-  window.onload = initMap;
-</script>
+    <!-- Leaflet & Data Libraries -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <!-- Core Application JavaScript -->
+    <script src="app.js"></script>
 </body>
 </html>

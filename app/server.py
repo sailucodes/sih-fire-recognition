@@ -1,4 +1,4 @@
-﻿import os
+import os
 import sys
 import json
 from pathlib import Path
@@ -50,7 +50,7 @@ class AeroThermalHTTPHandler(BaseHTTPRequestHandler):
         query_params = parse_qs(parsed.query)
 
         # 1. Root / Map Visualizer
-        if path in ["", "/", "/map"]:
+        if path in ["", "/", "/map", "/frontend", "/frontend/", "/frontend/index.html", "/index.html"]:
             self._serve_static_html("index.html")
             return
 
@@ -63,7 +63,14 @@ class AeroThermalHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(SWAGGER_HTML.encode("utf-8"))
             return
 
-        # 3. API Dispatch
+        # 3. Static Assets (CSS, JS, CSV, Images)
+        clean_name = path.lstrip("/").replace("frontend/", "")
+        static_file = STATIC_DIR / clean_name
+        if static_file.is_file() and not ".." in clean_name:
+            self._serve_file(static_file)
+            return
+
+        # 4. API Dispatch
         status, headers, content = router.handle_request("GET", path, query_params, b"")
         self._send_custom_response(status, headers, content)
 
@@ -78,16 +85,38 @@ class AeroThermalHTTPHandler(BaseHTTPRequestHandler):
         status, headers, content = router.handle_request("POST", path, query_params, body_data)
         self._send_custom_response(status, headers, content)
 
-    def _serve_static_html(self, filename: str):
-        filepath = STATIC_DIR / filename
-        if os.path.exists(filepath):
+    def _serve_file(self, filepath: Path):
+        content_types = {
+            ".html": "text/html; charset=utf-8",
+            ".css": "text/css; charset=utf-8",
+            ".js": "application/javascript; charset=utf-8",
+            ".json": "application/json; charset=utf-8",
+            ".csv": "text/csv; charset=utf-8",
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".svg": "image/svg+xml",
+            ".ico": "image/x-icon"
+        }
+        ext = filepath.suffix.lower()
+        ctype = content_types.get(ext, "application/octet-stream")
+        try:
             with open(filepath, "rb") as f:
                 data = f.read()
             self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Type", ctype)
             self._send_cors_headers()
+            self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             self.wfile.write(data)
+        except Exception:
+            self.send_response(500)
+            self.end_headers()
+            self.wfile.write(b"Error reading static file")
+
+    def _serve_static_html(self, filename: str):
+        filepath = STATIC_DIR / filename
+        if os.path.exists(filepath):
+            self._serve_file(filepath)
         else:
             self.send_response(404)
             self.end_headers()
