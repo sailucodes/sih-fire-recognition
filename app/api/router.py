@@ -452,18 +452,197 @@ class APIRouter:
                 "description": "Enterprise Geospatial AI REST & GeoJSON backend for SIH Fire Recognition. Supports Auth, Multilingual Translations, Voice Control, Dual CSV Streaming, and National Alert Briefing."
             },
             "paths": {
-                "/api/v1/health": {"get": {"summary": "Health check & model status"}},
-                "/predict": {"get": {"summary": "Live AI Prediction endpoint"}, "post": {"summary": "Live AI Prediction endpoint matching teammate frontend"}},
-                "/api/v1/auth/register": {"post": {"summary": "Register new authority/analyst user"}},
-                "/api/v1/auth/login": {"post": {"summary": "User authentication credentials login"}},
-                "/api/v1/auth/google": {"post": {"summary": "Google OAuth authentication verification"}},
-                "/api/v1/languages": {"get": {"summary": "Get supported Indian languages list"}},
-                "/api/v1/translations/{lang}": {"get": {"summary": "Get UI translations for specific Indian language"}},
-                "/api/v1/voice/command": {"post": {"summary": "Natural language speech transcript intent processing"}},
-                "/api/v1/alerts/dispatch": {"post": {"summary": "Dispatch urgent incident briefing to NDMA"}},
-                "/event_classification_features.csv": {"get": {"summary": "Event classification features CSV"}},
-                "/source_persistence_features.csv": {"get": {"summary": "Source persistence features CSV"}},
-                "/predictions.csv": {"get": {"summary": "Unified predictions CSV"}}
+                "/api/v1/health": {
+                    "get": {
+                        "summary": "Health check & model status",
+                        "description": "Returns system health, total thermal sources, OSM facilities, active alerts, and model status.",
+                        "responses": {"200": {"description": "System healthy"}}
+                    }
+                },
+                "/predict": {
+                    "get": {
+                        "summary": "Live AI Prediction endpoint (Query Parameters)",
+                        "description": "Run AI classification using query parameters.",
+                        "parameters": [
+                            {"name": "latitude", "in": "query", "required": False, "schema": {"type": "number", "default": 29.4614}, "description": "Latitude coordinate"},
+                            {"name": "longitude", "in": "query", "required": False, "schema": {"type": "number", "default": 76.8636}, "description": "Longitude coordinate"},
+                            {"name": "mean_frp", "in": "query", "required": False, "schema": {"type": "number", "default": 45.0}, "description": "Fire Radiative Power (MW)"},
+                            {"name": "state", "in": "query", "required": False, "schema": {"type": "string", "default": "Odisha"}, "description": "Indian State jurisdiction"}
+                        ],
+                        "responses": {"200": {"description": "Prediction result with confidence and SIH alert severity"}}
+                    },
+                    "post": {
+                        "summary": "Live AI Prediction endpoint (JSON Body)",
+                        "description": "Submit full satellite and GIS parameters for real-time Random Forest inference.",
+                        "requestBody": {
+                            "required": False,
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "latitude": {"type": "number", "example": 29.4614},
+                                            "longitude": {"type": "number", "example": 76.8636},
+                                            "mean_frp": {"type": "number", "example": 45.0},
+                                            "max_frp": {"type": "number", "example": 85.0},
+                                            "state": {"type": "string", "example": "Odisha"},
+                                            "facility_type": {"type": "string", "example": "Refinery"},
+                                            "distance_industry": {"type": "number", "example": 0.1},
+                                            "active_days": {"type": "integer", "example": 10},
+                                            "observation_span": {"type": "integer", "example": 20}
+                                        }
+                                    },
+                                    "example": {
+                                        "latitude": 29.4614,
+                                        "longitude": 76.8636,
+                                        "mean_frp": 45.0,
+                                        "max_frp": 85.0,
+                                        "state": "Odisha",
+                                        "facility_type": "Refinery",
+                                        "distance_industry": 0.1,
+                                        "active_days": 10,
+                                        "observation_span": 20
+                                    }
+                                }
+                            }
+                        },
+                        "responses": {"200": {"description": "AI Classification Output"}}
+                    }
+                },
+                "/api/v1/auth/register": {
+                    "post": {
+                        "summary": "Register new authority/analyst user",
+                        "description": "Creates a new user record with credentials and returns session token.",
+                        "requestBody": {
+                            "required": False,
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "email": {"type": "string", "example": "officer.sih@gov.in"},
+                                            "password": {"type": "string", "example": "Password@123"},
+                                            "name": {"type": "string", "example": "Officer Sharma"},
+                                            "role": {"type": "string", "example": "State Emergency Analyst"},
+                                            "organization": {"type": "string", "example": "State Disaster Management Authority"}
+                                        }
+                                    },
+                                    "example": {
+                                        "email": "officer.sih@gov.in",
+                                        "password": "Password@123",
+                                        "name": "Officer Sharma",
+                                        "role": "State Emergency Analyst",
+                                        "organization": "State Disaster Management Authority"
+                                    }
+                                }
+                            }
+                        },
+                        "responses": {"200": {"description": "Registration successful"}}
+                    }
+                },
+                "/api/v1/auth/login": {
+                    "post": {
+                        "summary": "User authentication credentials login",
+                        "description": "Authenticates user and returns JWT session token.",
+                        "requestBody": {
+                            "required": False,
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "email": {"type": "string", "example": "admin@sih.gov.in"},
+                                            "password": {"type": "string", "example": "Admin@123"}
+                                        }
+                                    },
+                                    "example": {
+                                        "email": "admin@sih.gov.in",
+                                        "password": "Admin@123"
+                                    }
+                                }
+                            }
+                        },
+                        "responses": {"200": {"description": "Login successful"}}
+                    }
+                },
+                "/api/v1/voice/command": {
+                    "post": {
+                        "summary": "Natural language speech transcript intent processing",
+                        "description": "Parses voice transcript and extracts state, event type, and dispatch intents.",
+                        "requestBody": {
+                            "required": False,
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "command": {"type": "string", "example": "Show Odisha"},
+                                            "language": {"type": "string", "example": "en-US"}
+                                        }
+                                    },
+                                    "example": {
+                                        "command": "Show Odisha",
+                                        "language": "en-US"
+                                    }
+                                }
+                            }
+                        },
+                        "responses": {"200": {"description": "Parsed intent and spoken voice reply"}}
+                    }
+                },
+                "/api/v1/alerts/dispatch": {
+                    "post": {
+                        "summary": "Dispatch urgent incident briefing to NDMA",
+                        "description": "Queues high-priority thermal incident briefing to National Disaster Authority.",
+                        "requestBody": {
+                            "required": False,
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "state": {"type": "string", "example": "Odisha"},
+                                            "critical_count": {"type": "integer", "example": 5},
+                                            "high_count": {"type": "integer", "example": 12},
+                                            "officer_email": {"type": "string", "example": "chief.ndma@gov.in"}
+                                        }
+                                    },
+                                    "example": {
+                                        "state": "Odisha",
+                                        "critical_count": 5,
+                                        "high_count": 12,
+                                        "officer_email": "chief.ndma@gov.in"
+                                    }
+                                }
+                            }
+                        },
+                        "responses": {"200": {"description": "Briefing dispatched"}}
+                    }
+                },
+                "/api/v1/languages": {
+                    "get": {
+                        "summary": "Get supported Indian languages list",
+                        "responses": {"200": {"description": "List of 5 supported languages"}}
+                    }
+                },
+                "/event_classification_features.csv": {
+                    "get": {
+                        "summary": "Event classification features CSV",
+                        "responses": {"200": {"description": "CSV stream"}}
+                    }
+                },
+                "/source_persistence_features.csv": {
+                    "get": {
+                        "summary": "Source persistence features CSV",
+                        "responses": {"200": {"description": "CSV stream"}}
+                    }
+                },
+                "/predictions.csv": {
+                    "get": {
+                        "summary": "Unified predictions CSV",
+                        "responses": {"200": {"description": "CSV stream"}}
+                    }
+                }
             }
         }
         return 200, headers, json.dumps(spec, indent=2).encode("utf-8")
