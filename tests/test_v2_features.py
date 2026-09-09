@@ -15,15 +15,17 @@ class TestV2BackendFeatures(unittest.TestCase):
         self.assertTrue(login_res["success"])
         self.assertIn("token", login_res)
 
-        # Test New Registration
-        reg_res = auth_service.register("officer.odisha@gov.in", "Password@123", "Odisha EOC Officer")
+        # Test New Registration (Idempotent)
+        import time
+        test_email = f"test_officer_{int(time.time()*1000)}@gov.in"
+        reg_res = auth_service.register(test_email, "Password@123", "Odisha EOC Officer")
         self.assertTrue(reg_res["success"])
         self.assertIn("token", reg_res)
 
         # Test Token Verification
         user = auth_service.verify_token(reg_res["token"])
         self.assertIsNotNone(user)
-        self.assertEqual(user["email"], "officer.odisha@gov.in")
+        self.assertEqual(user["email"], test_email)
 
     def test_voice_nlp_intents(self):
         # English State Intent
