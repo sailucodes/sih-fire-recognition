@@ -1,47 +1,63 @@
+import os
 import requests
 import datetime
 from typing import List, Dict, Any, Optional
 
 class NASAFIRMSService:
-    def __init__(self, api_key: str = "DEMO_KEY"):
-        self.api_key = api_key
+    def __init__(self, api_key: Optional[str] = None):
+        # Support both NASA_FIRMS_MAP_KEY and NASA_FIRMS_API_KEY environment variables
+        self.api_key = api_key or os.environ.get("NASA_FIRMS_MAP_KEY") or os.environ.get("NASA_FIRMS_API_KEY")
 
     def fetch_live_hotspots(self, country_code: str = "IND", days: int = 1) -> List[Dict[str, Any]]:
         """
         Fetch real-time active fire anomalies from NASA FIRMS VIIRS / MODIS.
-        Falls back to realistic simulation if API key is invalid or offline.
+        Requires a valid NASA FIRMS MAP_KEY via environment variable or constructor.
+        Does NOT silently fall back to simulated data when key is missing or request fails.
         """
-        # Attempt NASA FIRMS API Call if valid key
-        if self.api_key and self.api_key != "DEMO_KEY":
-            try:
-                url = f"https://firms.modaps.eosdis.nasa.gov/api/country/csv/{self.api_key}/VIIRS_SNPP_NRT/{country_code}/{days}"
-                resp = requests.get(url, timeout=10)
-                if resp.status_code == 200 and "latitude" in resp.text:
-                    lines = resp.text.strip().split("\n")
-                    header = [c.strip() for c in lines[0].split(",")]
-                    results = []
-                    for row in lines[1:]:
-                        vals = [v.strip() for v in row.split(",")]
-                        if len(vals) == len(header):
-                            d = dict(zip(header, vals))
-                            results.append({
-                                "latitude": float(d.get("latitude", 0)),
-                                "longitude": float(d.get("longitude", 0)),
-                                "frp": float(d.get("frp", 5.0) or 5.0),
-                                "brightness": float(d.get("bright_ti4", 320.0) or 320.0),
-                                "acq_date": d.get("acq_date", "2026-08-25"),
-                                "acq_time": d.get("acq_time", "1200"),
-                                "satellite": "VIIRS",
-                                "confidence": d.get("confidence", "nominal"),
-                                "daynight": d.get("daynight", "D")
-                            })
-                    if results:
-                        return results
-            except Exception as e:
-                print(f"NASA FIRMS API fetch notice: {e}, using live realistic hotspot generator")
+        api_key = self.api_key or os.environ.get("NASA_FIRMS_MAP_KEY") or os.environ.get("NASA_FIRMS_API_KEY")
+        if not api_key or api_key.strip() in ["", "DEMO_KEY"]:
+            raise ValueError(
+                "NASA FIRMS MAP_KEY is not configured. Please set the 'NASA_FIRMS_MAP_KEY' "
+                "(or 'NASA_FIRMS_API_KEY') environment variable with a valid Earthdata MAP_KEY "
+                "from https://firms.modaps.eosdis.nasa.gov/api/map_key/."
+            )
 
-        # High-fidelity realistic simulation across major industrial, forest, and agricultural zones
-        return self._generate_simulated_firms_data()
+        url = f"https://firms.modaps.eosdis.nasa.gov/api/country/csv/{api_key.strip()}/VIIRS_SNPP_NRT/{country_code}/{days}"
+        try:
+            resp = requests.get(url, timeout=15)
+        except requests.exceptions.RequestException as e:
+            raise RuntimeError(f"Failed to connect to NASA FIRMS API ({url}): {e}")
+
+        if resp.status_code != 200:
+            raise RuntimeError(
+                f"NASA FIRMS API returned HTTP {resp.status_code}: {resp.text[:200]}"
+            )
+
+        if "latitude" not in resp.text:
+            raise RuntimeError(
+                f"Invalid response from NASA FIRMS API. Expected CSV with 'latitude', got: {resp.text[:200]}"
+            )
+
+        lines = resp.text.strip().split("\n")
+        header = [c.strip() for c in lines[0].split(",")]
+        results = []
+        for row in lines[1:]:
+            vals = [v.strip() for v in row.split(",")]
+            if len(vals) == len(header):
+                d = dict(zip(header, vals))
+                results.append({
+                    "latitude": float(d.get("latitude", 0)),
+                    "longitude": float(d.get("longitude", 0)),
+                    "frp": float(d.get("frp", 5.0) or 5.0),
+                    "brightness": float(d.get("bright_ti4", 320.0) or 320.0),
+                    "acq_date": d.get("acq_date", datetime.date.today().isoformat()),
+                    "acq_time": d.get("acq_time", "1200"),
+                    "satellite": "VIIRS",
+                    "confidence": d.get("confidence", "nominal"),
+                    "daynight": d.get("daynight", "D")
+                })
+
+        return results
 
     def _generate_simulated_firms_data(self) -> List[Dict[str, Any]]:
         today_str = datetime.date.today().isoformat()

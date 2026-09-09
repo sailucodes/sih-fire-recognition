@@ -346,6 +346,7 @@ class ThermalStorageService:
             "forest_natural_sources": counts["Forest/Natural"],
             "agricultural_sources": counts["Agricultural"],
             "other_sources": counts["Other"],
+            "industrial_percentage": round((counts["Industrial"] / total) * 100, 2) if total > 0 else 0.0,
             "persistent_sources_count": persistent_count,
             "critical_alerts_count": critical_count,
             "high_alerts_count": high_count,
