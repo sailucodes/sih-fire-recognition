@@ -608,51 +608,180 @@ window.showEventDetails = function(sourceId) {
     document.getElementById("details-panel")?.scrollIntoView({ behavior: 'smooth' });
 };
 
-/* AI PREDICTION FORM */
+/* AI PREDICTION FORM - INTEGRATED WITH BACKEND M3 ML ENGINE */
 function setupPredictionForm() {
     const form = document.getElementById("prediction-form");
     if (!form) return;
 
-    form.addEventListener("submit", function (e) {
+    form.addEventListener("submit", async function (e) {
         e.preventDefault();
 
-        const activeDays = Number(document.getElementById("active_days")?.value) || 0;
-        const obsSpan = Number(document.getElementById("observation_span")?.value) || 1;
-        const calculatedPersistence = Math.min(100, Math.round((activeDays / obsSpan) * 100));
-        const selectedState = document.getElementById("state-filter")?.value !== "ALL" ? document.getElementById("state-filter").value : "Odisha";
+        const submitBtn = document.getElementById("predict-button");
+        const originalBtnHtml = submitBtn ? submitBtn.innerHTML : "";
+        const resultBox = document.getElementById("prediction-result");
 
-        const payload = {
-            source_id: "PRED_" + Date.now().toString().substring(8),
-            state: selectedState,
-            latitude: Number(document.getElementById("latitude")?.value || 0),
-            longitude: Number(document.getElementById("longitude")?.value || 0),
-            mean_frp: Number(document.getElementById("mean_frp")?.value || 0),
-            predicted_event_type: document.getElementById("facility_type")?.value !== "None" ? "Industrial" : "Agricultural",
-            confidence: Math.floor(Math.random() * (98 - 72 + 1)) + 72,
-            persistence_score: calculatedPersistence,
-            landcover: "Monitored Zone"
+        // 1. Collect all 13 fields from existing prediction form
+        const lat = Number(document.getElementById("latitude")?.value);
+        const lon = Number(document.getElementById("longitude")?.value);
+        const meanFrp = Number(document.getElementById("mean_frp")?.value);
+        const maxFrp = Number(document.getElementById("max_frp")?.value);
+        const meanBrightness = Number(document.getElementById("mean_brightness")?.value);
+        const maxBrightness = Number(document.getElementById("max_brightness")?.value);
+        const facilityType = document.getElementById("facility_type")?.value || "None";
+        const distanceIndustry = Number(document.getElementById("distance_industry")?.value);
+        const facilities1km = Number(document.getElementById("facilities_1km")?.value);
+        const facilities5km = Number(document.getElementById("facilities_5km")?.value);
+        const totalDetections = Number(document.getElementById("total_detections")?.value);
+        const activeDays = Number(document.getElementById("active_days")?.value);
+        const observationSpan = Number(document.getElementById("observation_span")?.value);
+
+        const selectedState = document.getElementById("state-filter")?.value !== "ALL"
+            ? document.getElementById("state-filter").value
+            : detectStateForCoordinates(lat, lon);
+
+        const requestPayload = {
+            latitude: lat,
+            longitude: lon,
+            mean_frp: meanFrp,
+            max_frp: maxFrp,
+            mean_brightness: meanBrightness,
+            max_brightness: maxBrightness,
+            facility_type: facilityType,
+            distance_industry: distanceIndustry,
+            facilities_1km: facilities1km,
+            facilities_5km: facilities5km,
+            total_detections: totalDetections,
+            active_days: activeDays,
+            observation_span: observationSpan,
+            state: selectedState
         };
 
-        saveEventToDatabase(payload);
-        allEvents.unshift(payload);
-        applyFilters();
-
-        const resultBox = document.getElementById("prediction-result");
-        if (resultBox) {
-            resultBox.classList.remove("hidden");
-            setText("result-type", payload.predicted_event_type);
-            setText("result-confidence-value", `${payload.confidence.toFixed(1)}%`);
-            setText("result-persistence-value", `${payload.persistence_score}%`);
-
-            const confFill = document.getElementById("result-confidence-fill");
-            const persFill = document.getElementById("result-persistence-fill");
-            if (confFill) confFill.style.width = `${payload.confidence}%`;
-            if (persFill) persFill.style.width = `${payload.persistence_score}%`;
-            
-            resultBox.scrollIntoView({ behavior: 'smooth' });
+        // Loading state
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>CLASSIFYING WITH AI MODEL...</span>`;
         }
-        
-        showToast(`New prediction recorded: ${payload.source_id}`, "success");
+
+        try {
+            // 2. Real HTTP POST to authoritative backend endpoint
+            const response = await fetch("/api/v1/predict", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(requestPayload)
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || `Backend returned HTTP error ${response.status}`);
+            }
+
+            // 3. Consume authoritative backend response
+            const data = await response.json();
+
+            const authoritativeEventType = data.predicted_event_type || data.event_type || "Other";
+            const authoritativeConfidence = typeof data.confidence_pct === "number"
+                ? data.confidence_pct
+                : typeof data.confidence === "number"
+                    ? data.confidence
+                    : 0.0;
+            const authoritativePersistence = typeof data.persistence_score === "number"
+                ? data.persistence_score
+                : 0.0;
+            const authoritativeRiskLevel = data.risk_level || "LOW";
+            const authoritativeRiskDesc = data.risk_description || "";
+            const probabilities = data.probabilities || {};
+            const isPersistent = Boolean(data.is_persistent);
+            const isFlareAnomaly = Boolean(data.is_flare_anomaly);
+            const alertSeverity = data.sih_alert_severity || "LOW";
+
+            // 4. Display the backend prediction in the UI
+            if (resultBox) {
+                resultBox.classList.remove("hidden");
+                setText("result-type", authoritativeEventType);
+                setText("result-confidence-value", `${authoritativeConfidence.toFixed(1)}%`);
+                setText("result-persistence-value", `${authoritativePersistence.toFixed(1)}%`);
+
+                const confFill = document.getElementById("result-confidence-fill");
+                const persFill = document.getElementById("result-persistence-fill");
+                if (confFill) confFill.style.width = `${Math.min(100, authoritativeConfidence)}%`;
+                if (persFill) persFill.style.width = `${Math.min(100, authoritativePersistence)}%`;
+
+                const resultMessageEl = document.getElementById("result-message");
+                if (resultMessageEl) {
+                    const probEntries = Object.entries(probabilities)
+                        .map(([cls, p]) => `${escapeHTML(cls)}: ${Number(p).toFixed(1)}%`)
+                        .join(" | ");
+
+                    resultMessageEl.innerHTML = `
+                        <strong>Risk:</strong> <span class="badge" style="background:rgba(255,77,90,0.18); color:var(--industrial);">${escapeHTML(authoritativeRiskLevel)}</span>
+                        &nbsp;|&nbsp; <strong>Alert Severity:</strong> <span class="badge" style="background:rgba(34,211,238,0.15); color:var(--cyan);">${escapeHTML(alertSeverity)}</span>
+                        ${isPersistent ? '&nbsp;|&nbsp; <span class="badge" style="background:rgba(245,158,11,0.18); color:var(--agricultural);">PERSISTENT SOURCE</span>' : ''}
+                        ${isFlareAnomaly ? '&nbsp;|&nbsp; <span class="badge" style="background:rgba(255,77,90,0.18); color:var(--industrial);">FLARE ANOMALY</span>' : ''}
+                        <br><span style="color:var(--muted); font-size:12px; display:inline-block; margin-top:6px;">${escapeHTML(authoritativeRiskDesc)}</span>
+                        ${probEntries ? `<br><span style="color:var(--muted); font-size:12px; display:inline-block; margin-top:4px;"><strong>Probabilities:</strong> ${escapeHTML(probEntries)}</span>` : ''}
+                    `;
+                }
+
+                resultBox.scrollIntoView({ behavior: 'smooth' });
+            }
+
+            // 5. Build verified event object and save to database/localStorage
+            const verifiedEvent = {
+                source_id: data.source_id || ("PRED_" + Date.now().toString().substring(8)),
+                state: data.state || selectedState,
+                latitude: lat,
+                longitude: lon,
+                mean_frp: meanFrp,
+                max_frp: maxFrp,
+                predicted_event_type: authoritativeEventType,
+                confidence: authoritativeConfidence,
+                persistence_score: authoritativePersistence,
+                landcover: data.landcover_class || "Monitored Zone",
+                risk_level: authoritativeRiskLevel,
+                risk_description: authoritativeRiskDesc,
+                sih_alert_severity: alertSeverity,
+                is_persistent: isPersistent,
+                is_flare_anomaly: isFlareAnomaly,
+                probabilities: probabilities
+            };
+
+            saveEventToDatabase(verifiedEvent);
+
+            // 6. Prepend verified prediction and refresh dashboard, table, map
+            allEvents.unshift(verifiedEvent);
+            applyFilters();
+
+            showToast(`Verified prediction recorded: ${verifiedEvent.source_id} (${authoritativeEventType})`, "success");
+
+        } catch (err) {
+            console.error("Backend prediction failed:", err);
+            showToast(`Backend connection failed: ${err.message || "Network unreachable"}`, "alert");
+
+            // Visibly show error in prediction result panel without generating fake data
+            if (resultBox) {
+                resultBox.classList.remove("hidden");
+                setText("result-type", "Prediction Unavailable");
+                setText("result-confidence-value", "0.0%");
+                setText("result-persistence-value", "0.0%");
+
+                const confFill = document.getElementById("result-confidence-fill");
+                const persFill = document.getElementById("result-persistence-fill");
+                if (confFill) confFill.style.width = "0%";
+                if (persFill) persFill.style.width = "0%";
+
+                const resultMessageEl = document.getElementById("result-message");
+                if (resultMessageEl) {
+                    resultMessageEl.innerHTML = `<span style="color:var(--industrial);"><strong>Error:</strong> ${escapeHTML(err.message || "Could not reach backend /api/v1/predict. Ensure the backend server is running.")}</span>`;
+                }
+
+                resultBox.scrollIntoView({ behavior: 'smooth' });
+            }
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnHtml;
+            }
+        }
     });
 }
 
