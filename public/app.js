@@ -318,7 +318,7 @@ function startLiveNasaWidget() {
 
 async function updateNasaFirmsWidget() {
     let activeDetections = filteredEvents.length;
-    let criticalCount = filteredEvents.filter(e => e.confidence >= ALERT_RULES.CRITICAL).length;
+    let criticalCount = filteredEvents.filter(e => (parseFloat(e.confidence) || 0) >= ALERT_RULES.CRITICAL).length;
     const now = new Date();
     let timeStr = now.toUTCString().replace("GMT", "UTC");
 
@@ -326,9 +326,29 @@ async function updateNasaFirmsWidget() {
         const firmsRes = await fetch("/api/v1/firms/sync");
         if (firmsRes.ok) {
             const firmsData = await firmsRes.json();
-            if (firmsData.live_feed) {
-                if (firmsData.live_feed.observation_count) activeDetections = firmsData.live_feed.observation_count;
-                if (firmsData.live_feed.last_sync_utc) timeStr = firmsData.live_feed.last_sync_utc + " UTC";
+            if (firmsData.hotspots_count !== undefined) {
+                activeDetections = firmsData.hotspots_count;
+            } else if (firmsData.live_feed && firmsData.live_feed.observation_count) {
+                activeDetections = firmsData.live_feed.observation_count;
+            }
+            if (firmsData.sync_time) {
+                timeStr = now.toUTCString().replace("GMT", "UTC") + " (" + firmsData.sync_time + ")";
+            }
+            if (firmsData.sample_clusters && firmsData.sample_clusters.length > 0) {
+                let added = 0;
+                firmsData.sample_clusters.forEach(sc => {
+                    if (!allEvents.some(ev => String(ev.source_id) === String(sc.source_id))) {
+                        allEvents.unshift(sc);
+                        added++;
+                    }
+                });
+                if (added > 0) {
+                    filteredEvents = [...allEvents];
+                    updateDashboard();
+                    renderMarkers();
+                    renderTable();
+                    updateAlerts();
+                }
             }
         }
     } catch (_) {}
@@ -672,17 +692,61 @@ function initializeAuthModal() {
 }
 
 /* LEAFLET GIS MAP ENGINE */
+let baseLayers = {};
+let overlays = {};
+
 function initializeMap() {
     const mapElement = document.getElementById("map");
     if (!mapElement) return;
 
-    map = L.map("map").setView([20.5937, 78.9629], 5);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    // Base Layer 1: Dark Matter (Default for dark aesthetic)
+    const darkLayer = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+        maxZoom: 19,
+        attribution: "&copy; CartoDB & OpenStreetMap"
+    });
+
+    // Base Layer 2: ESRI High-Resolution Satellite
+    const satelliteLayer = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+        maxZoom: 19,
+        attribution: "Tiles &copy; Esri"
+    });
+
+    // Base Layer 3: Standard Street GIS
+    const streetLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
         attribution: "&copy; OpenStreetMap contributors"
-    }).addTo(map);
+    });
+
+    map = L.map("map", {
+        center: [20.5937, 78.9629],
+        zoom: 5,
+        layers: [darkLayer]
+    });
 
     markersLayer = L.layerGroup().addTo(map);
+
+    // Overlay: NASA GIBS Near Real-Time Active Fires Thermal Overlay
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const dateIso = yesterday.toISOString().split("T")[0];
+    const nasaGibsThermal = L.tileLayer(`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_Thermal_Anomalies_375m_Day/default/${dateIso}/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png`, {
+        tileSize: 256,
+        opacity: 0.85,
+        attribution: "NASA GIBS Thermal Anomalies"
+    });
+
+    baseLayers = {
+        "🌑 Dark Tactical GIS": darkLayer,
+        "🛰️ Satellite Imagery (ESRI)": satelliteLayer,
+        "🗺️ Standard Street Map": streetLayer
+    };
+
+    overlays = {
+        "🔥 Thermal Hotspots": markersLayer,
+        "📡 NASA GIBS Fire Overlay": nasaGibsThermal
+    };
+
+    L.control.layers(baseLayers, overlays, { position: "topright", collapsed: false }).addTo(map);
 }
 
 /* FILTER EVENT LISTENERS: PANS & FILTERS PER SELECTED STATE */
@@ -705,6 +769,8 @@ function setupEventListeners() {
     });
 
     typeFilter?.addEventListener("change", applyFilters);
+    document.getElementById("landcover-filter")?.addEventListener("change", applyFilters);
+    document.getElementById("landcover-filter")?.addEventListener("change", applyFilters);
     minConf?.addEventListener("input", (e) => {
         setText("confidence-output", `${e.target.value}%`);
         applyFilters();
@@ -730,18 +796,20 @@ function applyFilters() {
     const state = document.getElementById("state-filter")?.value || "";
     const type = document.getElementById("type-filter")?.value || "";
     const minConf = parseFloat(document.getElementById("confidence-filter")?.value || 0);
+    const landcover = document.getElementById("landcover-filter")?.value || "ALL";
     const search = (document.getElementById("search-input")?.value || "").toLowerCase().trim();
 
     filteredEvents = allEvents.filter(e => {
         const matchState = !state || String(e.state).toLowerCase() === state.toLowerCase();
         const matchType = !type || normalizeType(e.predicted_event_type) === normalizeType(type);
         const matchConf = (parseFloat(e.confidence) || 0) >= minConf;
+        const matchLandcover = !landcover || landcover === "ALL" || String(e.landcover || "").toLowerCase().includes(landcover.toLowerCase());
         const matchSearch = !search || 
             String(e.source_id).toLowerCase().includes(search) || 
             String(e.state).toLowerCase().includes(search) || 
             String(e.predicted_event_type).toLowerCase().includes(search);
 
-        return matchState && matchType && matchConf && matchSearch;
+        return matchState && matchType && matchConf && matchLandcover && matchSearch;
     });
 
     updateDashboard();

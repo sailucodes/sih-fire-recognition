@@ -865,44 +865,8 @@ th {
     font-weight: 700;
 }
 
-.btn-dismiss-alert {
-    background: rgba(255, 77, 90, 0.12);
-    color: var(--industrial);
-    border: 1px solid rgba(255, 77, 90, 0.35);
-    border-radius: 6px;
-    padding: 6px 12px;
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 600;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    transition: all 0.2s;
-}
-
-.btn-dismiss-alert:hover {
-    background: var(--industrial);
-    color: #ffffff;
-}
-
-.btn-delete-source {
-    background: rgba(255, 77, 90, 0.1);
-    color: var(--industrial);
-    border: 1px solid rgba(255, 77, 90, 0.25);
-    border-radius: 4px;
-    padding: 5px 8px;
-    cursor: pointer;
-    font-size: 12px;
-    margin-left: 6px;
-    transition: all 0.2s;
-}
-
-.btn-delete-source:hover {
-    background: var(--industrial);
-    color: #ffffff;
-}
-
-.hidden { display: none !important; }</style>
+.hidden { display: none !important; }
+</style>
 </head>
 <body>
 
@@ -1107,21 +1071,21 @@ th {
                     <form id="prediction-form" class="prediction-content">
                         <div class="input-grid">
                             <div class="input-group-custom">
-                                <label for="pred-state">State / Union Territory</label>
+                                <label for="pred-state" id="lbl-pred-state-label">State / Union Territory</label>
                                 <select id="pred-state">
                                     <option value="">Select State / UT</option>
                                 </select>
                             </div>
                             <div class="input-group-custom">
-                                <label for="latitude">Latitude</label>
+                                <label for="latitude" id="lbl-latitude-label">Latitude</label>
                                 <input type="number" step="any" id="latitude" placeholder="e.g. 20.7957" required>
                             </div>
                             <div class="input-group-custom">
-                                <label for="longitude">Longitude</label>
+                                <label for="longitude" id="lbl-longitude-label">Longitude</label>
                                 <input type="number" step="any" id="longitude" placeholder="e.g. 85.2547" required>
                             </div>
                             <div class="input-group-custom">
-                                <label for="mean_frp">Mean FRP (MW)</label>
+                                <label for="mean_frp" id="lbl-mean-frp-label">Mean FRP (MW)</label>
                                 <input type="number" step="any" id="mean_frp" placeholder="e.g. 15.4" required>
                             </div>
                         </div>
@@ -1138,14 +1102,9 @@ th {
                             <span class="panel-kicker">EARLY WARNING & AUTHORITY DISPATCH</span>
                             <h2><i class="fa-solid fa-bell"></i> <span id="lbl-alerts-heading">Thermal Event Alerts</span></h2>
                         </div>
-                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                            <button id="clear-all-alerts-btn" class="btn-secondary" style="padding:8px 14px; font-size:13px;">
-                                <i class="fa-solid fa-trash-can"></i> <span>Clear All</span>
-                            </button>
-                            <button id="send-national-alert-btn" class="btn-authority">
-                                <i class="fa-solid fa-paper-plane"></i> <span id="lbl-dispatch-btn">Dispatch National Authority Alert</span>
-                            </button>
-                        </div>
+                        <button id="send-national-alert-btn" class="btn-authority">
+                            <i class="fa-solid fa-paper-plane"></i> <span id="lbl-dispatch-btn">Dispatch National Authority Alert</span>
+                        </button>
                     </div>
                     <div class="alert-summary">
                         <div class="alert-summary-item high">Critical: <span id="critical-alert-count">0</span></div>
@@ -1186,15 +1145,15 @@ th {
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Source ID</th>
-                                    <th>State</th>
-                                    <th>Type</th>
-                                    <th>Confidence</th>
-                                    <th>Persistence</th>
-                                    <th>Latitude</th>
-                                    <th>Longitude</th>
-                                    <th>Mean FRP</th>
-                                    <th>Action</th>
+                                    <th id="th-source-id">Source ID</th>
+                                    <th id="th-state">State</th>
+                                    <th id="th-type">Type</th>
+                                    <th id="th-confidence">Confidence</th>
+                                    <th id="th-persistence">Persistence</th>
+                                    <th id="th-lat">Latitude</th>
+                                    <th id="th-lng">Longitude</th>
+                                    <th id="th-frp">Mean FRP</th>
+                                    <th id="th-action">Action</th>
                                 </tr>
                             </thead>
                             <tbody id="table-body"></tbody>
@@ -1220,209 +1179,19 @@ th {
                 Continue with Google
             </button>
 
-            <div class="auth-divider"><span>OR SIGN IN WITH CREDENTIALS</span></div>
+            <div class="auth-divider"><span>OR</span></div>
             
             <form id="login-form" class="auth-form">
                 <div class="input-group-custom">
                     <label>Email Address</label>
-                    <input type="email" id="login-email" required placeholder="admin@sih.gov.in">
+                    <input type="email" required placeholder="user@agency.gov">
                 </div>
                 <div class="input-group-custom">
                     <label>Password</label>
-                    <input type="password" id="login-password" required placeholder="••••••••">
+                    <input type="password" required placeholder="••••••••">
                 </div>
                 <button type="submit" class="btn-primary">Sign In</button>
             </form>
-
-            <form id="register-form" class="auth-form hidden">
-                <div class="input-group-custom">
-                    <label>Full Name</label>
-                    <input type="text" id="reg-name" required placeholder="Officer Name">
-                </div>
-                <div class="input-group-custom">
-                    <label>Email Address</label>
-                    <input type="email" id="reg-email" required placeholder="officer@agency.gov.in">
-                </div>
-                <div class="input-group-custom">
-                    <label>Password</label>
-                    <input type="password" id="reg-password" required placeholder="••••••••">
-                </div>
-                <div class="input-group-custom">
-                    <label>Organization / Department</label>
-                    <input type="text" id="reg-org" placeholder="e.g. State Disaster Response Authority">
-                </div>
-                <button type="submit" class="btn-primary">Create Account</button>
-            </form>
-        </div>
-    </div>
-
-    <!-- REALISTIC GOOGLE OAUTH ACCOUNT SELECTOR MODAL (EXACT GOOGLE ACCOUNTS DIALOG) -->
-    <div class="auth-modal" id="google-oauth-modal">
-        <div class="auth-card" style="width: 820px; max-width: 95vw; border-radius: 28px; padding: 40px 44px; background: #131314; color: #e3e3e3; border: 1px solid #303030; box-shadow: 0 16px 48px rgba(0,0,0,0.85); font-family: 'Google Sans', Roboto, -apple-system, BlinkMacSystemFont, sans-serif;">
-            <button class="auth-close" id="close-google-modal-btn" aria-label="Close Modal" style="color: #9aa0a6; top: 24px; right: 24px;"><i class="fa-solid fa-xmark"></i></button>
-            
-            <!-- Top Google Brand Header -->
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 32px;">
-                <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"/><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.7-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"/><path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15s.7 5.3 1.9 7.7l3.7-2.9c-.2-.7-.4-1.5-.4-2.3z"/><path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16c1.8 3.7 5.6 7 10.1 7z"/></svg>
-                <span style="font-size: 14px; font-weight: 500; color: #c4c7c5;">Sign in with Google</span>
-            </div>
-
-            <!-- Two-column OAuth Layout -->
-            <div style="display: grid; grid-template-columns: 1fr 1.3fr; gap: 36px; align-items: start;">
-                <!-- Left Column: App Brand & Action -->
-                <div>
-                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #1db954; color: #000; display: flex; align-items: center; justify-content: center; font-size: 26px; margin-bottom: 20px;">
-                        <i class="fa-solid fa-fire-flame-curved"></i>
-                    </div>
-                    <h2 style="font-size: 28px; font-weight: 400; margin: 0 0 12px 0; color: #f1f3f4; line-height: 1.2;">Choose an account</h2>
-                    <p style="font-size: 15px; color: #c4c7c5; margin: 0; line-height: 1.4;">to continue to <strong style="color: #a8c7fa; font-weight: 600;">AI Thermal Intelligence</strong></p>
-                </div>
-
-                <!-- Right Column: Account Selector List -->
-                <div>
-                    <div id="google-accounts-list" style="display: flex; flex-direction: column;">
-                        
-                        <!-- Account 1: University Account -->
-                        <div class="google-acc-row" data-email="sridevi.24bcd7246@vitapstudent.ac.in" data-name="Sridevi" style="display: flex; align-items: center; gap: 14px; padding: 12px 10px; cursor: pointer; border-radius: 8px; transition: background 0.15s ease; border-bottom: 1px solid #282a2c;">
-                            <div style="width: 36px; height: 36px; border-radius: 50%; background: #2e7d32; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 15px;">C</div>
-                            <div style="flex: 1; min-width: 0;">
-                                <div style="font-size: 13.5px; color: #e3e3e3; font-weight: 500;">sridevi.24bcd7246@vitapstudent.ac.in</div>
-                            </div>
-                        </div>
-
-                        <!-- Account 2: Athota Sanjana (Signed out) -->
-                        <div class="google-acc-row" data-email="sanjanaathota@gmail.com" data-name="Athota Sanjana" style="display: flex; align-items: center; gap: 14px; padding: 12px 10px; cursor: pointer; border-radius: 8px; transition: background 0.15s ease; border-bottom: 1px solid #282a2c;">
-                            <div style="width: 36px; height: 36px; border-radius: 50%; background: #0288d1; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; overflow: hidden;">
-                                <i class="fa-solid fa-cloud" style="font-size: 16px;"></i>
-                            </div>
-                            <div style="flex: 1; min-width: 0;">
-                                <div style="font-size: 14px; font-weight: 500; color: #e3e3e3;">Athota Sanjana</div>
-                                <div style="font-size: 12.5px; color: #9aa0a6;">sanjanaathota@gmail.com</div>
-                            </div>
-                            <span style="font-size: 12px; color: #9aa0a6;">Signed out</span>
-                        </div>
-
-                        <!-- Account 3: Sailaja Sridevi Chavala -->
-                        <div class="google-acc-row" data-email="sailajasridevich@gmail.com" data-name="Sailaja Sridevi Chavala" style="display: flex; align-items: center; gap: 14px; padding: 12px 10px; cursor: pointer; border-radius: 8px; transition: background 0.15s ease; border-bottom: 1px solid #282a2c;">
-                            <div style="width: 36px; height: 36px; border-radius: 50%; background: #43a047; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 15px;">S</div>
-                            <div style="flex: 1; min-width: 0;">
-                                <div style="font-size: 14px; font-weight: 500; color: #e3e3e3;">Sailaja Sridevi Chavala</div>
-                                <div style="font-size: 12.5px; color: #9aa0a6;">sailajasridevich@gmail.com</div>
-                            </div>
-                        </div>
-
-                        <!-- Account 4: Sailaja Sridevi Chavala (Secondary) -->
-                        <div class="google-acc-row" data-email="chavalasailajasridevi@gmail.com" data-name="Sailaja Sridevi Chavala" style="display: flex; align-items: center; gap: 14px; padding: 12px 10px; cursor: pointer; border-radius: 8px; transition: background 0.15s ease; border-bottom: 1px solid #282a2c;">
-                            <div style="width: 36px; height: 36px; border-radius: 50%; background: #5c6bc0; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 15px;">S</div>
-                            <div style="flex: 1; min-width: 0;">
-                                <div style="font-size: 14px; font-weight: 500; color: #e3e3e3;">Sailaja Sridevi Chavala</div>
-                                <div style="font-size: 12.5px; color: #9aa0a6;">chavalasailajasridevi@gmail.com</div>
-                            </div>
-                        </div>
-
-                        <!-- Use another account -->
-                        <div class="google-acc-row" id="use-another-account-row" style="display: flex; align-items: center; gap: 14px; padding: 12px 10px; cursor: pointer; border-radius: 8px; transition: background 0.15s ease;">
-                            <div style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; color: #c4c7c5; font-size: 18px;">
-                                <i class="fa-regular fa-circle-user"></i>
-                            </div>
-                            <div style="flex: 1; min-width: 0;">
-                                <div style="font-size: 14px; font-weight: 500; color: #e3e3e3;">Use another account</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- CUSTOM GOOGLE ACCOUNT INPUT FORM (EXPANDS ON CLICK) -->
-                    <div id="custom-google-login-form" class="hidden" style="margin-top: 10px; padding: 12px; background: #1f1f21; border-radius: 8px; border: 1px solid #3c4043;">
-                        <label style="display: block; font-size: 12px; color: #9aa0a6; margin-bottom: 6px;">Enter your device Google Email:</label>
-                        <div style="display: flex; gap: 8px;">
-                            <input type="email" id="custom-google-email-input" placeholder="you@gmail.com" style="flex: 1; padding: 8px 10px; border-radius: 6px; background: #131314; border: 1px solid #5f6368; color: #fff; font-size: 13px;">
-                            <button type="button" id="custom-google-email-submit" style="padding: 8px 14px; background: #0b57d0; color: #fff; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px;">Sign In</button>
-                        </div>
-                    </div>
-
-                    <div id="google-signing-in-indicator" class="hidden" style="text-align: center; padding: 10px; margin-top: 8px;">
-                        <i class="fa-solid fa-circle-notch fa-spin" style="color: #a8c7fa; font-size: 20px;"></i>
-                        <span style="margin-left: 8px; font-size: 13px; color: #a8c7fa; font-weight: 500;">Signing in...</span>
-                    </div>
-
-                    <div style="font-size: 12px; color: #9aa0a6; line-height: 1.5; margin-top: 24px;">
-                        Before using this app, you can review Thermal Intelligence's <a href="#" style="color: #a8c7fa; text-decoration: none;">Privacy Policy</a> and <a href="#" style="color: #a8c7fa; text-decoration: none;">Terms of Service</a>.
-                    </div>
-                </div>
-            </div>
-
-            <!-- Footer: Language & Help/Privacy/Terms -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 36px; padding-top: 16px; border-top: 1px solid #282a2c; font-size: 12px; color: #9aa0a6;">
-                <div>English (United Kingdom) <i class="fa-solid fa-caret-down" style="font-size: 10px; margin-left: 4px;"></i></div>
-                <div style="display: flex; gap: 20px;">
-                    <a href="#" style="color: #9aa0a6; text-decoration: none;">Help</a>
-                    <a href="#" style="color: #9aa0a6; text-decoration: none;">Privacy</a>
-                    <a href="#" style="color: #9aa0a6; text-decoration: none;">Terms</a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- NATIONAL AUTHORITY EMERGENCY DISPATCH CONSOLE MODAL -->
-    <div class="auth-modal" id="authority-dispatch-modal">
-        <div class="auth-card" style="width: 600px; max-width: 95vw; max-height: 90vh; overflow-y: auto;">
-            <button class="auth-close" id="close-dispatch-btn" aria-label="Close Modal"><i class="fa-solid fa-xmark"></i></button>
-            
-            <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 16px;">
-                <div style="width: 44px; height: 44px; border-radius: 10px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #ef4444; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;">
-                    <i class="fa-solid fa-satellite-dish"></i>
-                </div>
-                <div>
-                    <h3 style="margin: 0; font-size: 17px; font-weight: 800; color: var(--text);">🚨 National Rapid Alert Dispatcher</h3>
-                    <p style="margin: 4px 0 0 0; font-size: 12px; color: var(--muted);">NDMA Operations Room & State EOC Direct Link</p>
-                </div>
-            </div>
-
-            <div style="display: flex; flex-direction: column; gap: 14px;">
-                <div class="input-group-custom">
-                    <label style="font-size: 12px; color: var(--muted); font-weight: 600;">Target Jurisdiction / State Command</label>
-                    <select id="dispatch-state-select">
-                        <option value="National">National HQ & All State Commands</option>
-                        <option value="Odisha">Odisha State Disaster Authority (OSDMA)</option>
-                        <option value="Tamil Nadu">Tamil Nadu SDMA & State EOC</option>
-                        <option value="Andhra Pradesh">Andhra Pradesh SDMA</option>
-                        <option value="Maharashtra">Maharashtra State Emergency Operations</option>
-                        <option value="West Bengal">West Bengal State EOC</option>
-                        <option value="Chhattisgarh">Chhattisgarh SDMA</option>
-                        <option value="Jharkhand">Jharkhand Disaster Management</option>
-                        <option value="Gujarat">Gujarat SDMA / GIDM</option>
-                        <option value="Karnataka">Karnataka State Disaster Monitoring</option>
-                    </select>
-                </div>
-
-                <div class="input-group-custom">
-                    <label style="font-size: 12px; color: var(--muted); font-weight: 600;">Alert Priority Level</label>
-                    <select id="dispatch-priority-select">
-                        <option value="CRITICAL_P1">LEVEL 1 - CRITICAL (Immediate Deployment)</option>
-                        <option value="HIGH_P2">LEVEL 2 - HIGH (Standby & Airborne Recon)</option>
-                        <option value="ADVISORY">LEVEL 3 - Early Warning Advisory</option>
-                    </select>
-                </div>
-
-                <div class="input-group-custom">
-                    <label style="font-size: 12px; color: var(--muted); font-weight: 600;">Official Incident Directive</label>
-                    <textarea id="dispatch-directive-text" rows="4" style="width: 100%; box-sizing: border-box; background: var(--panel-light); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; color: var(--text); font-family: monospace; font-size: 12px; resize: vertical;"></textarea>
-                </div>
-
-                <div id="dispatch-success-box" class="hidden" style="padding: 12px 14px; background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.35); border-radius: 6px;">
-                    <div style="display: flex; align-items: center; gap: 10px; color: var(--forest); font-weight: 700; font-size: 13px;">
-                        <i class="fa-solid fa-circle-check"></i>
-                        <span id="dispatch-id-display">TRANSMISSION CONFIRMED: NDMA-DISPATCH-2026</span>
-                    </div>
-                </div>
-
-                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
-                    <button type="button" class="btn-secondary" id="cancel-dispatch-btn">Cancel</button>
-                    <button type="button" class="btn-primary" id="execute-dispatch-btn" style="background: #ef4444; border-color: #ef4444; color: #fff; width: auto; margin-top: 0;">
-                        <i class="fa-solid fa-paper-plane"></i> Transmit Dispatch
-                    </button>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -1432,8 +1201,11 @@ th {
     <!-- External Libraries -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
-    <!-- Pre-compiled Ground Truth Database (Enables 100% Standalone Static Operation) -->
-    <script>/* PRE-LOADED 563 GROUND-TRUTH NASA FIRMS / OSM CLUSTERED SOURCES */
+    <!-- Application Logic -->
+    
+    <!-- Pre-compiled Ground Truth Database -->
+    <script>
+/* PRE-LOADED 563 GROUND-TRUTH NASA FIRMS / OSM CLUSTERED SOURCES */
 const INITIAL_563_EVENTS = [
   {
     "source_id": "SOURCE_0001",
@@ -25645,9 +25417,11 @@ const INITIAL_563_EVENTS = [
     "confidence_pct": "87.33"
   }
 ];
-</script>
+
+    </script>
     <!-- Application Logic -->
-    <script>let allEvents = [];
+    <script>
+let allEvents = [];
 let filteredEvents = [];
 let map = null;
 let markersLayer = null;
@@ -25967,7 +25741,7 @@ function startLiveNasaWidget() {
 
 async function updateNasaFirmsWidget() {
     let activeDetections = filteredEvents.length;
-    let criticalCount = filteredEvents.filter(e => e.confidence >= ALERT_RULES.CRITICAL).length;
+    let criticalCount = filteredEvents.filter(e => (parseFloat(e.confidence) || 0) >= ALERT_RULES.CRITICAL).length;
     const now = new Date();
     let timeStr = now.toUTCString().replace("GMT", "UTC");
 
@@ -25975,9 +25749,29 @@ async function updateNasaFirmsWidget() {
         const firmsRes = await fetch("/api/v1/firms/sync");
         if (firmsRes.ok) {
             const firmsData = await firmsRes.json();
-            if (firmsData.live_feed) {
-                if (firmsData.live_feed.observation_count) activeDetections = firmsData.live_feed.observation_count;
-                if (firmsData.live_feed.last_sync_utc) timeStr = firmsData.live_feed.last_sync_utc + " UTC";
+            if (firmsData.hotspots_count !== undefined) {
+                activeDetections = firmsData.hotspots_count;
+            } else if (firmsData.live_feed && firmsData.live_feed.observation_count) {
+                activeDetections = firmsData.live_feed.observation_count;
+            }
+            if (firmsData.sync_time) {
+                timeStr = now.toUTCString().replace("GMT", "UTC") + " (" + firmsData.sync_time + ")";
+            }
+            if (firmsData.sample_clusters && firmsData.sample_clusters.length > 0) {
+                let added = 0;
+                firmsData.sample_clusters.forEach(sc => {
+                    if (!allEvents.some(ev => String(ev.source_id) === String(sc.source_id))) {
+                        allEvents.unshift(sc);
+                        added++;
+                    }
+                });
+                if (added > 0) {
+                    filteredEvents = [...allEvents];
+                    updateDashboard();
+                    renderMarkers();
+                    renderTable();
+                    updateAlerts();
+                }
             }
         }
     } catch (_) {}
@@ -26321,17 +26115,61 @@ function initializeAuthModal() {
 }
 
 /* LEAFLET GIS MAP ENGINE */
+let baseLayers = {};
+let overlays = {};
+
 function initializeMap() {
     const mapElement = document.getElementById("map");
     if (!mapElement) return;
 
-    map = L.map("map").setView([20.5937, 78.9629], 5);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    // Base Layer 1: Dark Matter (Default for dark aesthetic)
+    const darkLayer = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+        maxZoom: 19,
+        attribution: "&copy; CartoDB & OpenStreetMap"
+    });
+
+    // Base Layer 2: ESRI High-Resolution Satellite
+    const satelliteLayer = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+        maxZoom: 19,
+        attribution: "Tiles &copy; Esri"
+    });
+
+    // Base Layer 3: Standard Street GIS
+    const streetLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
         attribution: "&copy; OpenStreetMap contributors"
-    }).addTo(map);
+    });
+
+    map = L.map("map", {
+        center: [20.5937, 78.9629],
+        zoom: 5,
+        layers: [darkLayer]
+    });
 
     markersLayer = L.layerGroup().addTo(map);
+
+    // Overlay: NASA GIBS Near Real-Time Active Fires Thermal Overlay
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const dateIso = yesterday.toISOString().split("T")[0];
+    const nasaGibsThermal = L.tileLayer(`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_Thermal_Anomalies_375m_Day/default/${dateIso}/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png`, {
+        tileSize: 256,
+        opacity: 0.85,
+        attribution: "NASA GIBS Thermal Anomalies"
+    });
+
+    baseLayers = {
+        "🌑 Dark Tactical GIS": darkLayer,
+        "🛰️ Satellite Imagery (ESRI)": satelliteLayer,
+        "🗺️ Standard Street Map": streetLayer
+    };
+
+    overlays = {
+        "🔥 Thermal Hotspots": markersLayer,
+        "📡 NASA GIBS Fire Overlay": nasaGibsThermal
+    };
+
+    L.control.layers(baseLayers, overlays, { position: "topright", collapsed: false }).addTo(map);
 }
 
 /* FILTER EVENT LISTENERS: PANS & FILTERS PER SELECTED STATE */
@@ -26354,6 +26192,8 @@ function setupEventListeners() {
     });
 
     typeFilter?.addEventListener("change", applyFilters);
+    document.getElementById("landcover-filter")?.addEventListener("change", applyFilters);
+    document.getElementById("landcover-filter")?.addEventListener("change", applyFilters);
     minConf?.addEventListener("input", (e) => {
         setText("confidence-output", `${e.target.value}%`);
         applyFilters();
@@ -26379,18 +26219,20 @@ function applyFilters() {
     const state = document.getElementById("state-filter")?.value || "";
     const type = document.getElementById("type-filter")?.value || "";
     const minConf = parseFloat(document.getElementById("confidence-filter")?.value || 0);
+    const landcover = document.getElementById("landcover-filter")?.value || "ALL";
     const search = (document.getElementById("search-input")?.value || "").toLowerCase().trim();
 
     filteredEvents = allEvents.filter(e => {
         const matchState = !state || String(e.state).toLowerCase() === state.toLowerCase();
         const matchType = !type || normalizeType(e.predicted_event_type) === normalizeType(type);
         const matchConf = (parseFloat(e.confidence) || 0) >= minConf;
+        const matchLandcover = !landcover || landcover === "ALL" || String(e.landcover || "").toLowerCase().includes(landcover.toLowerCase());
         const matchSearch = !search || 
             String(e.source_id).toLowerCase().includes(search) || 
             String(e.state).toLowerCase().includes(search) || 
             String(e.predicted_event_type).toLowerCase().includes(search);
 
-        return matchState && matchType && matchConf && matchSearch;
+        return matchState && matchType && matchConf && matchLandcover && matchSearch;
     });
 
     updateDashboard();
@@ -26974,6 +26816,8 @@ function setupNationalAuthorityAlerts() {
         showDramaticBannerAlert(`Dispatched Official Incident Brief (${criticalCount} Critical Anomalies in ${targetState}) to NDMA & State EOC. Ref: ${dispatchId}`, "AUTHORITY DISPATCH TRANSMITTED");
         showToast(`Dispatched to NDMA & State EOC [${dispatchId}]`, "success");
     });
-}</script>
+}
+    </script>
+
 </body>
 </html>
