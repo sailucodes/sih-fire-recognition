@@ -11,11 +11,13 @@ from app.services.auth_service import auth_service
 from app.services.language_service import language_service
 from app.services.voice_service import voice_service
 from app.services.alert_dispatcher_service import alert_dispatcher_service
+from app.db.database import db_manager
 
 from app.core.feature_engineering import extract_features_for_point
 from app.core.ml_model import ml_engine
 from app.core.anomaly_detector import evaluate_thermal_risk
 from app.core.clustering import cluster_firms_hotspots
+from app.core.spatial_engine import deduce_indian_state
 
 class APIRouter:
     def handle_request(self, method: str, path: str, query_params: Dict[str, List[str]], body_data: bytes) -> Tuple[int, Dict[str, str], bytes]:
@@ -76,10 +78,19 @@ class APIRouter:
             elif parsed_path in ["/api/v1/sources/geojson", "/geojson"] and method == "GET":
                 return self._handle_sources_geojson(query_params, headers)
 
-            # 8. Single Thermal Source Detail
+            # 8. Single Thermal Source Detail & Deletion
             elif parsed_path.startswith("/api/v1/sources/") and method == "GET":
                 source_id = parsed_path.split("/")[-1]
                 return self._handle_source_detail(source_id, headers)
+
+            elif parsed_path.startswith("/api/v1/sources/") and method == "DELETE":
+                source_id = parsed_path.split("/")[-1]
+                success = storage_service.delete_source(source_id)
+                return 200, headers, json.dumps({
+                    "success": success,
+                    "source_id": source_id,
+                    "message": f"Thermal source {source_id} permanently deleted from database & map."
+                }).encode("utf-8")
 
             # 9. Live Prediction Endpoint (Supports GET & POST for /predict)
             elif parsed_path in ["/predict", "/api/v1/predict", "/api/v1/classify"] and method in ["GET", "POST"]:
@@ -100,11 +111,28 @@ class APIRouter:
                 stats = storage_service.get_analytics_summary(state=state)
                 return 200, headers, json.dumps(stats).encode("utf-8")
 
-            # 12. Risk Alerts Listing
+            # 12. Risk Alerts Listing & Dismissal
             elif parsed_path in ["/api/v1/alerts", "/alerts"] and method == "GET":
                 state = query_params.get("state", [None])[0]
                 alerts = storage_service.get_alerts(state=state)
                 return 200, headers, json.dumps({"count": len(alerts), "alerts": alerts}).encode("utf-8")
+
+            elif parsed_path.startswith("/api/v1/alerts/") and method == "DELETE":
+                alert_id = parsed_path.split("/")[-1]
+                success = storage_service.delete_alert(alert_id)
+                return 200, headers, json.dumps({
+                    "success": success,
+                    "alert_id": alert_id,
+                    "message": f"Alert {alert_id} dismissed."
+                }).encode("utf-8")
+
+            elif parsed_path in ["/api/v1/alerts", "/alerts"] and method == "DELETE":
+                cleared_count = storage_service.clear_all_alerts()
+                return 200, headers, json.dumps({
+                    "success": True,
+                    "cleared_count": cleared_count,
+                    "message": f"Successfully cleared all {cleared_count} alerts."
+                }).encode("utf-8")
 
             # 13. Dual CSV Streaming Endpoints (For frontend loadDualCsvData)
             elif parsed_path in ["/event_classification_features.csv", "/data/event_classification_features.csv"] and method == "GET":
@@ -137,9 +165,13 @@ class APIRouter:
             "status": "healthy",
             "system": "AI-Based Industrial Fire & Persistent Thermal Source Detection System",
             "version": "2.0.0",
+            "database_engine": "SQLite 3 (thermal_intel.db)",
+            "database_path": str(db_manager.db_path),
             "model_status": "loaded" if ml_engine.model is not None else "ready",
             "model_classes": ml_engine.classes_,
             "total_thermal_sources_indexed": len(storage_service.sources),
+            "sqlite_thermal_sources_count": db_manager.count_sources(),
+            "sqlite_users_count": db_manager.count_users(),
             "osm_facilities_indexed": len(osm_service.facilities),
             "active_alerts_count": len(storage_service.alerts),
             "dispatched_national_briefs": len(alert_dispatcher_service.dispatches),
@@ -311,7 +343,12 @@ class APIRouter:
         # Calculate persistence score between 0 and 100%
         calculated_persistence = min(100.0, round((active_days / obs_span) * 100, 1))
 
-        state_val = body.get("state") or query_params.get("state", ["Odisha"])[0]
+        # Accurately deduce state jurisdiction from geospatial coordinates
+        provided_state = body.get("state") or query_params.get("state", [None])[0]
+        if not provided_state or provided_state in ["", "Select State / UT", "National", "Unknown"]:
+            state_val = deduce_indian_state(lat, lon)
+        else:
+            state_val = provided_state
 
         fac_type = body.get("facility_type") or body.get("nearest_facility_type")
         if fac_type and fac_type.lower() != "none":
@@ -395,20 +432,43 @@ class APIRouter:
                 "nearest_industrial_area_km": features["nearest_industrial_area_km"],
                 "industrial_facilities_within_5km": features["mean_industrial_facilities_5km"]
             },
+            "mean_frp": round(mean_frp, 2),
+            "max_frp": round(max_frp, 2),
+            "mean_brightness": round(mean_bright, 2),
+            "max_brightness": round(max_bright, 2),
+            "active_days": active_days,
+            "total_detections": detection_count,
+            "observation_span_days": obs_span,
+            "min_distance_to_industry_km": features["min_distance_to_industry_km"],
             "explanation": pred_res["explanation"]
         }
+
+        # Persist verified prediction into SQLite and in-memory storage
+        storage_service.save_new_source(response)
+
         return 200, headers, json.dumps(response, indent=2).encode("utf-8")
 
     def _handle_firms_sync(self, query_params: Dict[str, List[str]], headers: Dict[str, str]) -> Tuple[int, Dict[str, str], bytes]:
         country = query_params.get("country", ["IND"])[0]
-        days = int(query_params.get("days", [1])[0])
+        days = int(query_params.get("days", [5])[0])
+        api_key = query_params.get("key", [None])[0] or query_params.get("map_key", [None])[0]
 
-        raw_hotspots = firms_service.fetch_live_hotspots(country_code=country, days=days)
+        try:
+            raw_hotspots = firms_service.fetch_live_hotspots(country_code=country, days=days, api_key=api_key)
+        except Exception as e:
+            return 400, headers, json.dumps({
+                "status": "error",
+                "error": str(e),
+                "message": "NASA FIRMS live synchronization could not proceed.",
+                "hint": "Set NASA_FIRMS_MAP_KEY environment variable or provide a valid MAP_KEY from https://firms.modaps.eosdis.nasa.gov/api/map_key/"
+            }, indent=2).encode("utf-8")
+
         clustered_sources = cluster_firms_hotspots(raw_hotspots, eps_km=1.5)
         facilities = osm_service.get_all_facilities()
         synced_sources = []
 
-        for c in clustered_sources:
+        for idx, c in enumerate(clustered_sources, start=1):
+            c["source_id"] = f"LIVE_FIRMS_{idx:04d}"
             features = extract_features_for_point(
                 lat=c["latitude"], lon=c["longitude"], frp=c["mean_frp"],
                 detection_count=c["total_detections"], active_days=c["active_days"],
@@ -420,27 +480,56 @@ class APIRouter:
                 c["mean_frp"], c["max_frp"], c["active_days"], c["total_detections"]
             )
 
+            # Determine SIH alert severity based on event type, FRP, and risk
+            if pred_res["predicted_event_type"] == "Industrial" or c.get("max_frp", 0) >= 40.0:
+                sih_alert = "CRITICAL"
+            elif risk_level == "High" or c.get("max_frp", 0) >= 20.0 or c.get("active_days", 0) >= 3:
+                sih_alert = "HIGH"
+            elif risk_level == "Medium":
+                sih_alert = "MEDIUM"
+            else:
+                sih_alert = "LOW"
+
             c["event_type"] = pred_res["predicted_event_type"]
             c["predicted_event_type"] = pred_res["predicted_event_type"]
             c["confidence_pct"] = pred_res["confidence_pct"]
+            c["confidence"] = pred_res["confidence_pct"]
             c["risk_level"] = risk_level
             c["risk_description"] = risk_desc
+            c["sih_alert_severity"] = sih_alert
             c["is_flare_anomaly"] = is_flare_anomaly
             c["is_persistent"] = c["active_days"] >= 3 or c["total_detections"] >= 5
             c["nearest_facility_type"] = features["nearest_facility_type"]
             c["nearest_facility_name"] = features["nearest_facility_name"]
-            c["min_distance_to_industry_km"] = features["min_distance_to_industry_km"]
             c["landcover_class"] = features["landcover_class"]
 
-            storage_service.save_new_source(c)
+            # Dynamic satellite persistence calculation (based on active days, span, detection frequency & industrial proximity)
+            act_days = max(1, int(c.get("active_days", 1)))
+            obs_span = max(1, int(c.get("observation_span_days", days)))
+            tot_dets = max(1, int(c.get("total_detections", 1)))
+            is_ind = pred_res["predicted_event_type"] == "Industrial"
+
+            day_ratio = min(1.0, act_days / obs_span)
+            density_ratio = min(1.0, tot_dets / (act_days * 3.0))
+            ind_boost = 25.0 if is_ind else 0.0
+
+            calc_pers = round(min(98.5, max(14.0, (day_ratio * 50.0) + (density_ratio * 25.0) + ind_boost)), 1)
+            c["persistence_score"] = calc_pers
+
             synced_sources.append(c)
 
+        storage_service.save_new_sources_batch(synced_sources)
+
+        import time
         return 200, headers, json.dumps({
             "status": "success",
-            "message": f"Successfully ingested {len(raw_hotspots)} FIRMS hotspots, clustered into {len(synced_sources)} persistent/dynamic thermal sources.",
+            "message": f"Successfully ingested {len(raw_hotspots)} NASA FIRMS hotspots, clustered into {len(synced_sources)} persistent/dynamic thermal sources.",
+            "source": f"NASA FIRMS VIIRS NRT ({country})",
+            "observation_window_days": days,
+            "sync_time": time.strftime("%H:%M:%S IST"),
             "hotspots_count": len(raw_hotspots),
             "clusters_count": len(synced_sources),
-            "sample_clusters": synced_sources[:5]
+            "sample_clusters": synced_sources
         }, indent=2).encode("utf-8")
 
     def _handle_openapi(self, headers: Dict[str, str]) -> Tuple[int, Dict[str, str], bytes]:

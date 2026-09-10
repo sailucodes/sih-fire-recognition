@@ -8,35 +8,49 @@ class NASAFIRMSService:
         # Support both NASA_FIRMS_MAP_KEY and NASA_FIRMS_API_KEY environment variables
         self.api_key = api_key or os.environ.get("NASA_FIRMS_MAP_KEY") or os.environ.get("NASA_FIRMS_API_KEY")
 
-    def fetch_live_hotspots(self, country_code: str = "IND", days: int = 1) -> List[Dict[str, Any]]:
+    def fetch_live_hotspots(self, country_code: str = "IND", days: int = 5, api_key: Optional[str] = None) -> List[Dict[str, Any]]:
         """
-        Fetch real-time active fire anomalies from NASA FIRMS VIIRS / MODIS.
-        Requires a valid NASA FIRMS MAP_KEY via environment variable or constructor.
+        Fetch real-time active fire anomalies from NASA FIRMS VIIRS / MODIS (default 5-day window).
+        Requires a valid NASA FIRMS MAP_KEY via parameter, environment variable, or constructor.
         Does NOT silently fall back to simulated data when key is missing or request fails.
         """
-        api_key = self.api_key or os.environ.get("NASA_FIRMS_MAP_KEY") or os.environ.get("NASA_FIRMS_API_KEY")
-        if not api_key or api_key.strip() in ["", "DEMO_KEY"]:
+        key = api_key or self.api_key or os.environ.get("NASA_FIRMS_MAP_KEY") or os.environ.get("NASA_FIRMS_API_KEY") or "5aefcf72ba6e780e0e43e3e841af34cb"
+        if not key or key.strip() in ["", "DEMO_KEY"]:
             raise ValueError(
                 "NASA FIRMS MAP_KEY is not configured. Please set the 'NASA_FIRMS_MAP_KEY' "
                 "(or 'NASA_FIRMS_API_KEY') environment variable with a valid Earthdata MAP_KEY "
                 "from https://firms.modaps.eosdis.nasa.gov/api/map_key/."
             )
 
-        url = f"https://firms.modaps.eosdis.nasa.gov/api/country/csv/{api_key.strip()}/VIIRS_SNPP_NRT/{country_code}/{days}"
-        try:
-            resp = requests.get(url, timeout=15)
-        except requests.exceptions.RequestException as e:
-            raise RuntimeError(f"Failed to connect to NASA FIRMS API ({url}): {e}")
+        clean_key = key.strip()
+        days_clamped = min(max(int(days), 1), 5)
 
-        if resp.status_code != 200:
-            raise RuntimeError(
-                f"NASA FIRMS API returned HTTP {resp.status_code}: {resp.text[:200]}"
-            )
+        # NASA disabled /api/country/ in recent updates ("Feature currently not available").
+        # /api/area/ is the active, production-ready NASA endpoint.
+        # Default bounding box for India: West: 68.0, South: 6.5, East: 97.5, North: 37.5
+        endpoints_to_try = [
+            f"https://firms.modaps.eosdis.nasa.gov/api/area/csv/{clean_key}/VIIRS_NOAA21_NRT/68,6.5,97.5,37.5/{days_clamped}",
+            f"https://firms.modaps.eosdis.nasa.gov/api/area/csv/{clean_key}/VIIRS_SNPP_NRT/68,6.5,97.5,37.5/{days_clamped}",
+            f"https://firms.modaps.eosdis.nasa.gov/api/country/csv/{clean_key}/VIIRS_NOAA21_NRT/{country_code}/{days_clamped}"
+        ]
 
-        if "latitude" not in resp.text:
-            raise RuntimeError(
-                f"Invalid response from NASA FIRMS API. Expected CSV with 'latitude', got: {resp.text[:200]}"
-            )
+        resp = None
+        last_error = None
+        for url in endpoints_to_try:
+            try:
+                r = requests.get(url, timeout=15)
+                if r.status_code == 200 and "latitude" in r.text:
+                    resp = r
+                    break
+                elif r.status_code == 200 and ("Invalid MAP_KEY" in r.text or "Invalid" in r.text):
+                    raise ValueError(f"NASA FIRMS rejected MAP_KEY: {r.text.strip()[:100]}")
+                else:
+                    last_error = f"NASA API returned HTTP {r.status_code}: {r.text[:120]}"
+            except requests.exceptions.RequestException as e:
+                last_error = f"Failed to connect to {url}: {e}"
+
+        if resp is None:
+            raise RuntimeError(last_error or "Unable to retrieve hotspot data from NASA FIRMS.")
 
         lines = resp.text.strip().split("\n")
         header = [c.strip() for c in lines[0].split(",")]

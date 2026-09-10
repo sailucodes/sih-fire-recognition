@@ -1,4 +1,5 @@
 import os
+import time
 import pandas as pd
 from pathlib import Path
 from typing import List, Dict, Any, Optional
@@ -6,6 +7,7 @@ from collections import defaultdict
 from app.core.spatial_engine import is_point_in_bbox, haversine_distance
 from app.core.anomaly_detector import evaluate_thermal_risk
 from app.services.osm_service import osm_service
+from app.db.database import db_manager
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 CSV_PATH = BASE_DIR / "data" / "predictions.csv"
@@ -85,6 +87,38 @@ class ThermalStorageService:
         self._initialize_database()
 
     def _initialize_database(self):
+        # 1. If SQLite already contains indexed thermal sources, load from database
+        db_count = db_manager.count_sources()
+        if db_count > 0:
+            db_sources = db_manager.list_all_sources()
+            for s in db_sources:
+                s["is_persistent"] = bool(s.get("is_persistent", 0))
+                s["is_flare_anomaly"] = bool(s.get("is_flare_anomaly", 0))
+                s_id = s["source_id"]
+                self.sources[s_id] = s
+                
+                sih_alert = s.get("sih_alert_severity", "LOW")
+                if sih_alert in ["CRITICAL", "HIGH", "MEDIUM"]:
+                    self.alerts.append({
+                        "alert_id": f"ALERT_{len(self.alerts) + 1:04d}",
+                        "source_id": s_id,
+                        "state": s["state"],
+                        "timestamp": s.get("last_detection", ""),
+                        "latitude": s["latitude"],
+                        "longitude": s["longitude"],
+                        "event_type": s["predicted_event_type"],
+                        "confidence": s["confidence_pct"],
+                        "confidence_pct": s["confidence_pct"],
+                        "persistence_score": s["persistence_score"],
+                        "severity": sih_alert,
+                        "title": f"{sih_alert} Alert: {s['predicted_event_type']} Anomaly in {s['state']} ({s.get('nearest_facility_name', 'Facility')})",
+                        "message": s.get("risk_description", ""),
+                        "facility_context": f"{s.get('nearest_facility_type', 'industrial').title()} ({s.get('min_distance_to_industry_km', 0.0):.2f} km away), FRP: {s.get('max_frp', 0.0):.1f} MW"
+                    })
+            print(f"[OK] SQLite GIS Storage ready: {len(self.sources)} thermal sources loaded from database, {len(self.alerts)} active alerts.")
+            return
+
+        # 2. Seed SQLite database from baseline CSV if database is empty
         if not os.path.exists(CSV_PATH):
             print(f"Notice: CSV data file {CSV_PATH} not found yet.")
             return
@@ -210,7 +244,9 @@ class ThermalStorageService:
                     "facility_context": f"{source_obj['nearest_facility_type'].title()} ({min_dist_ind:.2f} km away), FRP: {max_frp:.1f} MW"
                 })
 
-        print(f"[OK] In-Memory GIS Storage ready: {len(self.sources)} thermal sources loaded, {len(self.alerts)} active alerts.")
+        # Persist all seeded sources into SQLite
+        db_manager.bulk_insert_sources(list(self.sources.values()))
+        print(f"[OK] SQLite GIS Storage initialized & seeded: {len(self.sources)} thermal sources saved to database, {len(self.alerts)} active alerts.")
 
     def get_source(self, source_id: str) -> Optional[Dict[str, Any]]:
         return self.sources.get(source_id)
@@ -283,29 +319,29 @@ class ThermalStorageService:
                 },
                 "properties": {
                     "source_id": s["source_id"],
-                    "state": s["state"],
-                    "event_type": s["event_type"],
-                    "predicted_event_type": s["predicted_event_type"],
-                    "confidence": s["confidence_pct"],
-                    "confidence_pct": s["confidence_pct"],
-                    "persistence_score": s["persistence_score"],
-                    "sih_alert_severity": s["sih_alert_severity"],
-                    "mean_frp": s["mean_frp"],
-                    "max_frp": s["max_frp"],
-                    "mean_brightness": s["mean_brightness"],
-                    "max_brightness": s["max_brightness"],
-                    "active_days": s["active_days"],
-                    "total_detections": s["total_detections"],
-                    "is_persistent": s["is_persistent"],
-                    "is_flare_anomaly": s["is_flare_anomaly"],
-                    "risk_level": s["risk_level"],
-                    "risk_description": s["risk_description"],
-                    "nearest_facility_name": s["nearest_facility_name"],
-                    "nearest_facility_type": s["nearest_facility_type"],
-                    "min_distance_to_industry_km": s["min_distance_to_industry_km"],
-                    "landcover_class": s["landcover_class"],
-                    "marker_color": s["marker_color"],
-                    "marker_radius": max(5, min(20, int(s["mean_frp"] * 1.5)))
+                    "state": s.get("state", "Odisha"),
+                    "event_type": s.get("event_type", "Other"),
+                    "predicted_event_type": s.get("predicted_event_type", "Other"),
+                    "confidence": s.get("confidence_pct", 80.0),
+                    "confidence_pct": s.get("confidence_pct", 80.0),
+                    "persistence_score": s.get("persistence_score", 50.0),
+                    "sih_alert_severity": s.get("sih_alert_severity", "LOW"),
+                    "mean_frp": s.get("mean_frp", 5.0),
+                    "max_frp": s.get("max_frp", 5.0),
+                    "mean_brightness": s.get("mean_brightness", 330.0),
+                    "max_brightness": s.get("max_brightness", 330.0),
+                    "active_days": s.get("active_days", 1),
+                    "total_detections": s.get("total_detections", 1),
+                    "is_persistent": s.get("is_persistent", False),
+                    "is_flare_anomaly": s.get("is_flare_anomaly", False),
+                    "risk_level": s.get("risk_level", "Low"),
+                    "risk_description": s.get("risk_description", ""),
+                    "nearest_facility_name": s.get("nearest_facility_name", "Industrial Complex"),
+                    "nearest_facility_type": s.get("nearest_facility_type", "industrial_area"),
+                    "min_distance_to_industry_km": s.get("min_distance_to_industry_km", 20.0),
+                    "landcover_class": s.get("landcover_class", "Built-up"),
+                    "marker_color": s.get("marker_color", "#457b9d"),
+                    "marker_radius": max(5, min(20, int(float(s.get("mean_frp", 5.0) or 5.0) * 1.5)))
                 }
             }
             features.append(feature)
@@ -365,6 +401,78 @@ class ThermalStorageService:
         if "state" not in source_obj or not source_obj["state"]:
             source_obj["state"] = "Odisha"
         self.sources[s_id] = source_obj
+
+        # Persist to SQLite
+        db_manager.upsert_source(source_obj)
+
+        sih_alert = source_obj.get("sih_alert_severity", "LOW")
+        if sih_alert in ["CRITICAL", "HIGH", "MEDIUM"]:
+            self.alerts.append({
+                "alert_id": f"ALERT_{len(self.alerts) + 1:04d}",
+                "source_id": s_id,
+                "state": source_obj["state"],
+                "timestamp": source_obj.get("last_detection", time.strftime("%Y-%m-%d %H:%M:%S")),
+                "latitude": source_obj["latitude"],
+                "longitude": source_obj["longitude"],
+                "event_type": source_obj.get("predicted_event_type", "Other"),
+                "confidence": source_obj.get("confidence_pct", 80.0),
+                "confidence_pct": source_obj.get("confidence_pct", 80.0),
+                "persistence_score": source_obj.get("persistence_score", 50.0),
+                "severity": sih_alert,
+                "title": f"{sih_alert} Alert: {source_obj.get('predicted_event_type')} Anomaly in {source_obj['state']} ({source_obj.get('nearest_facility_name', 'Facility')})",
+                "message": source_obj.get("risk_description", ""),
+                "facility_context": f"{source_obj.get('nearest_facility_type', 'industrial').title()} ({source_obj.get('min_distance_to_industry_km', 0.0):.2f} km away), FRP: {source_obj.get('max_frp', 0.0):.1f} MW"
+            })
         return s_id
+
+    def save_new_sources_batch(self, sources_list: List[Dict[str, Any]]) -> List[str]:
+        saved_ids = []
+        for s in sources_list:
+            s_id = s.get("source_id") or f"SOURCE_{len(self.sources) + 1:04d}"
+            s["source_id"] = s_id
+            s["marker_color"] = CATEGORY_COLOR_MAP.get(s.get("predicted_event_type", "Other"), "#457b9d")
+            if "state" not in s or not s["state"]:
+                s["state"] = "Odisha"
+            self.sources[s_id] = s
+            saved_ids.append(s_id)
+
+            sih_alert = s.get("sih_alert_severity", "LOW")
+            if sih_alert in ["CRITICAL", "HIGH", "MEDIUM"]:
+                self.alerts.append({
+                    "alert_id": f"ALERT_{len(self.alerts) + 1:04d}",
+                    "source_id": s_id,
+                    "state": s["state"],
+                    "timestamp": s.get("last_detection", time.strftime("%Y-%m-%d %H:%M:%S")),
+                    "latitude": s["latitude"],
+                    "longitude": s["longitude"],
+                    "event_type": s.get("predicted_event_type", "Other"),
+                    "confidence": s.get("confidence_pct", 80.0),
+                    "confidence_pct": s.get("confidence_pct", 80.0),
+                    "persistence_score": s.get("persistence_score", 50.0),
+                    "severity": sih_alert,
+                    "title": f"{sih_alert} Alert: {s.get('predicted_event_type')} Anomaly in {s['state']} ({s.get('nearest_facility_name', 'Facility')})",
+                    "message": s.get("risk_description", ""),
+                    "facility_context": f"{s.get('nearest_facility_type', 'industrial').title()} ({s.get('min_distance_to_industry_km', 0.0):.2f} km away), FRP: {s.get('max_frp', 0.0):.1f} MW"
+                })
+
+        db_manager.bulk_insert_sources(sources_list)
+        return saved_ids
+
+    def delete_source(self, source_id: str) -> bool:
+        if source_id in self.sources:
+            del self.sources[source_id]
+        # remove corresponding alerts
+        self.alerts = [a for a in self.alerts if str(a.get("source_id", "")).strip() != str(source_id).strip()]
+        return db_manager.delete_source(source_id)
+
+    def delete_alert(self, alert_id: str) -> bool:
+        initial_len = len(self.alerts)
+        self.alerts = [a for a in self.alerts if str(a.get("alert_id", "")).strip() != str(alert_id).strip()]
+        return len(self.alerts) < initial_len
+
+    def clear_all_alerts(self) -> int:
+        count = len(self.alerts)
+        self.alerts.clear()
+        return count
 
 storage_service = ThermalStorageService()

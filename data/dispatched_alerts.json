@@ -1,5 +1,18 @@
 [
   {
+    "dispatch_id": "NDMA-SIH-2026-0005",
+    "timestamp": "2026-09-10 18:28:52 UTC",
+    "target_agency": "National Disaster Management Authority (NDMA) & State EOC",
+    "jurisdiction": "Odisha",
+    "summary": "Urgent Incident Brief: 5 Critical & 12 High-Risk Anomalies detected in Odisha.",
+    "dispatched_by": "authority@ndma.gov.in",
+    "critical_events_count": 5,
+    "high_events_count": 12,
+    "status": "DISPATCHED_TO_NDMA_DESK",
+    "priority": "P1-CRITICAL",
+    "recommended_action": "Deploy State Rapid Action Fire Squads & verify industrial perimeter."
+  },
+  {
     "dispatch_id": "NDMA-SIH-2026-0004",
     "timestamp": "2026-09-09 20:41:45 UTC",
     "target_agency": "National Disaster Management Authority (NDMA) & State EOC",

@@ -3,9 +3,7 @@ import json
 import os
 from pathlib import Path
 from typing import Dict, Any, List
-
-DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
-DISPATCH_LOG_FILE = DATA_DIR / "dispatched_alerts.json"
+from app.db.database import db_manager
 
 class AlertDispatcherService:
     def __init__(self):
@@ -13,20 +11,11 @@ class AlertDispatcherService:
         self._load_dispatches()
 
     def _load_dispatches(self):
-        if os.path.exists(DISPATCH_LOG_FILE):
-            try:
-                with open(DISPATCH_LOG_FILE, "r", encoding="utf-8") as f:
-                    self.dispatches = json.load(f)
-            except Exception:
-                self.dispatches = []
-
-    def _save_dispatches(self):
-        os.makedirs(DATA_DIR, exist_ok=True)
-        with open(DISPATCH_LOG_FILE, "w", encoding="utf-8") as f:
-            json.dump(self.dispatches, f, indent=2)
+        self.dispatches = db_manager.list_dispatches(limit=100)
 
     def dispatch_brief(self, state: str = "National", critical_count: int = 0, high_count: int = 0, officer_email: str = "authority@ndma.gov.in") -> Dict[str, Any]:
-        dispatch_id = f"NDMA-SIH-2026-{len(self.dispatches) + 1:04d}"
+        count = db_manager.count_dispatches()
+        dispatch_id = f"NDMA-SIH-2026-{count + 1:04d}"
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S UTC")
 
         record = {
@@ -43,8 +32,8 @@ class AlertDispatcherService:
             "recommended_action": "Deploy State Rapid Action Fire Squads & verify industrial perimeter."
         }
 
+        db_manager.insert_dispatch(record)
         self.dispatches.insert(0, record)
-        self._save_dispatches()
 
         return {
             "success": True,
@@ -54,6 +43,7 @@ class AlertDispatcherService:
         }
 
     def list_dispatches(self, limit: int = 50) -> List[Dict[str, Any]]:
-        return self.dispatches[:limit]
+        return db_manager.list_dispatches(limit=limit)
 
 alert_dispatcher_service = AlertDispatcherService()
+

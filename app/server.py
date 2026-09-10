@@ -85,6 +85,28 @@ class AeroThermalHTTPHandler(BaseHTTPRequestHandler):
         status, headers, content = router.handle_request("POST", path, query_params, body_data)
         self._send_custom_response(status, headers, content)
 
+    def do_DELETE(self):
+        parsed = urlparse(self.path)
+        path = parsed.path
+        query_params = parse_qs(parsed.query)
+
+        content_len = int(self.headers.get("Content-Length", 0))
+        body_data = self.rfile.read(content_len) if content_len > 0 else b""
+
+        status, headers, content = router.handle_request("DELETE", path, query_params, body_data)
+        self._send_custom_response(status, headers, content)
+
+    def do_PUT(self):
+        parsed = urlparse(self.path)
+        path = parsed.path
+        query_params = parse_qs(parsed.query)
+
+        content_len = int(self.headers.get("Content-Length", 0))
+        body_data = self.rfile.read(content_len) if content_len > 0 else b""
+
+        status, headers, content = router.handle_request("PUT", path, query_params, body_data)
+        self._send_custom_response(status, headers, content)
+
     def _serve_file(self, filepath: Path):
         content_types = {
             ".html": "text/html; charset=utf-8",
@@ -108,32 +130,45 @@ class AeroThermalHTTPHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             self.wfile.write(data)
+        except (ConnectionAbortedError, BrokenPipeError, ConnectionResetError):
+            pass
         except Exception:
-            self.send_response(500)
-            self.end_headers()
-            self.wfile.write(b"Error reading static file")
+            try:
+                self.send_response(500)
+                self.end_headers()
+                self.wfile.write(b"Error reading static file")
+            except Exception:
+                pass
 
     def _serve_static_html(self, filename: str):
         filepath = STATIC_DIR / filename
         if os.path.exists(filepath):
             self._serve_file(filepath)
         else:
-            self.send_response(404)
-            self.end_headers()
-            self.wfile.write(b"Static file not found")
+            try:
+                self.send_response(404)
+                self.end_headers()
+                self.wfile.write(b"Static file not found")
+            except Exception:
+                pass
 
     def _send_cors_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
     def _send_custom_response(self, status: int, headers: dict, content: bytes):
-        self.send_response(status)
-        for k, v in headers.items():
-            self.send_header(k, v)
-        self.send_header("Content-Length", str(len(content)))
-        self.end_headers()
-        self.wfile.write(content)
+        try:
+            self.send_response(status)
+            for k, v in headers.items():
+                self.send_header(k, v)
+            self.send_header("Content-Length", str(len(content)))
+            self.end_headers()
+            self.wfile.write(content)
+        except (ConnectionAbortedError, BrokenPipeError, ConnectionResetError):
+            pass
+        except Exception as e:
+            print(f"[ERROR] Sending response: {e}")
 
     def log_message(self, format, *args):
         # Custom clean logging

@@ -30,5 +30,13 @@
     "role": "Analyst",
     "organization": "State Emergency Operations",
     "created_at": "2026-09-09 20:41:35"
+  },
+  "test_officer_1789045132611@gov.in": {
+    "email": "test_officer_1789045132611@gov.in",
+    "name": "Odisha EOC Officer",
+    "password_hash": "14baab42e73a9293cb7d253e4c35cd0a97244802eac00ad093e472bc5762b2f9",
+    "role": "Analyst",
+    "organization": "State Emergency Operations",
+    "created_at": "2026-09-10 18:28:52"
   }
 }
