@@ -150,6 +150,32 @@ body {
     color: var(--muted);
 }
 
+.btn-sync-live {
+    background: linear-gradient(135deg, #0284c7, #0ea5e9);
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 6px rgba(14, 165, 233, 0.35);
+}
+
+.btn-sync-live:hover {
+    background: linear-gradient(135deg, #0369a1, #0284c7);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(14, 165, 233, 0.45);
+}
+
+.btn-sync-live:active {
+    transform: translateY(0);
+}
+
 .nasa-widget-body {
     display: flex;
     gap: 30px;
@@ -1021,7 +1047,12 @@ th {
                 <section class="nasa-firms-widget">
                     <div class="nasa-widget-header">
                         <span class="nasa-badge"><i class="fa-solid fa-satellite"></i> LIVE NASA FIRMS FEED</span>
-                        <span class="nasa-timestamp">Last Sync: <strong id="nasa-last-update">Updating...</strong></span>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span class="nasa-timestamp">Last Sync: <strong id="nasa-last-update">Updating...</strong></span>
+                            <button id="btn-sync-nasa" class="btn-sync-live" onclick="window.manualSyncNasa()" title="Fetch latest real-time satellite data from NASA FIRMS">
+                                <i class="fa-solid fa-rotate" id="sync-icon"></i> <span id="sync-btn-text">Sync Live Data</span>
+                            </button>
+                        </div>
                     </div>
                     <div class="nasa-widget-body">
                         <div class="nasa-stat">
@@ -26029,12 +26060,37 @@ function loadDatabase() {
 /* LIVE DYNAMIC NASA FIRMS STATUS WIDGET */
 function startLiveNasaWidget() {
     updateNasaFirmsWidget();
-    setInterval(updateNasaFirmsWidget, 10000);
+    setInterval(updateNasaFirmsWidget, 60000); // Check every 60s
 }
 
 const DEFAULT_NASA_MAP_KEY = "5aefcf72ba6e780e0e43e3e841af34cb";
 
-async function updateNasaFirmsWidget() {
+window.manualSyncNasa = async function() {
+    const icon = document.getElementById("sync-icon");
+    const text = document.getElementById("sync-btn-text");
+    if (icon) icon.classList.add("fa-spin");
+    if (text) text.innerText = "Syncing...";
+
+    showToast("Connecting to NASA FIRMS satellite constellation...", "info");
+
+    try {
+        const count = await updateNasaFirmsWidget(true);
+        if (count && count > 0) {
+            showToast(`Successfully synced ${count} live thermal hotspots from NASA VIIRS!`, "success");
+        } else {
+            showToast("Sync complete. Real-time satellite data is up to date.", "success");
+        }
+    } catch (err) {
+        showToast("Sync failed. Check connection or NASA API status.", "warning");
+    } finally {
+        setTimeout(() => {
+            if (icon) icon.classList.remove("fa-spin");
+            if (text) text.innerText = "Sync Live Data";
+        }, 600);
+    }
+};
+
+async function updateNasaFirmsWidget(forceRefresh = false) {
     const mapKey = localStorage.getItem("nasa_firms_map_key") || DEFAULT_NASA_MAP_KEY;
     const now = new Date();
     let timeStr = now.toUTCString().replace("GMT", "UTC");
@@ -26098,14 +26154,14 @@ async function updateNasaFirmsWidget() {
                         }
                     });
 
-                    if (added > 0) {
+                    if (added > 0 || forceRefresh) {
                         filteredEvents = [...allEvents];
                         updateDashboard();
                         renderMarkers();
                         renderTable();
                         updateAlerts();
                     }
-                    return;
+                    return liveHotspots.length;
                 }
             }
         }
@@ -26118,6 +26174,7 @@ async function updateNasaFirmsWidget() {
     setText("nasa-live-count", activeDetections);
     setText("nasa-live-critical", criticalCount);
     setText("nasa-last-update", timeStr);
+    return 0;
 }
 
 /* MULTILINGUAL TRANSLATION ENGINE & SPEECH RECOGNITION */

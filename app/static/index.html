@@ -86,7 +86,12 @@
                 <section class="nasa-firms-widget">
                     <div class="nasa-widget-header">
                         <span class="nasa-badge"><i class="fa-solid fa-satellite"></i> LIVE NASA FIRMS FEED</span>
-                        <span class="nasa-timestamp">Last Sync: <strong id="nasa-last-update">Updating...</strong></span>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span class="nasa-timestamp">Last Sync: <strong id="nasa-last-update">Updating...</strong></span>
+                            <button id="btn-sync-nasa" class="btn-sync-live" onclick="window.manualSyncNasa()" title="Fetch latest real-time satellite data from NASA FIRMS">
+                                <i class="fa-solid fa-rotate" id="sync-icon"></i> <span id="sync-btn-text">Sync Live Data</span>
+                            </button>
+                        </div>
                     </div>
                     <div class="nasa-widget-body">
                         <div class="nasa-stat">

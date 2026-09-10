@@ -331,12 +331,37 @@ function loadDatabase() {
 /* LIVE DYNAMIC NASA FIRMS STATUS WIDGET */
 function startLiveNasaWidget() {
     updateNasaFirmsWidget();
-    setInterval(updateNasaFirmsWidget, 10000);
+    setInterval(updateNasaFirmsWidget, 60000); // Check every 60s
 }
 
 const DEFAULT_NASA_MAP_KEY = "5aefcf72ba6e780e0e43e3e841af34cb";
 
-async function updateNasaFirmsWidget() {
+window.manualSyncNasa = async function() {
+    const icon = document.getElementById("sync-icon");
+    const text = document.getElementById("sync-btn-text");
+    if (icon) icon.classList.add("fa-spin");
+    if (text) text.innerText = "Syncing...";
+
+    showToast("Connecting to NASA FIRMS satellite constellation...", "info");
+
+    try {
+        const count = await updateNasaFirmsWidget(true);
+        if (count && count > 0) {
+            showToast(`Successfully synced ${count} live thermal hotspots from NASA VIIRS!`, "success");
+        } else {
+            showToast("Sync complete. Real-time satellite data is up to date.", "success");
+        }
+    } catch (err) {
+        showToast("Sync failed. Check connection or NASA API status.", "warning");
+    } finally {
+        setTimeout(() => {
+            if (icon) icon.classList.remove("fa-spin");
+            if (text) text.innerText = "Sync Live Data";
+        }, 600);
+    }
+};
+
+async function updateNasaFirmsWidget(forceRefresh = false) {
     const mapKey = localStorage.getItem("nasa_firms_map_key") || DEFAULT_NASA_MAP_KEY;
     const now = new Date();
     let timeStr = now.toUTCString().replace("GMT", "UTC");
@@ -400,14 +425,14 @@ async function updateNasaFirmsWidget() {
                         }
                     });
 
-                    if (added > 0) {
+                    if (added > 0 || forceRefresh) {
                         filteredEvents = [...allEvents];
                         updateDashboard();
                         renderMarkers();
                         renderTable();
                         updateAlerts();
                     }
-                    return;
+                    return liveHotspots.length;
                 }
             }
         }
@@ -420,6 +445,7 @@ async function updateNasaFirmsWidget() {
     setText("nasa-live-count", activeDetections);
     setText("nasa-live-critical", criticalCount);
     setText("nasa-last-update", timeStr);
+    return 0;
 }
 
 /* MULTILINGUAL TRANSLATION ENGINE & SPEECH RECOGNITION */
