@@ -477,8 +477,20 @@ body {
 /* METRIC CARDS */
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 22px;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 18px;
+}
+
+@media (max-width: 1280px) {
+    .stats-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .stat-card {
@@ -578,11 +590,72 @@ body {
     z-index: 1;
 }
 
-/* FORMS & INPUTS */
-.filter-grid, .input-grid {
+/* FORMS & INPUTS - 2-ROW BALANCED LAYOUT */
+.filter-row-top {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 18px;
+    margin-bottom: 18px;
+}
+
+.filter-row-bottom {
+    display: flex;
+    gap: 18px;
+    align-items: flex-end;
+}
+
+.filter-actions-group {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+}
+
+.btn-filter-action {
+    height: 44px;
+    padding: 0 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.btn-filter-action.live-filter {
+    background: transparent;
+    border: 1px solid #ef4444;
+    color: #ef4444;
+}
+
+.btn-filter-action.live-filter:hover {
+    background: rgba(239, 68, 68, 0.12);
+}
+
+.btn-filter-action.reset-filter {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+}
+
+.btn-filter-action.reset-filter:hover {
+    background: var(--panel-light);
+}
+
+@media (max-width: 1100px) {
+    .filter-row-top {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .filter-row-bottom {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .filter-actions-group {
+        justify-content: flex-end;
+    }
 }
 
 .filter-group, .input-group-custom {
@@ -1017,6 +1090,37 @@ tbody tr:hover {
     font-weight: 500 !important;
     color: #e2e8f0 !important;
 }
+
+/* FIXED TOAST NOTIFICATIONS (NEVER PUSHES DOCUMENT FLOW) */
+#toast-container, .toast-container {
+    position: fixed !important;
+    bottom: 24px !important;
+    right: 24px !important;
+    z-index: 99999 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    pointer-events: none !important;
+    max-width: 420px !important;
+}
+
+#toast-container > div, .toast-container > div {
+    pointer-events: auto !important;
+    background: #1e293b !important;
+    color: #ffffff !important;
+    padding: 12px 18px !important;
+    border-radius: 8px !important;
+    border: 1px solid #334155 !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+    animation: toastSlide 0.25s ease-out !important;
+}
+
+@keyframes toastSlide {
+    from { opacity: 0; transform: translateY(10px) scale(0.96); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
 </style>
 </head>
 <body>
@@ -1158,7 +1262,7 @@ tbody tr:hover {
 
                 <!-- FILTERS AND CONTROLS PANEL -->
                 <section class="control-panel">
-                    <div class="filter-grid">
+                    <div class="filter-row-top">
                         <div class="filter-group">
                             <label for="state-filter" id="lbl-select-state">Select Jurisdiction / State</label>
                             <select id="state-filter">
@@ -1176,13 +1280,6 @@ tbody tr:hover {
                             </select>
                         </div>
                         <div class="filter-group">
-                            <label for="confidence-filter" id="lbl-min-conf">Min Confidence Score (%)</label>
-                            <div class="range-container">
-                                <input type="range" id="confidence-filter" min="0" max="100" value="0">
-                                <output id="confidence-output">0%</output>
-                            </div>
-                        </div>
-                        <div class="filter-group">
                             <label for="landcover-filter" id="lbl-landcover">Landcover Class</label>
                             <select id="landcover-filter">
                                 <option value="ALL">All Land Covers</option>
@@ -1193,13 +1290,26 @@ tbody tr:hover {
                                 <option value="Cropland">Cropland</option>
                             </select>
                         </div>
-                        <div class="filter-group search-group">
-                            <label for="search-input" id="lbl-search-id">Search ID / Region</label>
-                            <input type="text" id="search-input" placeholder="e.g. SOURCE_0001">
+                        <div class="filter-group">
+                            <label for="confidence-filter" id="lbl-min-conf">Min Confidence Score (%)</label>
+                            <div class="range-container">
+                                <input type="range" id="confidence-filter" min="0" max="100" value="0">
+                                <output id="confidence-output">0%</output>
+                            </div>
                         </div>
-                        <div class="filter-group button-group" style="display: flex; gap: 8px; align-items: flex-end;">
-                            <button id="reset-btn" class="btn-secondary" style="flex:1;"><i class="fa-solid fa-rotate-right"></i> <span id="lbl-reset-btn">Reset</span></button>
-                            <button id="live-only-btn" class="btn-secondary" style="border-color: #ef4444; color: #ef4444; font-weight:700; flex:1;" title="Show only real-time satellite fires detected today"><i class="fa-solid fa-satellite"></i> <span>Live NASA</span></button>
+                    </div>
+                    <div class="filter-row-bottom">
+                        <div class="filter-group search-group" style="flex: 1;">
+                            <label for="search-input" id="lbl-search-id">Search ID / Region / Coordinates</label>
+                            <input type="text" id="search-input" placeholder="Search by ID (e.g. SOURCE_0001, NASA_LIVE), state, or coordinates...">
+                        </div>
+                        <div class="filter-actions-group">
+                            <button id="live-only-btn" class="btn-filter-action live-filter" title="Show only real-time satellite fires detected today">
+                                <i class="fa-solid fa-satellite"></i> <span>Live NASA</span>
+                            </button>
+                            <button id="reset-btn" class="btn-filter-action reset-filter" title="Reset all search and filter conditions">
+                                <i class="fa-solid fa-rotate-right"></i> <span id="lbl-reset-btn">Reset</span>
+                            </button>
                         </div>
                     </div>
                 </section>
@@ -26051,17 +26161,20 @@ function showToast(message, type = "info") {
     if (!toastContainer) {
         toastContainer = document.createElement("div");
         toastContainer.id = "toast-container";
-        toastContainer.style.cssText = "position:fixed; bottom:20px; right:20px; z-index:9999; display:flex; flex-direction:column; gap:8px;";
+        toastContainer.className = "toast-container";
         document.body.appendChild(toastContainer);
     }
+    toastContainer.style.cssText = "position:fixed !important; bottom:24px !important; right:24px !important; z-index:99999 !important; display:flex !important; flex-direction:column !important; gap:10px !important; pointer-events:none !important; max-width:420px !important;";
 
     const toast = document.createElement("div");
-    toast.style.cssText = `background:${type === 'success' ? '#10b981' : '#1e293b'}; color:#fff; padding:12px 18px; border-radius:8px; border:1px solid #334155; font-size:13px; font-weight:600; box-shadow:0 4px 12px rgba(0,0,0,0.3); transition:all 0.3s ease;`;
+    const bg = type === 'success' ? '#10b981' : (type === 'warning' ? '#f59e0b' : (type === 'error' ? '#ef4444' : '#1e293b'));
+    toast.style.cssText = `background:${bg}; color:#fff; padding:12px 18px; border-radius:8px; border:1px solid rgba(255,255,255,0.15); font-size:13px; font-weight:600; box-shadow:0 8px 24px rgba(0,0,0,0.4); pointer-events:auto; transition:all 0.3s ease;`;
     toast.textContent = message;
     toastContainer.appendChild(toast);
 
     setTimeout(() => {
         toast.style.opacity = "0";
+        toast.style.transform = "translateY(10px)";
         setTimeout(() => toast.remove(), 300);
     }, 3500);
 }

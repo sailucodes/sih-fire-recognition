@@ -150,7 +150,7 @@
 
                 <!-- FILTERS AND CONTROLS PANEL -->
                 <section class="control-panel">
-                    <div class="filter-grid">
+                    <div class="filter-row-top">
                         <div class="filter-group">
                             <label for="state-filter" id="lbl-select-state">Select Jurisdiction / State</label>
                             <select id="state-filter">
@@ -168,13 +168,6 @@
                             </select>
                         </div>
                         <div class="filter-group">
-                            <label for="confidence-filter" id="lbl-min-conf">Min Confidence Score (%)</label>
-                            <div class="range-container">
-                                <input type="range" id="confidence-filter" min="0" max="100" value="0">
-                                <output id="confidence-output">0%</output>
-                            </div>
-                        </div>
-                        <div class="filter-group">
                             <label for="landcover-filter" id="lbl-landcover">Landcover Class</label>
                             <select id="landcover-filter">
                                 <option value="ALL">All Land Covers</option>
@@ -185,13 +178,26 @@
                                 <option value="Cropland">Cropland</option>
                             </select>
                         </div>
-                        <div class="filter-group search-group">
-                            <label for="search-input" id="lbl-search-id">Search ID / Region</label>
-                            <input type="text" id="search-input" placeholder="e.g. SOURCE_0001">
+                        <div class="filter-group">
+                            <label for="confidence-filter" id="lbl-min-conf">Min Confidence Score (%)</label>
+                            <div class="range-container">
+                                <input type="range" id="confidence-filter" min="0" max="100" value="0">
+                                <output id="confidence-output">0%</output>
+                            </div>
                         </div>
-                        <div class="filter-group button-group" style="display: flex; gap: 8px; align-items: flex-end;">
-                            <button id="reset-btn" class="btn-secondary" style="flex:1;"><i class="fa-solid fa-rotate-right"></i> <span id="lbl-reset-btn">Reset</span></button>
-                            <button id="live-only-btn" class="btn-secondary" style="border-color: #ef4444; color: #ef4444; font-weight:700; flex:1;" title="Show only real-time satellite fires detected today"><i class="fa-solid fa-satellite"></i> <span>Live NASA</span></button>
+                    </div>
+                    <div class="filter-row-bottom">
+                        <div class="filter-group search-group" style="flex: 1;">
+                            <label for="search-input" id="lbl-search-id">Search ID / Region / Coordinates</label>
+                            <input type="text" id="search-input" placeholder="Search by ID (e.g. SOURCE_0001, NASA_LIVE), state, or coordinates...">
+                        </div>
+                        <div class="filter-actions-group">
+                            <button id="live-only-btn" class="btn-filter-action live-filter" title="Show only real-time satellite fires detected today">
+                                <i class="fa-solid fa-satellite"></i> <span>Live NASA</span>
+                            </button>
+                            <button id="reset-btn" class="btn-filter-action reset-filter" title="Reset all search and filter conditions">
+                                <i class="fa-solid fa-rotate-right"></i> <span id="lbl-reset-btn">Reset</span>
+                            </button>
                         </div>
                     </div>
                 </section>
