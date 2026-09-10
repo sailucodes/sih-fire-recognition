@@ -1119,9 +1119,9 @@ th {
                             <label for="search-input" id="lbl-search-id">Search ID / Region</label>
                             <input type="text" id="search-input" placeholder="e.g. SOURCE_0001">
                         </div>
-                        <div class="filter-group button-group">
-                            <label>&nbsp;</label>
-                            <button id="reset-btn" class="btn-secondary"><i class="fa-solid fa-rotate-right"></i> <span id="lbl-reset-btn">Reset Filters</span></button>
+                        <div class="filter-group button-group" style="display: flex; gap: 8px; align-items: flex-end;">
+                            <button id="reset-btn" class="btn-secondary" style="flex:1;"><i class="fa-solid fa-rotate-right"></i> <span id="lbl-reset-btn">Reset</span></button>
+                            <button id="live-only-btn" class="btn-secondary" style="border-color: #ef4444; color: #ef4444; font-weight:700; flex:1;" title="Show only real-time satellite fires detected today"><i class="fa-solid fa-satellite"></i> <span>Live NASA</span></button>
                         </div>
                     </div>
                 </section>
@@ -26087,10 +26087,11 @@ async function updateNasaFirmsWidget() {
                 if (liveHotspots.length > 0) {
                     setText("nasa-live-count", liveHotspots.length);
                     setText("nasa-live-critical", liveCritical);
-                    setText("nasa-last-update", timeStr + " (LIVE)");
+                    setText("nasa-last-update", timeStr + " (LIVE VIIRS)");
 
+                    // Ingest ALL live satellite detections into allEvents
                     let added = 0;
-                    liveHotspots.slice(0, 50).forEach(lh => {
+                    liveHotspots.forEach(lh => {
                         if (!allEvents.some(ev => String(ev.source_id) === String(lh.source_id))) {
                             allEvents.unshift(lh);
                             added++;
@@ -26536,7 +26537,28 @@ function setupEventListeners() {
         filterDebounce = setTimeout(applyFilters, 60);
     });
 
+    let liveOnlyActive = false;
+    const liveOnlyBtn = document.getElementById("live-only-btn");
+    liveOnlyBtn?.addEventListener("click", () => {
+        liveOnlyActive = !liveOnlyActive;
+        if (liveOnlyActive) {
+            liveOnlyBtn.style.background = "#ef4444";
+            liveOnlyBtn.style.color = "#ffffff";
+            showToast("Showing exclusively real-time live NASA satellite fires", "info");
+        } else {
+            liveOnlyBtn.style.background = "transparent";
+            liveOnlyBtn.style.color = "#ef4444";
+            showToast("Showing all monitored thermal sources & live fires", "info");
+        }
+        applyFilters();
+    });
+
     resetBtn?.addEventListener("click", () => {
+        liveOnlyActive = false;
+        if (liveOnlyBtn) {
+            liveOnlyBtn.style.background = "transparent";
+            liveOnlyBtn.style.color = "#ef4444";
+        }
         if (stateFilter) stateFilter.value = "";
         if (typeFilter) typeFilter.value = "";
         if (minConf) {
@@ -26557,18 +26579,21 @@ function applyFilters() {
     const minConf = parseFloat(document.getElementById("confidence-filter")?.value || 0);
     const landcover = document.getElementById("landcover-filter")?.value || "ALL";
     const search = (document.getElementById("search-input")?.value || "").toLowerCase().trim();
+    const liveOnlyBtn = document.getElementById("live-only-btn");
+    const isLiveOnly = liveOnlyBtn && liveOnlyBtn.style.background.includes("239");
 
     filteredEvents = allEvents.filter(e => {
         const matchState = !state || String(e.state).toLowerCase() === state.toLowerCase();
         const matchType = !type || normalizeType(e.predicted_event_type) === normalizeType(type);
         const matchConf = (parseFloat(e.confidence) || 0) >= minConf;
         const matchLandcover = !landcover || landcover === "ALL" || String(e.landcover || "").toLowerCase().includes(landcover.toLowerCase());
+        const matchLiveOnly = !isLiveOnly || Boolean(e.is_live_nasa);
         const matchSearch = !search || 
             String(e.source_id).toLowerCase().includes(search) || 
             String(e.state).toLowerCase().includes(search) || 
             String(e.predicted_event_type).toLowerCase().includes(search);
 
-        return matchState && matchType && matchConf && matchLandcover && matchSearch;
+        return matchState && matchType && matchConf && matchLandcover && matchSearch && matchLiveOnly;
     });
 
     updateDashboard();
@@ -26852,41 +26877,67 @@ function updateAlerts() {
     const list = document.getElementById("alerts-list");
     if (!list) return;
 
-    const criticalEvents = filteredEvents.filter(e => e.confidence >= ALERT_RULES.CRITICAL && !dismissedAlertIds.has(String(e.source_id).trim()));
-    const highEvents = filteredEvents.filter(e => e.confidence >= ALERT_RULES.HIGH && e.confidence < ALERT_RULES.CRITICAL && !dismissedAlertIds.has(String(e.source_id).trim()));
-    const monitoredEvents = filteredEvents.filter(e => e.confidence < ALERT_RULES.HIGH && !dismissedAlertIds.has(String(e.source_id).trim()));
+    // Separate into real-time live NASA satellite detections vs historical baseline sources
+    const liveAlerts = filteredEvents.filter(e => e.is_live_nasa && !dismissedAlertIds.has(String(e.source_id).trim()));
+    const otherCritical = filteredEvents.filter(e => !e.is_live_nasa && (parseFloat(e.confidence) || 0) >= ALERT_RULES.CRITICAL && !dismissedAlertIds.has(String(e.source_id).trim()));
+    const otherHigh = filteredEvents.filter(e => !e.is_live_nasa && (parseFloat(e.confidence) || 0) >= ALERT_RULES.HIGH && (parseFloat(e.confidence) || 0) < ALERT_RULES.CRITICAL && !dismissedAlertIds.has(String(e.source_id).trim()));
 
-    setText("critical-alert-count", criticalEvents.length);
-    setText("high-alert-count", highEvents.length);
-    setText("monitor-alert-count", monitoredEvents.length);
+    const totalCritical = liveAlerts.length + otherCritical.length;
+    setText("critical-alert-count", totalCritical);
+    setText("high-alert-count", otherHigh.length);
+    setText("monitor-alert-count", Math.max(0, filteredEvents.length - totalCritical - otherHigh.length));
 
-    // Sort critical events by highest persistence and confidence first
-    criticalEvents.sort((a, b) => {
-        const pDiff = (parseFloat(b.persistence_score) || 0) - (parseFloat(a.persistence_score) || 0);
-        if (Math.abs(pDiff) > 0.01) return pDiff;
-        return (parseFloat(b.confidence) || 0) - (parseFloat(a.confidence) || 0);
-    });
+    // Sort: ALL LIVE NASA SATELLITE ALERTS FIRST (highest FRP first), followed by other critical
+    liveAlerts.sort((a, b) => (parseFloat(b.mean_frp) || 0) - (parseFloat(a.mean_frp) || 0));
+    otherCritical.sort((a, b) => (parseFloat(b.confidence) || 0) - (parseFloat(a.confidence) || 0));
+
+    const combinedAlerts = [...liveAlerts, ...otherCritical];
 
     list.innerHTML = "";
-    if (criticalEvents.length === 0) {
+    if (combinedAlerts.length === 0) {
         list.innerHTML = `<div style="text-align:center; padding: 20px; color: var(--muted); font-size:13px;"><i class="fa-solid fa-circle-check" style="color:var(--forest); margin-right:6px;"></i> All thermal alerts cleared. No active critical anomalies.</div>`;
         return;
     }
 
-    criticalEvents.slice(0, 8).forEach(e => {
+    combinedAlerts.slice(0, 15).forEach(e => {
         const item = document.createElement("div");
         item.className = "alert-card";
-        item.innerHTML = `
-            <div>
-                <strong>${escapeHTML(e.source_id)} [${escapeHTML(e.state)}] - High Intensity Event</strong>
-                <p style="font-size:12px; color:var(--muted)">Type: ${normalizeType(e.predicted_event_type)} | Confidence: ${Number(e.confidence).toFixed(1)}% | Persistence: ${e.persistence_score}%</p>
-            </div>
-            <div style="display:flex; gap:8px; align-items:center;">
-                <button class="btn-secondary" onclick="showEventDetails('${escapeHTML(e.source_id)}')">Inspect</button>
-                <button class="btn-authority" onclick="window.inspectAndDispatch('${escapeHTML(e.source_id)}')"><i class="fa-solid fa-paper-plane"></i> Dispatch</button>
-                <button class="btn-dismiss-alert" onclick="window.dismissAlert('${escapeHTML(e.source_id)}')"><i class="fa-solid fa-xmark"></i> Dismiss</button>
-            </div>
-        `;
+        
+        if (e.is_live_nasa) {
+            item.style.borderLeft = "4px solid #ef4444";
+            item.style.background = "rgba(239, 68, 68, 0.08)";
+            item.innerHTML = `
+                <div>
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                        <span class="badge" style="background:#ef4444; color:#fff; font-size:10px; font-weight:800; padding:2px 6px;">🚨 LIVE NASA SATELLITE DETECTION</span>
+                        <strong style="color:#ef4444">${escapeHTML(e.source_id)} [${escapeHTML(e.state)}]</strong>
+                    </div>
+                    <p style="font-size:12px; color:var(--text); margin:0;">
+                        <strong>Type:</strong> ${normalizeType(e.predicted_event_type)} | 
+                        <strong>FRP:</strong> ${e.mean_frp ? Number(e.mean_frp).toFixed(1) : "—"} MW | 
+                        <strong>Confidence:</strong> ${Number(e.confidence).toFixed(1)}% | 
+                        <strong>Coords:</strong> ${Number(e.latitude).toFixed(3)}, ${Number(e.longitude).toFixed(3)}
+                    </p>
+                </div>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <button class="btn-secondary" onclick="showEventDetails('${escapeHTML(e.source_id)}')">Inspect</button>
+                    <button class="btn-authority" onclick="window.inspectAndDispatch('${escapeHTML(e.source_id)}')"><i class="fa-solid fa-paper-plane"></i> Dispatch</button>
+                    <button class="btn-dismiss-alert" onclick="window.dismissAlert('${escapeHTML(e.source_id)}')"><i class="fa-solid fa-xmark"></i> Dismiss</button>
+                </div>
+            `;
+        } else {
+            item.innerHTML = `
+                <div>
+                    <strong>${escapeHTML(e.source_id)} [${escapeHTML(e.state)}] - Baseline Monitored Facility</strong>
+                    <p style="font-size:12px; color:var(--muted); margin:2px 0 0 0;">Type: ${normalizeType(e.predicted_event_type)} | Confidence: ${Number(e.confidence).toFixed(1)}% | Persistence: ${e.persistence_score}%</p>
+                </div>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <button class="btn-secondary" onclick="showEventDetails('${escapeHTML(e.source_id)}')">Inspect</button>
+                    <button class="btn-authority" onclick="window.inspectAndDispatch('${escapeHTML(e.source_id)}')"><i class="fa-solid fa-paper-plane"></i> Dispatch</button>
+                    <button class="btn-dismiss-alert" onclick="window.dismissAlert('${escapeHTML(e.source_id)}')"><i class="fa-solid fa-xmark"></i> Dismiss</button>
+                </div>
+            `;
+        }
         list.appendChild(item);
     });
 }
