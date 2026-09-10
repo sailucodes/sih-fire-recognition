@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Thermal Event Intelligence Dashboard</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <!-- Custom Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- DRAMATIC RED ALERT BANNER CONTAINER -->
+    <div id="dramatic-alert-banner" class="dramatic-alert-banner" style="display: none;"></div>
+
+    <!-- RETRACTABLE SIDEBAR NAVIGATION -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="brand-icon"><i class="fa-solid fa-fire-flame-curved"></i></div>
+            <span class="brand-title">THERMAL-AI</span>
+            <button class="toggle-btn" id="sidebar-toggle" aria-label="Toggle Navigation"><i class="fa-solid fa-bars"></i></button>
+        </div>
+
+        <nav class="sidebar-menu">
+            <a href="#dashboard-section" class="nav-item active" data-target="dashboard-section"><i class="fa-solid fa-chart-line"></i><span id="nav-dash">Dashboard</span></a>
+            <a href="#map-section" class="nav-item" data-target="map-section"><i class="fa-solid fa-earth-americas"></i><span id="nav-map">Geospatial Map</span></a>
+            <a href="#prediction-section" class="nav-item" data-target="prediction-section"><i class="fa-solid fa-wand-magic-sparkles"></i><span id="nav-predict">AI Predictor</span></a>
+            <a href="#alerts-section" class="nav-item" data-target="alerts-section"><i class="fa-solid fa-bell"></i><span id="nav-alerts">Alerts Center</span></a>
+            <a href="#database-section" class="nav-item" data-target="database-section"><i class="fa-solid fa-database"></i><span id="nav-db">Event Database</span></a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <button class="btn-login-modal" id="open-auth-btn">
+                <i class="fa-solid fa-right-to-bracket"></i>
+                <span id="nav-login">Login / Register</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- MAIN DASHBOARD CONTENT -->
+    <main class="main-content" id="main-content">
+        
+        <!-- TOP APP HEADER -->
+        <header class="top-header">
+            <div class="header-left">
+                <h1 id="app-heading">AI THERMAL EVENT INTELLIGENCE</h1>
+                <p id="app-subheading">NASA FIRMS • OSM • SATELLITE MULTI-MODAL DETECTION</p>
+            </div>
+            <div class="header-right">
+                <div class="voice-lang-container">
+                    <select id="language-select" class="lang-dropdown">
+                        <option value="en-US">English</option>
+                        <option value="hi-IN">हिन्दी (Hindi)</option>
+                        <option value="ta-IN">தமிழ் (Tamil)</option>
+                        <option value="te-IN">తెలుగు (Telugu)</option>
+                    </select>
+                    <button id="mic-btn" class="btn-voice-mic">
+                        <i class="fa-solid fa-microphone"></i>
+                        <span id="mic-label">Voice Control</span>
+                    </button>
+                </div>
+                <button class="theme-toggle-btn" id="theme-toggle" aria-label="Toggle Dark/Light Mode">
+                    <i class="fa-solid fa-moon" id="theme-icon"></i>
+                </button>
+                <div class="system-status">
+                    <span class="status-indicator"><i class="live-dot"></i> <span id="txt-sys-online">SYSTEM ONLINE</span></span>
+                    <span class="status-sub" id="database-status">DATABASE READY</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="voice-transcript-banner">
+            <i class="fa-solid fa-comment-dots"></i>
+            <span id="transcript-text">Press Voice Control and say a command (e.g. 'Show Odisha', 'Filter Industrial')...</span>
+        </div>
+
+        <div class="dashboard-container">
+
+            <!-- MAIN DASHBOARD VIEW -->
+            <div id="dashboard-section" class="view-section active-view">
+                
+                <!-- LIVE NASA FIRMS DYNAMIC WIDGET -->
+                <section class="nasa-firms-widget">
+                    <div class="nasa-widget-header">
+                        <span class="nasa-badge"><i class="fa-solid fa-satellite"></i> LIVE NASA FIRMS FEED</span>
+                        <span class="nasa-timestamp">Last Sync: <strong id="nasa-last-update">Updating...</strong></span>
+                    </div>
+                    <div class="nasa-widget-body">
+                        <div class="nasa-stat">
+                            <span>Active Detections</span>
+                            <strong id="nasa-live-count">0</strong>
+                        </div>
+                        <div class="nasa-stat critical">
+                            <span>Critical Hotspots</span>
+                            <strong id="nasa-live-critical">0</strong>
+                        </div>
+                        <div class="nasa-stat">
+                            <span>Sensor Constellation</span>
+                            <strong>VIIRS / MODIS</strong>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- METRIC CARDS -->
+                <section class="stats-grid">
+                    <div class="stat-card total-card">
+                        <div class="stat-icon"><i class="fa-solid fa-satellite-dish"></i></div>
+                        <div>
+                            <span class="stat-label" id="lbl-total-sources">TOTAL THERMAL SOURCES</span>
+                            <strong id="total-sources">0</strong>
+                        </div>
+                    </div>
+                    <div class="stat-card industrial-card">
+                        <div class="stat-icon"><i class="fa-solid fa-industry"></i></div>
+                        <div>
+                            <span class="stat-label" id="lbl-ind-fires">INDUSTRIAL FIRES</span>
+                            <strong id="industrial-count">0</strong>
+                        </div>
+                    </div>
+                    <div class="stat-card forest-card">
+                        <div class="stat-icon"><i class="fa-solid fa-tree"></i></div>
+                        <div>
+                            <span class="stat-label" id="lbl-forest-fires">FOREST / NATURAL</span>
+                            <strong id="forest-count">0</strong>
+                        </div>
+                    </div>
+                    <div class="stat-card agricultural-card">
+                        <div class="stat-icon"><i class="fa-solid fa-wheat-awn"></i></div>
+                        <div>
+                            <span class="stat-label" id="lbl-agri-fires">AGRICULTURAL</span>
+                            <strong id="agricultural-count">0</strong>
+                        </div>
+                    </div>
+                    <div class="stat-card other-card">
+                        <div class="stat-icon"><i class="fa-solid fa-circle-question"></i></div>
+                        <div>
+                            <span class="stat-label" id="lbl-other-fires">OTHER / UNKNOWN</span>
+                            <strong id="other-count">0</strong>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- FILTERS AND CONTROLS PANEL -->
+                <section class="control-panel">
+                    <div class="filter-grid">
+                        <div class="filter-group">
+                            <label for="state-filter" id="lbl-select-state">Select Jurisdiction / State</label>
+                            <select id="state-filter">
+                                <option value="">All States & UTs</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="type-filter" id="lbl-event-type">Event Type</label>
+                            <select id="type-filter">
+                                <option value="">All Event Types</option>
+                                <option value="Industrial">Industrial</option>
+                                <option value="Forest/Natural">Forest/Natural</option>
+                                <option value="Agricultural">Agricultural</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="confidence-filter" id="lbl-min-conf">Min Confidence Score (%)</label>
+                            <div class="range-container">
+                                <input type="range" id="confidence-filter" min="0" max="100" value="0">
+                                <output id="confidence-output">0%</output>
+                            </div>
+                        </div>
+                        <div class="filter-group">
+                            <label for="landcover-filter" id="lbl-landcover">Landcover Class</label>
+                            <select id="landcover-filter">
+                                <option value="ALL">All Land Covers</option>
+                                <option value="Built-up">Built-up</option>
+                                <option value="Bare / sparse vegetation">Bare / sparse vegetation</option>
+                                <option value="Grassland">Grassland</option>
+                                <option value="Tree cover">Tree cover</option>
+                                <option value="Cropland">Cropland</option>
+                            </select>
+                        </div>
+                        <div class="filter-group search-group">
+                            <label for="search-input" id="lbl-search-id">Search ID / Region</label>
+                            <input type="text" id="search-input" placeholder="e.g. SOURCE_0001">
+                        </div>
+                        <div class="filter-group button-group">
+                            <label>&nbsp;</label>
+                            <button id="reset-btn" class="btn-secondary"><i class="fa-solid fa-rotate-right"></i> <span id="lbl-reset-btn">Reset Filters</span></button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- GEOSPATIAL MAP PANEL -->
+                <section class="map-panel" id="map-section">
+                    <div class="panel-header">
+                        <div>
+                            <span class="panel-kicker">GIS MONITORING</span>
+                            <h2 id="lbl-map-heading">Spatial Distribution & Active Hotspots</h2>
+                        </div>
+                        <span id="visible-count" class="badge">0 EVENTS</span>
+                    </div>
+                    <div id="map" class="map-container"></div>
+                </section>
+
+                <!-- AI PREDICTION ENGINE FORM -->
+                <section class="prediction-panel" id="prediction-section">
+                    <div class="panel-header">
+                        <div>
+                            <span class="panel-kicker">ML ENGINE</span>
+                            <h2 id="lbl-predict-heading">Run AI Classification & Thermal Persistence Analysis</h2>
+                        </div>
+                    </div>
+                    <form id="prediction-form" class="prediction-content">
+                        <div class="input-grid">
+                            <div class="input-group-custom">
+                                <label for="pred-state">State / Union Territory</label>
+                                <select id="pred-state">
+                                    <option value="">Select State / UT</option>
+                                </select>
+                            </div>
+                            <div class="input-group-custom">
+                                <label for="latitude">Latitude</label>
+                                <input type="number" step="any" id="latitude" placeholder="e.g. 20.7957" required>
+                            </div>
+                            <div class="input-group-custom">
+                                <label for="longitude">Longitude</label>
+                                <input type="number" step="any" id="longitude" placeholder="e.g. 85.2547" required>
+                            </div>
+                            <div class="input-group-custom">
+                                <label for="mean_frp">Mean FRP (MW)</label>
+                                <input type="number" step="any" id="mean_frp" placeholder="e.g. 15.4" required>
+                            </div>
+                        </div>
+                        <button type="submit" id="predict-button" class="btn-primary">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> <span id="lbl-predict-btn">PREDICT & SAVE EVENT</span>
+                        </button>
+                    </form>
+                </section>
+
+                <!-- CRITICAL ALERTS & NATIONAL AUTHORITY NOTIFICATIONS CENTER -->
+                <section class="alert-center" id="alerts-section">
+                    <div class="panel-header">
+                        <div>
+                            <span class="panel-kicker">EARLY WARNING & AUTHORITY DISPATCH</span>
+                            <h2><i class="fa-solid fa-bell"></i> <span id="lbl-alerts-heading">Thermal Event Alerts</span></h2>
+                        </div>
+                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                            <button id="clear-all-alerts-btn" class="btn-secondary" style="padding:8px 14px; font-size:13px;">
+                                <i class="fa-solid fa-trash-can"></i> <span>Clear All</span>
+                            </button>
+                            <button id="send-national-alert-btn" class="btn-authority">
+                                <i class="fa-solid fa-paper-plane"></i> <span id="lbl-dispatch-btn">Dispatch National Authority Alert</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="alert-summary">
+                        <div class="alert-summary-item high">Critical: <span id="critical-alert-count">0</span></div>
+                        <div class="alert-summary-item medium">High: <span id="high-alert-count">0</span></div>
+                        <div class="alert-summary-item normal">Monitored: <span id="monitor-alert-count">0</span></div>
+                    </div>
+                    <div id="alerts-list" class="alert-list"></div>
+                </section>
+
+                <!-- INSPECTION PANEL WITH NASA GIBS DYNAMIC SATELLITE IMAGERY -->
+                <section class="details-panel" id="details-panel">
+                    <div class="panel-header">
+                        <div>
+                            <span class="panel-kicker">INSPECTION</span>
+                            <h2>Selected Event Metrics & Satellite Verification</h2>
+                        </div>
+                    </div>
+                    <div id="details-content">
+                        <p style="text-align: center; color: var(--muted); padding: 20px;">
+                            Select an event from the map or database registry to review diagnostic parameters and satellite imagery.
+                        </p>
+                    </div>
+                </section>
+
+            </div>
+
+            <!-- SEPARATE EVENT DATABASE VIEW SECTION -->
+            <div id="database-section" class="view-section hidden">
+                <section class="table-panel">
+                    <div class="panel-header">
+                        <div>
+                            <span class="panel-kicker">EVENT DATABASE</span>
+                            <h2 id="lbl-db-heading">Detected Thermal Sources Registry</h2>
+                        </div>
+                        <span id="database-count-badge" class="badge">0 TOTAL RECORDS</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Source ID</th>
+                                    <th>State</th>
+                                    <th>Type</th>
+                                    <th>Confidence</th>
+                                    <th>Persistence</th>
+                                    <th>Latitude</th>
+                                    <th>Longitude</th>
+                                    <th>Mean FRP</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-body"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- AUTHENTICATION MODAL OVERLAY -->
+    <div class="auth-modal" id="auth-modal">
+        <div class="auth-card">
+            <button class="auth-close" id="close-auth-btn" aria-label="Close Modal"><i class="fa-solid fa-xmark"></i></button>
+            <div class="auth-tabs">
+                <button class="auth-tab active" id="tab-login">Login</button>
+                <button class="auth-tab" id="tab-register">Register</button>
+            </div>
+
+            <button type="button" class="btn-google" id="google-auth-btn">
+                <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"/><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.7-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"/><path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15s.7 5.3 1.9 7.7l3.7-2.9c-.2-.7-.4-1.5-.4-2.3z"/><path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16c1.8 3.7 5.6 7 10.1 7z"/></svg>
+                Continue with Google
+            </button>
+
+            <div class="auth-divider"><span>OR SIGN IN WITH CREDENTIALS</span></div>
+            
+            <form id="login-form" class="auth-form">
+                <div class="input-group-custom">
+                    <label>Email Address</label>
+                    <input type="email" id="login-email" required placeholder="admin@sih.gov.in">
+                </div>
+                <div class="input-group-custom">
+                    <label>Password</label>
+                    <input type="password" id="login-password" required placeholder="••••••••">
+                </div>
+                <button type="submit" class="btn-primary">Sign In</button>
+            </form>
+
+            <form id="register-form" class="auth-form hidden">
+                <div class="input-group-custom">
+                    <label>Full Name</label>
+                    <input type="text" id="reg-name" required placeholder="Officer Name">
+                </div>
+                <div class="input-group-custom">
+                    <label>Email Address</label>
+                    <input type="email" id="reg-email" required placeholder="officer@agency.gov.in">
+                </div>
+                <div class="input-group-custom">
+                    <label>Password</label>
+                    <input type="password" id="reg-password" required placeholder="••••••••">
+                </div>
+                <div class="input-group-custom">
+                    <label>Organization / Department</label>
+                    <input type="text" id="reg-org" placeholder="e.g. State Disaster Response Authority">
+                </div>
+                <button type="submit" class="btn-primary">Create Account</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- REALISTIC GOOGLE OAUTH ACCOUNT SELECTOR MODAL (EXACT GOOGLE ACCOUNTS DIALOG) -->
+    <div class="auth-modal" id="google-oauth-modal">
+        <div class="auth-card" style="width: 820px; max-width: 95vw; border-radius: 28px; padding: 40px 44px; background: #131314; color: #e3e3e3; border: 1px solid #303030; box-shadow: 0 16px 48px rgba(0,0,0,0.85); font-family: 'Google Sans', Roboto, -apple-system, BlinkMacSystemFont, sans-serif;">
+            <button class="auth-close" id="close-google-modal-btn" aria-label="Close Modal" style="color: #9aa0a6; top: 24px; right: 24px;"><i class="fa-solid fa-xmark"></i></button>
+            
+            <!-- Top Google Brand Header -->
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 32px;">
+                <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"/><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.7-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"/><path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15s.7 5.3 1.9 7.7l3.7-2.9c-.2-.7-.4-1.5-.4-2.3z"/><path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16c1.8 3.7 5.6 7 10.1 7z"/></svg>
+                <span style="font-size: 14px; font-weight: 500; color: #c4c7c5;">Sign in with Google</span>
+            </div>
+
+            <!-- Two-column OAuth Layout -->
+            <div style="display: grid; grid-template-columns: 1fr 1.3fr; gap: 36px; align-items: start;">
+                <!-- Left Column: App Brand & Action -->
+                <div>
+                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #1db954; color: #000; display: flex; align-items: center; justify-content: center; font-size: 26px; margin-bottom: 20px;">
+                        <i class="fa-solid fa-fire-flame-curved"></i>
+                    </div>
+                    <h2 style="font-size: 28px; font-weight: 400; margin: 0 0 12px 0; color: #f1f3f4; line-height: 1.2;">Choose an account</h2>
+                    <p style="font-size: 15px; color: #c4c7c5; margin: 0; line-height: 1.4;">to continue to <strong style="color: #a8c7fa; font-weight: 600;">AI Thermal Intelligence</strong></p>
+                </div>
+
+                <!-- Right Column: Account Selector List -->
+                <div>
+                    <div id="google-accounts-list" style="display: flex; flex-direction: column;">
+                        
+                        <!-- Account 1: University Account -->
+                        <div class="google-acc-row" data-email="sridevi.24bcd7246@vitapstudent.ac.in" data-name="Sridevi" style="display: flex; align-items: center; gap: 14px; padding: 12px 10px; cursor: pointer; border-radius: 8px; transition: background 0.15s ease; border-bottom: 1px solid #282a2c;">
+                            <div style="width: 36px; height: 36px; border-radius: 50%; background: #2e7d32; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 15px;">C</div>
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-size: 13.5px; color: #e3e3e3; font-weight: 500;">sridevi.24bcd7246@vitapstudent.ac.in</div>
+                            </div>
+                        </div>
+
+                        <!-- Account 2: Athota Sanjana (Signed out) -->
+                        <div class="google-acc-row" data-email="sanjanaathota@gmail.com" data-name="Athota Sanjana" style="display: flex; align-items: center; gap: 14px; padding: 12px 10px; cursor: pointer; border-radius: 8px; transition: background 0.15s ease; border-bottom: 1px solid #282a2c;">
+                            <div style="width: 36px; height: 36px; border-radius: 50%; background: #0288d1; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; overflow: hidden;">
+                                <i class="fa-solid fa-cloud" style="font-size: 16px;"></i>
+                            </div>
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-size: 14px; font-weight: 500; color: #e3e3e3;">Athota Sanjana</div>
+                                <div style="font-size: 12.5px; color: #9aa0a6;">sanjanaathota@gmail.com</div>
+                            </div>
+                            <span style="font-size: 12px; color: #9aa0a6;">Signed out</span>
+                        </div>
+
+                        <!-- Account 3: Sailaja Sridevi Chavala -->
+                        <div class="google-acc-row" data-email="sailajasridevich@gmail.com" data-name="Sailaja Sridevi Chavala" style="display: flex; align-items: center; gap: 14px; padding: 12px 10px; cursor: pointer; border-radius: 8px; transition: background 0.15s ease; border-bottom: 1px solid #282a2c;">
+                            <div style="width: 36px; height: 36px; border-radius: 50%; background: #43a047; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 15px;">S</div>
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-size: 14px; font-weight: 500; color: #e3e3e3;">Sailaja Sridevi Chavala</div>
+                                <div style="font-size: 12.5px; color: #9aa0a6;">sailajasridevich@gmail.com</div>
+                            </div>
+                        </div>
+
+                        <!-- Account 4: Sailaja Sridevi Chavala (Secondary) -->
+                        <div class="google-acc-row" data-email="chavalasailajasridevi@gmail.com" data-name="Sailaja Sridevi Chavala" style="display: flex; align-items: center; gap: 14px; padding: 12px 10px; cursor: pointer; border-radius: 8px; transition: background 0.15s ease; border-bottom: 1px solid #282a2c;">
+                            <div style="width: 36px; height: 36px; border-radius: 50%; background: #5c6bc0; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 15px;">S</div>
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-size: 14px; font-weight: 500; color: #e3e3e3;">Sailaja Sridevi Chavala</div>
+                                <div style="font-size: 12.5px; color: #9aa0a6;">chavalasailajasridevi@gmail.com</div>
+                            </div>
+                        </div>
+
+                        <!-- Use another account -->
+                        <div class="google-acc-row" id="use-another-account-row" style="display: flex; align-items: center; gap: 14px; padding: 12px 10px; cursor: pointer; border-radius: 8px; transition: background 0.15s ease;">
+                            <div style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; color: #c4c7c5; font-size: 18px;">
+                                <i class="fa-regular fa-circle-user"></i>
+                            </div>
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-size: 14px; font-weight: 500; color: #e3e3e3;">Use another account</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CUSTOM GOOGLE ACCOUNT INPUT FORM (EXPANDS ON CLICK) -->
+                    <div id="custom-google-login-form" class="hidden" style="margin-top: 10px; padding: 12px; background: #1f1f21; border-radius: 8px; border: 1px solid #3c4043;">
+                        <label style="display: block; font-size: 12px; color: #9aa0a6; margin-bottom: 6px;">Enter your device Google Email:</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="email" id="custom-google-email-input" placeholder="you@gmail.com" style="flex: 1; padding: 8px 10px; border-radius: 6px; background: #131314; border: 1px solid #5f6368; color: #fff; font-size: 13px;">
+                            <button type="button" id="custom-google-email-submit" style="padding: 8px 14px; background: #0b57d0; color: #fff; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px;">Sign In</button>
+                        </div>
+                    </div>
+
+                    <div id="google-signing-in-indicator" class="hidden" style="text-align: center; padding: 10px; margin-top: 8px;">
+                        <i class="fa-solid fa-circle-notch fa-spin" style="color: #a8c7fa; font-size: 20px;"></i>
+                        <span style="margin-left: 8px; font-size: 13px; color: #a8c7fa; font-weight: 500;">Signing in...</span>
+                    </div>
+
+                    <div style="font-size: 12px; color: #9aa0a6; line-height: 1.5; margin-top: 24px;">
+                        Before using this app, you can review Thermal Intelligence's <a href="#" style="color: #a8c7fa; text-decoration: none;">Privacy Policy</a> and <a href="#" style="color: #a8c7fa; text-decoration: none;">Terms of Service</a>.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer: Language & Help/Privacy/Terms -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 36px; padding-top: 16px; border-top: 1px solid #282a2c; font-size: 12px; color: #9aa0a6;">
+                <div>English (United Kingdom) <i class="fa-solid fa-caret-down" style="font-size: 10px; margin-left: 4px;"></i></div>
+                <div style="display: flex; gap: 20px;">
+                    <a href="#" style="color: #9aa0a6; text-decoration: none;">Help</a>
+                    <a href="#" style="color: #9aa0a6; text-decoration: none;">Privacy</a>
+                    <a href="#" style="color: #9aa0a6; text-decoration: none;">Terms</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NATIONAL AUTHORITY EMERGENCY DISPATCH CONSOLE MODAL -->
+    <div class="auth-modal" id="authority-dispatch-modal">
+        <div class="auth-card" style="width: 600px; max-width: 95vw; max-height: 90vh; overflow-y: auto;">
+            <button class="auth-close" id="close-dispatch-btn" aria-label="Close Modal"><i class="fa-solid fa-xmark"></i></button>
+            
+            <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 16px;">
+                <div style="width: 44px; height: 44px; border-radius: 10px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #ef4444; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;">
+                    <i class="fa-solid fa-satellite-dish"></i>
+                </div>
+                <div>
+                    <h3 style="margin: 0; font-size: 17px; font-weight: 800; color: var(--text);">🚨 National Rapid Alert Dispatcher</h3>
+                    <p style="margin: 4px 0 0 0; font-size: 12px; color: var(--muted);">NDMA Operations Room & State EOC Direct Link</p>
+                </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 14px;">
+                <div class="input-group-custom">
+                    <label style="font-size: 12px; color: var(--muted); font-weight: 600;">Target Jurisdiction / State Command</label>
+                    <select id="dispatch-state-select">
+                        <option value="National">National HQ & All State Commands</option>
+                        <option value="Odisha">Odisha State Disaster Authority (OSDMA)</option>
+                        <option value="Tamil Nadu">Tamil Nadu SDMA & State EOC</option>
+                        <option value="Andhra Pradesh">Andhra Pradesh SDMA</option>
+                        <option value="Maharashtra">Maharashtra State Emergency Operations</option>
+                        <option value="West Bengal">West Bengal State EOC</option>
+                        <option value="Chhattisgarh">Chhattisgarh SDMA</option>
+                        <option value="Jharkhand">Jharkhand Disaster Management</option>
+                        <option value="Gujarat">Gujarat SDMA / GIDM</option>
+                        <option value="Karnataka">Karnataka State Disaster Monitoring</option>
+                    </select>
+                </div>
+
+                <div class="input-group-custom">
+                    <label style="font-size: 12px; color: var(--muted); font-weight: 600;">Alert Priority Level</label>
+                    <select id="dispatch-priority-select">
+                        <option value="CRITICAL_P1">LEVEL 1 - CRITICAL (Immediate Deployment)</option>
+                        <option value="HIGH_P2">LEVEL 2 - HIGH (Standby & Airborne Recon)</option>
+                        <option value="ADVISORY">LEVEL 3 - Early Warning Advisory</option>
+                    </select>
+                </div>
+
+                <div class="input-group-custom">
+                    <label style="font-size: 12px; color: var(--muted); font-weight: 600;">Official Incident Directive</label>
+                    <textarea id="dispatch-directive-text" rows="4" style="width: 100%; box-sizing: border-box; background: var(--panel-light); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; color: var(--text); font-family: monospace; font-size: 12px; resize: vertical;"></textarea>
+                </div>
+
+                <div id="dispatch-success-box" class="hidden" style="padding: 12px 14px; background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.35); border-radius: 6px;">
+                    <div style="display: flex; align-items: center; gap: 10px; color: var(--forest); font-weight: 700; font-size: 13px;">
+                        <i class="fa-solid fa-circle-check"></i>
+                        <span id="dispatch-id-display">TRANSMISSION CONFIRMED: NDMA-DISPATCH-2026</span>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+                    <button type="button" class="btn-secondary" id="cancel-dispatch-btn">Cancel</button>
+                    <button type="button" class="btn-primary" id="execute-dispatch-btn" style="background: #ef4444; border-color: #ef4444; color: #fff; width: auto; margin-top: 0;">
+                        <i class="fa-solid fa-paper-plane"></i> Transmit Dispatch
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOTIFICATION TOAST POPUP -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- External Libraries -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <!-- Pre-compiled Ground Truth Database (Enables 100% Standalone Static Operation) -->
+    <script src="initial_data.js"></script>
+    <!-- Application Logic -->
+    <script src="app.js"></script>
+</body>
+</html>
