@@ -646,12 +646,13 @@ function initializeAuthModal() {
         if (customGoogleForm) customGoogleForm.classList.add("hidden");
 
         try {
-            const res = await fetch("/api/v1/auth/google", {
+            await fetch("/api/v1/auth/google", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email, name })
             });
-            if (res.ok) {
+        } catch (_) {}
+
         const user = { email, name, auth: "google" };
         localStorage.setItem("sih_auth_user", JSON.stringify(user));
 
