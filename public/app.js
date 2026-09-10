@@ -573,28 +573,40 @@ function initializeSidebarAndNavigation() {
     const sidebar = document.getElementById("sidebar");
     const toggleBtn = document.getElementById("sidebar-toggle");
     
-    toggleBtn?.addEventListener("click", () => sidebar?.classList.toggle("collapsed"));
+    toggleBtn?.addEventListener("click", () => {
+        sidebar?.classList.toggle("collapsed");
+        if (map) setTimeout(() => map.invalidateSize(), 310);
+    });
 
     const navItems = document.querySelectorAll(".nav-item");
-    const viewSections = document.querySelectorAll(".view-section");
 
     navItems.forEach(item => {
         item.addEventListener("click", (e) => {
             e.preventDefault();
+            e.stopPropagation();
             navItems.forEach(i => i.classList.remove("active"));
             item.classList.add("active");
 
             const targetViewId = item.getAttribute("data-target");
             
             if (targetViewId === "database-section") {
-                viewSections.forEach(sec => sec.classList.add("hidden"));
+                document.getElementById("dashboard-section")?.classList.add("hidden");
                 document.getElementById("database-section")?.classList.remove("hidden");
+                window.scrollTo({ top: 0, behavior: "smooth" });
             } else {
-                viewSections.forEach(sec => sec.classList.add("hidden"));
-                document.getElementById("dashboard-section")?.classList.remove("hidden");
+                const dbSec = document.getElementById("database-section");
+                if (dbSec && !dbSec.classList.contains("hidden")) {
+                    dbSec.classList.add("hidden");
+                    document.getElementById("dashboard-section")?.classList.remove("hidden");
+                }
                 
-                if (targetViewId !== "dashboard-section") {
-                    document.getElementById(targetViewId)?.scrollIntoView({ behavior: "smooth" });
+                if (targetViewId === "dashboard-section") {
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                } else {
+                    const el = document.getElementById(targetViewId);
+                    if (el) {
+                        el.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }
                 }
             }
 
@@ -858,11 +870,11 @@ function setupEventListeners() {
     minConf?.addEventListener("input", (e) => {
         setText("confidence-output", `${e.target.value}%`);
         clearTimeout(filterDebounce);
-        filterDebounce = setTimeout(applyFilters, 40);
+        filterDebounce = setTimeout(applyFilters, 120);
     });
     searchInput?.addEventListener("input", () => {
         clearTimeout(filterDebounce);
-        filterDebounce = setTimeout(applyFilters, 60);
+        filterDebounce = setTimeout(applyFilters, 120);
     });
 
     let liveOnlyActive = false;
@@ -1276,8 +1288,11 @@ function showEventDetails(sourceId) {
     const container = document.getElementById("details-content");
     if (!event || !container) return;
 
-    document.querySelectorAll(".view-section").forEach(sec => sec.classList.add("hidden"));
-    document.getElementById("dashboard-section")?.classList.remove("hidden");
+    const dbSec = document.getElementById("database-section");
+    if (dbSec && !dbSec.classList.contains("hidden")) {
+        dbSec.classList.add("hidden");
+        document.getElementById("dashboard-section")?.classList.remove("hidden");
+    }
 
     const dateObj = new Date();
     dateObj.setDate(dateObj.getDate() - 2);
