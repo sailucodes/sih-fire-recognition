@@ -892,3 +892,43 @@ th {
 }
 
 .hidden { display: none !important; }
+
+/* LEAFLET DARK GIS CONTROLS & MODERN COLLAPSED LAYER BUTTON */
+.leaflet-control-layers {
+    background: #1e293b !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    border-radius: 8px !important;
+    color: #f1f5f9 !important;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5) !important;
+    font-family: inherit !important;
+    font-size: 13px !important;
+}
+
+.leaflet-control-layers-toggle {
+    background-color: #1e293b !important;
+    border-radius: 8px !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    width: 36px !important;
+    height: 36px !important;
+    background-size: 20px 20px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
+}
+
+.leaflet-control-layers-expanded {
+    padding: 12px 16px !important;
+    background: #0f172a !important;
+    color: #f8fafc !important;
+    border: 1px solid #334155 !important;
+    border-radius: 10px !important;
+}
+
+.leaflet-control-layers-base label,
+.leaflet-control-layers-overlays label {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 4px 0 !important;
+    cursor: pointer !important;
+    font-weight: 500 !important;
+    color: #e2e8f0 !important;
+}

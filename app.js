@@ -125,11 +125,29 @@ document.addEventListener("DOMContentLoaded", function () {
     startLiveNasaWidget();
 });
 
-/* APP LAUNCHER: PRE-LOADS ALL STATES AND UTs & SHOWS STARTUP OVERLAY */
+/* APP LAUNCHER: PRE-LOADS ALL STATES AND UTs & RESTORES USER SESSION */
 function initAppLauncher() {
-    const authModal = document.getElementById("auth-modal");
-    if (authModal) {
-        authModal.classList.add("open");
+    const savedUserStr = localStorage.getItem("sih_auth_user");
+    if (savedUserStr) {
+        try {
+            const savedUser = JSON.parse(savedUserStr);
+            const navLogin = document.getElementById("nav-login");
+            const openAuthBtn = document.getElementById("open-auth-btn");
+            if (navLogin) {
+                const displayName = (savedUser.name || savedUser.email || "User").split(" ")[0];
+                navLogin.textContent = `${displayName} (Google)`;
+            }
+            if (openAuthBtn) {
+                openAuthBtn.onclick = () => {
+                    if (confirm(`Signed in as ${savedUser.email}. Do you want to sign out?`)) {
+                        localStorage.removeItem("sih_auth_user");
+                        if (navLogin) navLogin.textContent = "Login / Register";
+                        showToast("Signed out successfully", "info");
+                        openAuthBtn.onclick = () => document.getElementById("auth-modal")?.classList.add("open");
+                    }
+                };
+            }
+        } catch (_) {}
     }
 }
 
@@ -316,43 +334,88 @@ function startLiveNasaWidget() {
     setInterval(updateNasaFirmsWidget, 10000);
 }
 
+const DEFAULT_NASA_MAP_KEY = "5aefcf72ba6e780e0e43e3e841af34cb";
+
 async function updateNasaFirmsWidget() {
-    let activeDetections = filteredEvents.length;
-    let criticalCount = filteredEvents.filter(e => (parseFloat(e.confidence) || 0) >= ALERT_RULES.CRITICAL).length;
+    const mapKey = localStorage.getItem("nasa_firms_map_key") || DEFAULT_NASA_MAP_KEY;
     const now = new Date();
     let timeStr = now.toUTCString().replace("GMT", "UTC");
 
     try {
-        const firmsRes = await fetch("/api/v1/firms/sync");
-        if (firmsRes.ok) {
-            const firmsData = await firmsRes.json();
-            if (firmsData.hotspots_count !== undefined) {
-                activeDetections = firmsData.hotspots_count;
-            } else if (firmsData.live_feed && firmsData.live_feed.observation_count) {
-                activeDetections = firmsData.live_feed.observation_count;
-            }
-            if (firmsData.sync_time) {
-                timeStr = now.toUTCString().replace("GMT", "UTC") + " (" + firmsData.sync_time + ")";
-            }
-            if (firmsData.sample_clusters && firmsData.sample_clusters.length > 0) {
-                let added = 0;
-                firmsData.sample_clusters.forEach(sc => {
-                    if (!allEvents.some(ev => String(ev.source_id) === String(sc.source_id))) {
-                        allEvents.unshift(sc);
-                        added++;
+        const nasaUrl = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${mapKey}/VIIRS_SNPP_NRT/68,6.5,97.5,37.5/1`;
+        const res = await fetch(nasaUrl);
+        if (res.ok) {
+            const csvText = await res.text();
+            if (csvText.includes("latitude")) {
+                const lines = csvText.trim().split("\n");
+                const headers = lines[0].split(",").map(h => h.trim());
+                const latIdx = headers.indexOf("latitude");
+                const lonIdx = headers.indexOf("longitude");
+                const frpIdx = headers.indexOf("frp");
+                const brightIdx = headers.indexOf("bright_ti4") !== -1 ? headers.indexOf("bright_ti4") : headers.indexOf("brightness");
+                const confIdx = headers.indexOf("confidence");
+
+                const liveHotspots = [];
+                let liveCritical = 0;
+
+                for (let i = 1; i < lines.length; i++) {
+                    const cols = lines[i].split(",").map(c => c.trim());
+                    if (cols.length >= headers.length) {
+                        const lat = parseFloat(cols[latIdx]);
+                        const lng = parseFloat(cols[lonIdx]);
+                        const frp = parseFloat(cols[frpIdx]) || 8.0;
+                        const bright = parseFloat(cols[brightIdx]) || 325.0;
+                        const conf = cols[confIdx] || "n";
+
+                        if (!isNaN(lat) && !isNaN(lng)) {
+                            const isCrit = frp >= 25.0 || bright >= 350.0 || conf === "h";
+                            if (isCrit) liveCritical++;
+                            liveHotspots.push({
+                                source_id: `NASA_LIVE_${i}`,
+                                state: getNearestState(lat, lng),
+                                latitude: lat,
+                                longitude: lng,
+                                predicted_event_type: frp >= 30 ? "Industrial" : (lat >= 28 && lng <= 77 ? "Agricultural" : "Forest/Natural"),
+                                confidence: conf === "h" ? 94.5 : (conf === "l" ? 64.0 : 84.0),
+                                persistence_score: Math.min(95, Math.round(50 + (frp * 1.1))),
+                                landcover: frp >= 30 ? "Built-up" : "Tree cover",
+                                mean_frp: frp,
+                                is_live_nasa: true
+                            });
+                        }
                     }
-                });
-                if (added > 0) {
-                    filteredEvents = [...allEvents];
-                    updateDashboard();
-                    renderMarkers();
-                    renderTable();
-                    updateAlerts();
+                }
+
+                if (liveHotspots.length > 0) {
+                    setText("nasa-live-count", liveHotspots.length);
+                    setText("nasa-live-critical", liveCritical);
+                    setText("nasa-last-update", timeStr + " (LIVE)");
+
+                    let added = 0;
+                    liveHotspots.slice(0, 50).forEach(lh => {
+                        if (!allEvents.some(ev => String(ev.source_id) === String(lh.source_id))) {
+                            allEvents.unshift(lh);
+                            added++;
+                        }
+                    });
+
+                    if (added > 0) {
+                        filteredEvents = [...allEvents];
+                        updateDashboard();
+                        renderMarkers();
+                        renderTable();
+                        updateAlerts();
+                    }
+                    return;
                 }
             }
         }
-    } catch (_) {}
+    } catch (e) {
+        console.warn("Direct NASA FIRMS fetch error, falling back to local dataset:", e);
+    }
 
+    let activeDetections = filteredEvents.length;
+    let criticalCount = filteredEvents.filter(e => (parseFloat(e.confidence) || 0) >= ALERT_RULES.CRITICAL).length;
     setText("nasa-live-count", activeDetections);
     setText("nasa-live-critical", criticalCount);
     setText("nasa-last-update", timeStr);
@@ -589,25 +652,28 @@ function initializeAuthModal() {
                 body: JSON.stringify({ email, name })
             });
             if (res.ok) {
-                const data = await res.json();
-                googleModal?.classList.remove("open");
-                googleSigningIn?.classList.add("hidden");
-                
-                const navLogin = document.getElementById("nav-login");
-                const displayName = name.split(' ')[0] || "User";
-                if (navLogin) navLogin.textContent = `${displayName} (Google)`;
-                
-                showDramaticBannerAlert(`Authenticated with Google: ${email} (${name})`, "GOOGLE SIGN-IN VERIFIED");
-                showToast(`Signed in as ${email}`, "success");
-                return;
-            }
-        } catch (_) {}
+        const user = { email, name, auth: "google" };
+        localStorage.setItem("sih_auth_user", JSON.stringify(user));
 
         googleModal?.classList.remove("open");
         googleSigningIn?.classList.add("hidden");
         const navLogin = document.getElementById("nav-login");
         const displayName = name.split(' ')[0] || "User";
         if (navLogin) navLogin.textContent = `${displayName} (Google)`;
+
+        const openAuthBtn = document.getElementById("open-auth-btn");
+        if (openAuthBtn) {
+            openAuthBtn.onclick = () => {
+                if (confirm(`Signed in as ${email}. Do you want to sign out?`)) {
+                    localStorage.removeItem("sih_auth_user");
+                    if (navLogin) navLogin.textContent = "Login / Register";
+                    showToast("Signed out successfully", "info");
+                    openAuthBtn.onclick = () => modal?.classList.add("open");
+                }
+            };
+        }
+
+        showDramaticBannerAlert(`Authenticated with Google: ${email} (${name})`, "GOOGLE SIGN-IN VERIFIED");
         showToast(`Signed in as ${email}`, "success");
     }
 
@@ -699,16 +765,16 @@ function initializeMap() {
     const mapElement = document.getElementById("map");
     if (!mapElement) return;
 
-    // Base Layer 1: Dark Matter (Default for dark aesthetic)
-    const darkLayer = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-        maxZoom: 19,
-        attribution: "&copy; CartoDB & OpenStreetMap"
-    });
-
-    // Base Layer 2: ESRI High-Resolution Satellite
+    // Base Layer 1: ESRI High-Resolution Satellite (Default view)
     const satelliteLayer = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
         maxZoom: 19,
         attribution: "Tiles &copy; Esri"
+    });
+
+    // Base Layer 2: Dark Tactical GIS
+    const darkLayer = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+        maxZoom: 19,
+        attribution: "&copy; CartoDB & OpenStreetMap"
     });
 
     // Base Layer 3: Standard Street GIS
@@ -720,33 +786,23 @@ function initializeMap() {
     map = L.map("map", {
         center: [20.5937, 78.9629],
         zoom: 5,
-        layers: [darkLayer]
+        layers: [satelliteLayer]
     });
 
     markersLayer = L.layerGroup().addTo(map);
 
-    // Overlay: NASA GIBS Near Real-Time Active Fires Thermal Overlay
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const dateIso = yesterday.toISOString().split("T")[0];
-    const nasaGibsThermal = L.tileLayer(`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_Thermal_Anomalies_375m_Day/default/${dateIso}/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png`, {
-        tileSize: 256,
-        opacity: 0.85,
-        attribution: "NASA GIBS Thermal Anomalies"
-    });
-
     baseLayers = {
-        "🌑 Dark Tactical GIS": darkLayer,
         "🛰️ Satellite Imagery (ESRI)": satelliteLayer,
+        "🌑 Dark Tactical GIS": darkLayer,
         "🗺️ Standard Street Map": streetLayer
     };
 
     overlays = {
-        "🔥 Thermal Hotspots": markersLayer,
-        "📡 NASA GIBS Fire Overlay": nasaGibsThermal
+        "🔥 Thermal Hotspots": markersLayer
     };
 
-    L.control.layers(baseLayers, overlays, { position: "topright", collapsed: false }).addTo(map);
+    // Collapsed: true creates the neat square layers icon button shown in Image 3
+    L.control.layers(baseLayers, overlays, { position: "topright", collapsed: true }).addTo(map);
 }
 
 /* FILTER EVENT LISTENERS: PANS & FILTERS PER SELECTED STATE */
@@ -770,12 +826,16 @@ function setupEventListeners() {
 
     typeFilter?.addEventListener("change", applyFilters);
     document.getElementById("landcover-filter")?.addEventListener("change", applyFilters);
-    document.getElementById("landcover-filter")?.addEventListener("change", applyFilters);
+    let filterDebounce = null;
     minConf?.addEventListener("input", (e) => {
         setText("confidence-output", `${e.target.value}%`);
-        applyFilters();
+        clearTimeout(filterDebounce);
+        filterDebounce = setTimeout(applyFilters, 40);
     });
-    searchInput?.addEventListener("input", applyFilters);
+    searchInput?.addEventListener("input", () => {
+        clearTimeout(filterDebounce);
+        filterDebounce = setTimeout(applyFilters, 60);
+    });
 
     resetBtn?.addEventListener("click", () => {
         if (stateFilter) stateFilter.value = "";
@@ -816,7 +876,6 @@ function applyFilters() {
     renderMarkers();
     renderTable();
     updateAlerts();
-    updateNasaFirmsWidget();
 }
 
 /* DATA INGESTION ENGINE WITH ACCURATE STATE DEDUCTION */
@@ -987,9 +1046,11 @@ function renderTable() {
         return;
     }
 
-    filteredEvents.forEach(e => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
+    const displayLimit = 50;
+    const toRender = filteredEvents.slice(0, displayLimit);
+
+    const rowsHtml = toRender.map(e => `
+        <tr>
             <td><strong>${escapeHTML(e.source_id)}</strong></td>
             <td><span class="badge">${escapeHTML(e.state || 'National')}</span></td>
             <td><span class="badge" style="background: ${getEventColor(normalizeType(e.predicted_event_type))}22; color: ${getEventColor(normalizeType(e.predicted_event_type))}">${normalizeType(e.predicted_event_type)}</span></td>
@@ -1002,9 +1063,16 @@ function renderTable() {
                 <button class="btn-secondary" onclick="showEventDetails('${escapeHTML(e.source_id)}')">View</button>
                 <button class="btn-delete-source" title="Delete thermal source from database" onclick="window.deleteSource('${escapeHTML(e.source_id)}')"><i class="fa-solid fa-trash-can"></i></button>
             </td>
-        `;
-        tbody.appendChild(tr);
-    });
+        </tr>
+    `).join("");
+
+    tbody.innerHTML = rowsHtml;
+
+    if (filteredEvents.length > displayLimit) {
+        const trMore = document.createElement("tr");
+        trMore.innerHTML = `<td colspan="9" style="text-align:center; color:var(--muted); font-size:12px; padding:10px;">Showing top ${displayLimit} of ${filteredEvents.length} records. Filter or search to narrow results.</td>`;
+        tbody.appendChild(trMore);
+    }
 }
 
 window.deleteSource = async function(sourceId) {
