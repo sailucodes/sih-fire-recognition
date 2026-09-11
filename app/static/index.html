@@ -148,6 +148,25 @@
                     </div>
                 </section>
 
+                <!-- INSPECTION PANEL WITH NASA GIBS DYNAMIC SATELLITE IMAGERY -->
+                <section class="details-panel" id="details-panel">
+                    <div class="panel-header">
+                        <div>
+                            <span class="panel-kicker">INSPECTION</span>
+                            <h2>Selected Event Metrics & Satellite Verification</h2>
+                        </div>
+                    </div>
+                    <div id="details-content">
+                        <p style="text-align: center; color: var(--muted); padding: 20px;">
+                            Select an event from the map or database registry to review diagnostic parameters and satellite imagery.
+                        </p>
+                    </div>
+                </section>
+
+            </div>
+
+            <!-- SEPARATE GEOSPATIAL MAP VIEW SECTION -->
+            <div id="map-section" class="view-section hidden">
                 <!-- FILTERS AND CONTROLS PANEL -->
                 <section class="control-panel">
                     <div class="filter-row-top">
@@ -203,7 +222,7 @@
                 </section>
 
                 <!-- GEOSPATIAL MAP PANEL -->
-                <section class="map-panel" id="map-section">
+                <section class="map-panel">
                     <div class="panel-header">
                         <div>
                             <span class="panel-kicker">GIS MONITORING</span>
@@ -213,9 +232,11 @@
                     </div>
                     <div id="map" class="map-container"></div>
                 </section>
+            </div>
 
-                <!-- AI PREDICTION ENGINE FORM -->
-                <section class="prediction-panel" id="prediction-section">
+            <!-- SEPARATE AI PREDICTION ENGINE VIEW SECTION -->
+            <div id="prediction-section" class="view-section hidden">
+                <section class="prediction-panel">
                     <div class="panel-header">
                         <div>
                             <span class="panel-kicker">ML ENGINE</span>
@@ -248,15 +269,23 @@
                         </button>
                     </form>
                 </section>
+            </div>
 
-                <!-- CRITICAL ALERTS & NATIONAL AUTHORITY NOTIFICATIONS CENTER -->
-                <section class="alert-center" id="alerts-section">
+            <!-- SEPARATE CRITICAL ALERTS & NATIONAL AUTHORITY NOTIFICATIONS CENTER -->
+            <div id="alerts-section" class="view-section hidden">
+                <section class="alert-center">
                     <div class="panel-header">
                         <div>
                             <span class="panel-kicker">EARLY WARNING & AUTHORITY DISPATCH</span>
                             <h2><i class="fa-solid fa-bell"></i> <span id="lbl-alerts-heading">Thermal Event Alerts</span></h2>
                         </div>
-                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                        <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+                            <!-- AUTOMATIC DISPATCH TOGGLE -->
+                            <label class="auto-dispatch-toggle-wrap" title="Automatically dispatch Level-1 Alerts to NDMA / State EOC for industrial fires >= 88% confidence">
+                                <input type="checkbox" id="auto-dispatch-toggle" checked>
+                                <span class="auto-dispatch-slider"></span>
+                                <span><i class="fa-solid fa-bolt" style="color:#ef4444; margin-right:4px;"></i> Auto-Dispatch Active</span>
+                            </label>
                             <button id="clear-all-alerts-btn" class="btn-secondary" style="padding:8px 14px; font-size:13px;">
                                 <i class="fa-solid fa-trash-can"></i> <span>Clear All</span>
                             </button>
@@ -272,22 +301,6 @@
                     </div>
                     <div id="alerts-list" class="alert-list"></div>
                 </section>
-
-                <!-- INSPECTION PANEL WITH NASA GIBS DYNAMIC SATELLITE IMAGERY -->
-                <section class="details-panel" id="details-panel">
-                    <div class="panel-header">
-                        <div>
-                            <span class="panel-kicker">INSPECTION</span>
-                            <h2>Selected Event Metrics & Satellite Verification</h2>
-                        </div>
-                    </div>
-                    <div id="details-content">
-                        <p style="text-align: center; color: var(--muted); padding: 20px;">
-                            Select an event from the map or database registry to review diagnostic parameters and satellite imagery.
-                        </p>
-                    </div>
-                </section>
-
             </div>
 
             <!-- SEPARATE EVENT DATABASE VIEW SECTION -->
@@ -331,8 +344,17 @@
 
     <!-- AUTHENTICATION MODAL OVERLAY -->
     <div class="auth-modal" id="auth-modal">
-        <div class="auth-card">
+        <div class="auth-card" style="width: 460px; max-width: 95vw;">
             <button class="auth-close" id="close-auth-btn" aria-label="Close Modal"><i class="fa-solid fa-xmark"></i></button>
+            <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 16px;">
+                <div style="width: 44px; height: 44px; border-radius: 10px; background: rgba(34, 211, 238, 0.12); color: var(--cyan); border: 1px solid rgba(34, 211, 238, 0.3); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <div>
+                    <h3 style="margin: 0; font-size: 18px; font-weight: 800; color: var(--text);">National Authority Portal</h3>
+                    <p style="margin: 2px 0 0 0; font-size: 12px; color: var(--muted);">NDMA • State EOC • Disaster Monitoring System</p>
+                </div>
+            </div>
             <div class="auth-tabs">
                 <button class="auth-tab active" id="tab-login">Login</button>
                 <button class="auth-tab" id="tab-register">Register</button>

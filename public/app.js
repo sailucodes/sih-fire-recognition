@@ -719,7 +719,7 @@ function initializeThemeToggle() {
     });
 }
 
-/* SIDEBAR AND NAVIGATION */
+/* SIDEBAR AND CLEAN SPA VIEW NAVIGATION */
 function initializeSidebarAndNavigation() {
     const sidebar = document.getElementById("sidebar");
     const toggleBtn = document.getElementById("sidebar-toggle");
@@ -730,39 +730,54 @@ function initializeSidebarAndNavigation() {
     });
 
     const navItems = document.querySelectorAll(".nav-item");
+    const allViews = [
+        "dashboard-section",
+        "map-section",
+        "prediction-section",
+        "alerts-section",
+        "database-section"
+    ];
+
+    window.navigateToView = function(targetViewId) {
+        // Highlight corresponding nav item
+        navItems.forEach(i => {
+            if (i.getAttribute("data-target") === targetViewId) {
+                i.classList.add("active");
+            } else {
+                i.classList.remove("active");
+            }
+        });
+
+        // Hide all views, display target view only
+        allViews.forEach(vid => {
+            const el = document.getElementById(vid);
+            if (el) {
+                if (vid === targetViewId) {
+                    el.classList.remove("hidden");
+                    el.classList.add("active-view");
+                } else {
+                    el.classList.add("hidden");
+                    el.classList.remove("active-view");
+                }
+            }
+        });
+
+        window.scrollTo({ top: 0, behavior: "smooth" });
+
+        if (targetViewId === "map-section" && map) {
+            setTimeout(() => {
+                map.invalidateSize();
+            }, 180);
+        }
+    };
 
     navItems.forEach(item => {
         item.addEventListener("click", (e) => {
             e.preventDefault();
             e.stopPropagation();
-            navItems.forEach(i => i.classList.remove("active"));
-            item.classList.add("active");
-
             const targetViewId = item.getAttribute("data-target");
-            
-            if (targetViewId === "database-section") {
-                document.getElementById("dashboard-section")?.classList.add("hidden");
-                document.getElementById("database-section")?.classList.remove("hidden");
-                window.scrollTo({ top: 0, behavior: "smooth" });
-            } else {
-                const dbSec = document.getElementById("database-section");
-                if (dbSec && !dbSec.classList.contains("hidden")) {
-                    dbSec.classList.add("hidden");
-                    document.getElementById("dashboard-section")?.classList.remove("hidden");
-                }
-                
-                if (targetViewId === "dashboard-section") {
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                } else {
-                    const el = document.getElementById(targetViewId);
-                    if (el) {
-                        el.scrollIntoView({ behavior: "smooth", block: "start" });
-                    }
-                }
-            }
-
-            if (map && targetViewId === "map-section") {
-                setTimeout(() => map.invalidateSize(), 200);
+            if (targetViewId) {
+                window.navigateToView(targetViewId);
             }
         });
     });
@@ -1442,13 +1457,14 @@ function renderMarkers() {
     markersLayer.clearLayers();
 
     filteredEvents.forEach(e => {
-        if (!e.latitude || !e.longitude) return;
+        const isInd = normalizeType(e.predicted_event_type) === "Industrial";
         const marker = L.circleMarker([e.latitude, e.longitude], {
-            radius: 8,
+            radius: isInd ? 10 : 8,
             fillColor: getEventColor(normalizeType(e.predicted_event_type)),
-            color: "#ffffff", 
-            weight: 1.5, 
-            fillOpacity: 0.85
+            color: isInd ? "#ffffff" : "#ffffff", 
+            weight: isInd ? 2.5 : 1.5, 
+            fillOpacity: 0.9,
+            className: isInd ? "blinking-industrial-hotspot" : ""
         });
         
         const pScore = Number(e.persistence_score) || 0;
@@ -1572,16 +1588,16 @@ function updateAlerts() {
 
         if (isPred) {
             item.style.borderLeft = "4px solid #ef4444";
-            item.style.background = "rgba(239, 68, 68, 0.12)";
-            item.style.boxShadow = "0 0 12px rgba(239, 68, 68, 0.22)";
+            item.style.background = "var(--panel-light)";
+            item.style.boxShadow = "0 2px 10px rgba(0, 0, 0, 0.05)";
             item.innerHTML = `
                 <div>
                     <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px; flex-wrap:wrap;">
                         <span class="badge" style="background:#dc2626; color:#fff; font-size:10px; font-weight:800; padding:2px 6px; border-radius:4px; letter-spacing:0.5px;">🔥 CRITICAL AI PREDICTION (CONF & PERS &ge; 88%)</span>
-                        <strong style="color:#ef4444">${escapeHTML(e.source_id)} [${escapeHTML(e.state || 'N/A')}]</strong>
+                        <strong style="color:var(--text); font-weight:800;">${escapeHTML(e.source_id)} [${escapeHTML(e.state || 'N/A')}]</strong>
                     </div>
                     <p style="font-size:12px; color:var(--text); margin:0;">
-                        <strong>Type:</strong> ${normalizeType(e.predicted_event_type)} | 
+                        <strong>Type:</strong> <span style="color:#ef4444; font-weight:700;">${normalizeType(e.predicted_event_type)}</span> | 
                         <strong>Confidence:</strong> <span style="color:var(--cyan); font-weight:700;">${Number(e.confidence).toFixed(1)}%</span> | 
                         <strong>Persistence:</strong> <span style="color:#f59e0b; font-weight:700;">${e.persistence_score}%</span> | 
                         <strong>FRP:</strong> ${e.mean_frp ? Number(e.mean_frp).toFixed(1) : "—"} MW | 
@@ -1596,12 +1612,13 @@ function updateAlerts() {
             `;
         } else if (e.is_live_nasa) {
             item.style.borderLeft = "4px solid #ef4444";
-            item.style.background = "rgba(239, 68, 68, 0.08)";
+            item.style.background = "var(--panel-light)";
+            item.style.boxShadow = "0 2px 10px rgba(0, 0, 0, 0.05)";
             item.innerHTML = `
                 <div>
                     <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
                         <span class="badge" style="background:#ef4444; color:#fff; font-size:10px; font-weight:800; padding:2px 6px;">🚨 LIVE NASA SATELLITE DETECTION</span>
-                        <strong style="color:#ef4444">${escapeHTML(e.source_id)} [${escapeHTML(e.state)}]</strong>
+                        <strong style="color:var(--text); font-weight:800;">${escapeHTML(e.source_id)} [${escapeHTML(e.state)}]</strong>
                     </div>
                     <p style="font-size:12px; color:var(--text); margin:0;">
                         <strong>Type:</strong> ${normalizeType(e.predicted_event_type)} | 
@@ -1617,6 +1634,7 @@ function updateAlerts() {
                 </div>
             `;
         } else {
+            item.style.background = "var(--panel-light)";
             item.innerHTML = `
                 <div>
                     <strong>${escapeHTML(e.source_id)} [${escapeHTML(e.state)}] - Baseline Monitored Facility</strong>
@@ -1630,6 +1648,10 @@ function updateAlerts() {
             `;
         }
         list.appendChild(item);
+
+        if (window.triggerAutoDispatchIfEligible) {
+            window.triggerAutoDispatchIfEligible(e);
+        }
     });
 }
 
@@ -1639,10 +1661,14 @@ function showEventDetails(sourceId) {
     const container = document.getElementById("details-content");
     if (!event || !container) return;
 
-    const dbSec = document.getElementById("database-section");
-    if (dbSec && !dbSec.classList.contains("hidden")) {
-        dbSec.classList.add("hidden");
-        document.getElementById("dashboard-section")?.classList.remove("hidden");
+    if (window.navigateToView) {
+        window.navigateToView("dashboard-section");
+    } else {
+        const dbSec = document.getElementById("database-section");
+        if (dbSec && !dbSec.classList.contains("hidden")) {
+            dbSec.classList.add("hidden");
+            document.getElementById("dashboard-section")?.classList.remove("hidden");
+        }
     }
 
     const dateObj = new Date();
@@ -1746,21 +1772,39 @@ function showEventDetails(sourceId) {
             attribution: 'NASA GIBS Active Fires'
         }).addTo(nasaMiniMap);
 
-        const hotspotMarker = L.circleMarker([lat, lon], {
-            radius: 12,
-            fillColor: "#ef4444",
-            color: "#ffffff",
-            weight: 3,
-            fillOpacity: 0.9
-        }).addTo(nasaMiniMap);
+        if (normalizeType(event.predicted_event_type) === "Industrial") {
+            const pulsingIcon = L.divIcon({
+                className: 'pulsing-industrial-beacon',
+                html: '<div class="beacon-ring"></div><div class="beacon-core"></div>',
+                iconSize: [28, 28],
+                iconAnchor: [14, 14]
+            });
+            const beaconMarker = L.marker([lat, lon], { icon: pulsingIcon }).addTo(nasaMiniMap);
+            beaconMarker.bindPopup(`
+                <div style="color:#000;">
+                    <strong style="color:#ef4444;">🏭 ACTIVE INDUSTRIAL FIRE HOTSPOT</strong><br>
+                    Lat: ${lat.toFixed(4)}°, Lon: ${lon.toFixed(4)}°<br>
+                    Confidence: ${Number(event.confidence).toFixed(1)}%<br>
+                    Persistence: ${event.persistence_score || 85}%
+                </div>
+            `).openPopup();
+        } else {
+            const hotspotMarker = L.circleMarker([lat, lon], {
+                radius: 12,
+                fillColor: getEventColor(normalizeType(event.predicted_event_type)),
+                color: "#ffffff",
+                weight: 3,
+                fillOpacity: 0.9
+            }).addTo(nasaMiniMap);
 
-        hotspotMarker.bindPopup(`
-            <div style="color:#000;">
-                <strong>🔥 Thermal Hotspot Location</strong><br>
-                Lat: ${lat.toFixed(4)}°, Lon: ${lon.toFixed(4)}°<br>
-                Confidence: ${Number(event.confidence).toFixed(1)}%
-            </div>
-        `).openPopup();
+            hotspotMarker.bindPopup(`
+                <div style="color:#000;">
+                    <strong>🔥 Thermal Hotspot Location</strong><br>
+                    Lat: ${lat.toFixed(4)}°, Lon: ${lon.toFixed(4)}°<br>
+                    Confidence: ${Number(event.confidence).toFixed(1)}%
+                </div>
+            `).openPopup();
+        }
     }, 100);
 }
 
@@ -1890,18 +1934,20 @@ function setupPredictionForm() {
                 );
                 showToast(`Critical Alert ${newEvent.source_id} routed to Alerts Center!`, "warning");
 
-                // Make sure dashboard section is visible and scroll to Alerts Section
-                const dbSec = document.getElementById("database-section");
-                if (dbSec && !dbSec.classList.contains("hidden")) {
-                    dbSec.classList.add("hidden");
-                    document.getElementById("dashboard-section")?.classList.remove("hidden");
-                }
-
-                const alertsSec = document.getElementById("alerts-section");
-                if (alertsSec) {
-                    setTimeout(() => {
-                        alertsSec.scrollIntoView({ behavior: "smooth", block: "start" });
-                    }, 350);
+                if (window.navigateToView) {
+                    window.navigateToView("alerts-section");
+                } else {
+                    const dbSec = document.getElementById("database-section");
+                    if (dbSec && !dbSec.classList.contains("hidden")) {
+                        dbSec.classList.add("hidden");
+                        document.getElementById("dashboard-section")?.classList.remove("hidden");
+                    }
+                    const alertsSec = document.getElementById("alerts-section");
+                    if (alertsSec) {
+                        setTimeout(() => {
+                            alertsSec.scrollIntoView({ behavior: "smooth", block: "start" });
+                        }, 350);
+                    }
                 }
             } else {
                 showDramaticBannerAlert(
@@ -2034,4 +2080,38 @@ function setupNationalAuthorityAlerts() {
         showDramaticBannerAlert(`Dispatched Official Incident Brief (${criticalCount} Critical Anomalies in ${targetState}) to NDMA & State EOC. Ref: ${dispatchId}`, "AUTHORITY DISPATCH TRANSMITTED");
         showToast(`Dispatched to NDMA & State EOC [${dispatchId}]`, "success");
     });
+
+    // AUTOMATIC RAPID DISPATCH LISTENER
+    const autoDispatchToggle = document.getElementById("auto-dispatch-toggle");
+    let autoDispatchedSet = new Set();
+
+    window.triggerAutoDispatchIfEligible = function(event) {
+        if (!autoDispatchToggle || !autoDispatchToggle.checked) return;
+        if (!event || autoDispatchedSet.has(String(event.source_id))) return;
+
+        const isInd = normalizeType(event.predicted_event_type) === "Industrial";
+        const isCriticalScore = (Number(event.confidence) >= 88 || Number(event.persistence_score) >= 88);
+
+        if (isInd && isCriticalScore) {
+            autoDispatchedSet.add(String(event.source_id));
+            const autoId = "AUTO-NDMA-" + Date.now().toString().slice(-5);
+            
+            try {
+                fetch("/api/v1/alerts/dispatch", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        state: event.state || "National",
+                        priority: "CRITICAL_P1",
+                        directive: `[AUTOMATIC RAPID LEVEL-1 DISPATCH] High-Severity Industrial Fire Anomaly ${event.source_id} detected. Instant dispatch triggered to District Fire Operations.`,
+                        critical_count: 1
+                    })
+                });
+            } catch (_) {}
+
+            setTimeout(() => {
+                showToast(`[AUTO-DISPATCH] Critical Industrial Fire ${event.source_id} transmitted to NDMA & State EOC (${autoId})`, "warning");
+            }, 600);
+        }
+    };
 }

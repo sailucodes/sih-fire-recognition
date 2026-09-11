@@ -733,20 +733,26 @@ input:focus, select:focus {
 .btn-secondary:hover { background: var(--panel-light); }
 
 .btn-authority {
-    background: rgba(255, 77, 90, 0.15);
-    border: 1px solid var(--industrial);
-    color: var(--industrial);
+    background: #ef4444;
+    border: 1px solid #dc2626;
+    color: #ffffff;
     padding: 10px 18px;
     border-radius: 8px;
     font-weight: 700;
     font-size: 13px;
     cursor: pointer;
-    transition: 0.2s;
+    box-shadow: 0 2px 10px rgba(239, 68, 68, 0.35);
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .btn-authority:hover {
-    background: var(--industrial);
+    background: #dc2626;
     color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(220, 38, 38, 0.45);
 }
 
 /* ALERTS CENTER */
@@ -1083,23 +1089,24 @@ tbody tr:hover {
 }
 
 .btn-dismiss-alert {
-    background: rgba(255, 77, 90, 0.12);
-    color: var(--industrial);
-    border: 1px solid rgba(255, 77, 90, 0.35);
+    background: transparent;
+    color: #ef4444;
+    border: 1px solid #ef4444;
     border-radius: 6px;
-    padding: 6px 12px;
+    padding: 6px 14px;
     cursor: pointer;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 700;
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    transition: all 0.2s;
+    transition: all 0.2s ease;
 }
 
 .btn-dismiss-alert:hover {
-    background: var(--industrial);
+    background: rgba(239, 68, 68, 0.15);
     color: #ffffff;
+    border-color: #dc2626;
 }
 
 .btn-delete-source {
@@ -1190,6 +1197,163 @@ tbody tr:hover {
 @keyframes toastSlide {
     from { opacity: 0; transform: translateY(10px) scale(0.96); }
     to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* =========================================================
+   PULSING HOTSPOT & INDUSTRIAL RADAR BEACON BLINKING EFFECT
+   (For Map Markers & Satellite Verification Mini-Map)
+========================================================= */
+@keyframes hotspotPulse {
+    0% {
+        transform: scale(0.92);
+        opacity: 0.95;
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.85);
+    }
+    60% {
+        transform: scale(1.22);
+        opacity: 1;
+        box-shadow: 0 0 0 16px rgba(239, 68, 68, 0);
+    }
+    100% {
+        transform: scale(0.92);
+        opacity: 0.95;
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    }
+}
+
+@keyframes beaconRadar {
+    0% {
+        transform: scale(1);
+        opacity: 0.8;
+    }
+    50% {
+        transform: scale(2.4);
+        opacity: 0;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 0;
+    }
+}
+
+.pulsing-industrial-beacon {
+    position: relative;
+    width: 28px !important;
+    height: 28px !important;
+    margin-left: -14px !important;
+    margin-top: -14px !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto !important;
+}
+
+.pulsing-industrial-beacon .beacon-core {
+    width: 14px;
+    height: 14px;
+    background: #ef4444;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    box-shadow: 0 0 10px #ef4444, 0 0 18px #ef4444;
+    animation: hotspotPulse 1.25s infinite cubic-bezier(0.45, 0.05, 0.55, 0.95);
+    z-index: 2;
+}
+
+.pulsing-industrial-beacon .beacon-ring {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(239, 68, 68, 0.35);
+    border: 1.5px solid rgba(239, 68, 68, 0.9);
+    animation: beaconRadar 1.5s infinite ease-out;
+    z-index: 1;
+}
+
+/* LEAFLET CIRCLE MARKER PULSE OVERLAY */
+path.leaflet-interactive.blinking-industrial-hotspot {
+    animation: svgMarkerPulse 1.25s infinite cubic-bezier(0.4, 0, 0.2, 1);
+    transform-origin: center;
+}
+
+@keyframes svgMarkerPulse {
+    0% {
+        stroke-width: 3px;
+        stroke: #ffffff;
+        fill: #ef4444;
+        fill-opacity: 0.95;
+    }
+    50% {
+        stroke-width: 8px;
+        stroke: rgba(255, 255, 255, 0.9);
+        fill: #dc2626;
+        fill-opacity: 1;
+        filter: drop-shadow(0 0 12px #ef4444);
+    }
+    100% {
+        stroke-width: 3px;
+        stroke: #ffffff;
+        fill: #ef4444;
+        fill-opacity: 0.95;
+    }
+}
+
+/* CLEAN TOGGLE SWITCH FOR AUTOMATIC DISPATCH */
+.auto-dispatch-toggle-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 14px;
+    background: var(--panel-light);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text);
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.2s ease;
+}
+
+.auto-dispatch-toggle-wrap:hover {
+    border-color: #ef4444;
+}
+
+.auto-dispatch-toggle-wrap input {
+    display: none;
+}
+
+.auto-dispatch-slider {
+    width: 34px;
+    height: 18px;
+    background: #475569;
+    border-radius: 20px;
+    position: relative;
+    transition: background 0.25s ease;
+    display: inline-block;
+}
+
+.auto-dispatch-slider::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    background: #ffffff;
+    border-radius: 50%;
+    transition: transform 0.25s ease;
+}
+
+.auto-dispatch-toggle-wrap input:checked + .auto-dispatch-slider {
+    background: #ef4444;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+}
+
+.auto-dispatch-toggle-wrap input:checked + .auto-dispatch-slider::after {
+    transform: translateX(16px);
 }
 </style>
 </head>
@@ -1330,6 +1494,25 @@ tbody tr:hover {
                     </div>
                 </section>
 
+                <!-- INSPECTION PANEL WITH NASA GIBS DYNAMIC SATELLITE IMAGERY -->
+                <section class="details-panel" id="details-panel">
+                    <div class="panel-header">
+                        <div>
+                            <span class="panel-kicker">INSPECTION</span>
+                            <h2>Selected Event Metrics & Satellite Verification</h2>
+                        </div>
+                    </div>
+                    <div id="details-content">
+                        <p style="text-align: center; color: var(--muted); padding: 20px;">
+                            Select an event from the map or database registry to review diagnostic parameters and satellite imagery.
+                        </p>
+                    </div>
+                </section>
+
+            </div>
+
+            <!-- SEPARATE GEOSPATIAL MAP VIEW SECTION -->
+            <div id="map-section" class="view-section hidden">
                 <!-- FILTERS AND CONTROLS PANEL -->
                 <section class="control-panel">
                     <div class="filter-row-top">
@@ -1385,7 +1568,7 @@ tbody tr:hover {
                 </section>
 
                 <!-- GEOSPATIAL MAP PANEL -->
-                <section class="map-panel" id="map-section">
+                <section class="map-panel">
                     <div class="panel-header">
                         <div>
                             <span class="panel-kicker">GIS MONITORING</span>
@@ -1395,9 +1578,11 @@ tbody tr:hover {
                     </div>
                     <div id="map" class="map-container"></div>
                 </section>
+            </div>
 
-                <!-- AI PREDICTION ENGINE FORM -->
-                <section class="prediction-panel" id="prediction-section">
+            <!-- SEPARATE AI PREDICTION ENGINE VIEW SECTION -->
+            <div id="prediction-section" class="view-section hidden">
+                <section class="prediction-panel">
                     <div class="panel-header">
                         <div>
                             <span class="panel-kicker">ML ENGINE</span>
@@ -1430,15 +1615,23 @@ tbody tr:hover {
                         </button>
                     </form>
                 </section>
+            </div>
 
-                <!-- CRITICAL ALERTS & NATIONAL AUTHORITY NOTIFICATIONS CENTER -->
-                <section class="alert-center" id="alerts-section">
+            <!-- SEPARATE CRITICAL ALERTS & NATIONAL AUTHORITY NOTIFICATIONS CENTER -->
+            <div id="alerts-section" class="view-section hidden">
+                <section class="alert-center">
                     <div class="panel-header">
                         <div>
                             <span class="panel-kicker">EARLY WARNING & AUTHORITY DISPATCH</span>
                             <h2><i class="fa-solid fa-bell"></i> <span id="lbl-alerts-heading">Thermal Event Alerts</span></h2>
                         </div>
-                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                        <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+                            <!-- AUTOMATIC DISPATCH TOGGLE -->
+                            <label class="auto-dispatch-toggle-wrap" title="Automatically dispatch Level-1 Alerts to NDMA / State EOC for industrial fires >= 88% confidence">
+                                <input type="checkbox" id="auto-dispatch-toggle" checked>
+                                <span class="auto-dispatch-slider"></span>
+                                <span><i class="fa-solid fa-bolt" style="color:#ef4444; margin-right:4px;"></i> Auto-Dispatch Active</span>
+                            </label>
                             <button id="clear-all-alerts-btn" class="btn-secondary" style="padding:8px 14px; font-size:13px;">
                                 <i class="fa-solid fa-trash-can"></i> <span>Clear All</span>
                             </button>
@@ -1454,22 +1647,6 @@ tbody tr:hover {
                     </div>
                     <div id="alerts-list" class="alert-list"></div>
                 </section>
-
-                <!-- INSPECTION PANEL WITH NASA GIBS DYNAMIC SATELLITE IMAGERY -->
-                <section class="details-panel" id="details-panel">
-                    <div class="panel-header">
-                        <div>
-                            <span class="panel-kicker">INSPECTION</span>
-                            <h2>Selected Event Metrics & Satellite Verification</h2>
-                        </div>
-                    </div>
-                    <div id="details-content">
-                        <p style="text-align: center; color: var(--muted); padding: 20px;">
-                            Select an event from the map or database registry to review diagnostic parameters and satellite imagery.
-                        </p>
-                    </div>
-                </section>
-
             </div>
 
             <!-- SEPARATE EVENT DATABASE VIEW SECTION -->
@@ -1513,8 +1690,17 @@ tbody tr:hover {
 
     <!-- AUTHENTICATION MODAL OVERLAY -->
     <div class="auth-modal" id="auth-modal">
-        <div class="auth-card">
+        <div class="auth-card" style="width: 460px; max-width: 95vw;">
             <button class="auth-close" id="close-auth-btn" aria-label="Close Modal"><i class="fa-solid fa-xmark"></i></button>
+            <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 16px;">
+                <div style="width: 44px; height: 44px; border-radius: 10px; background: rgba(34, 211, 238, 0.12); color: var(--cyan); border: 1px solid rgba(34, 211, 238, 0.3); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <div>
+                    <h3 style="margin: 0; font-size: 18px; font-weight: 800; color: var(--text);">National Authority Portal</h3>
+                    <p style="margin: 2px 0 0 0; font-size: 12px; color: var(--muted);">NDMA • State EOC • Disaster Monitoring System</p>
+                </div>
+            </div>
             <div class="auth-tabs">
                 <button class="auth-tab active" id="tab-login">Login</button>
                 <button class="auth-tab" id="tab-register">Register</button>
@@ -26684,7 +26870,7 @@ function initializeThemeToggle() {
     });
 }
 
-/* SIDEBAR AND NAVIGATION */
+/* SIDEBAR AND CLEAN SPA VIEW NAVIGATION */
 function initializeSidebarAndNavigation() {
     const sidebar = document.getElementById("sidebar");
     const toggleBtn = document.getElementById("sidebar-toggle");
@@ -26695,39 +26881,54 @@ function initializeSidebarAndNavigation() {
     });
 
     const navItems = document.querySelectorAll(".nav-item");
+    const allViews = [
+        "dashboard-section",
+        "map-section",
+        "prediction-section",
+        "alerts-section",
+        "database-section"
+    ];
+
+    window.navigateToView = function(targetViewId) {
+        // Highlight corresponding nav item
+        navItems.forEach(i => {
+            if (i.getAttribute("data-target") === targetViewId) {
+                i.classList.add("active");
+            } else {
+                i.classList.remove("active");
+            }
+        });
+
+        // Hide all views, display target view only
+        allViews.forEach(vid => {
+            const el = document.getElementById(vid);
+            if (el) {
+                if (vid === targetViewId) {
+                    el.classList.remove("hidden");
+                    el.classList.add("active-view");
+                } else {
+                    el.classList.add("hidden");
+                    el.classList.remove("active-view");
+                }
+            }
+        });
+
+        window.scrollTo({ top: 0, behavior: "smooth" });
+
+        if (targetViewId === "map-section" && map) {
+            setTimeout(() => {
+                map.invalidateSize();
+            }, 180);
+        }
+    };
 
     navItems.forEach(item => {
         item.addEventListener("click", (e) => {
             e.preventDefault();
             e.stopPropagation();
-            navItems.forEach(i => i.classList.remove("active"));
-            item.classList.add("active");
-
             const targetViewId = item.getAttribute("data-target");
-            
-            if (targetViewId === "database-section") {
-                document.getElementById("dashboard-section")?.classList.add("hidden");
-                document.getElementById("database-section")?.classList.remove("hidden");
-                window.scrollTo({ top: 0, behavior: "smooth" });
-            } else {
-                const dbSec = document.getElementById("database-section");
-                if (dbSec && !dbSec.classList.contains("hidden")) {
-                    dbSec.classList.add("hidden");
-                    document.getElementById("dashboard-section")?.classList.remove("hidden");
-                }
-                
-                if (targetViewId === "dashboard-section") {
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                } else {
-                    const el = document.getElementById(targetViewId);
-                    if (el) {
-                        el.scrollIntoView({ behavior: "smooth", block: "start" });
-                    }
-                }
-            }
-
-            if (map && targetViewId === "map-section") {
-                setTimeout(() => map.invalidateSize(), 200);
+            if (targetViewId) {
+                window.navigateToView(targetViewId);
             }
         });
     });
@@ -27407,13 +27608,14 @@ function renderMarkers() {
     markersLayer.clearLayers();
 
     filteredEvents.forEach(e => {
-        if (!e.latitude || !e.longitude) return;
+        const isInd = normalizeType(e.predicted_event_type) === "Industrial";
         const marker = L.circleMarker([e.latitude, e.longitude], {
-            radius: 8,
+            radius: isInd ? 10 : 8,
             fillColor: getEventColor(normalizeType(e.predicted_event_type)),
-            color: "#ffffff", 
-            weight: 1.5, 
-            fillOpacity: 0.85
+            color: isInd ? "#ffffff" : "#ffffff", 
+            weight: isInd ? 2.5 : 1.5, 
+            fillOpacity: 0.9,
+            className: isInd ? "blinking-industrial-hotspot" : ""
         });
         
         const pScore = Number(e.persistence_score) || 0;
@@ -27537,16 +27739,16 @@ function updateAlerts() {
 
         if (isPred) {
             item.style.borderLeft = "4px solid #ef4444";
-            item.style.background = "rgba(239, 68, 68, 0.12)";
-            item.style.boxShadow = "0 0 12px rgba(239, 68, 68, 0.22)";
+            item.style.background = "var(--panel-light)";
+            item.style.boxShadow = "0 2px 10px rgba(0, 0, 0, 0.05)";
             item.innerHTML = `
                 <div>
                     <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px; flex-wrap:wrap;">
                         <span class="badge" style="background:#dc2626; color:#fff; font-size:10px; font-weight:800; padding:2px 6px; border-radius:4px; letter-spacing:0.5px;">🔥 CRITICAL AI PREDICTION (CONF & PERS &ge; 88%)</span>
-                        <strong style="color:#ef4444">${escapeHTML(e.source_id)} [${escapeHTML(e.state || 'N/A')}]</strong>
+                        <strong style="color:var(--text); font-weight:800;">${escapeHTML(e.source_id)} [${escapeHTML(e.state || 'N/A')}]</strong>
                     </div>
                     <p style="font-size:12px; color:var(--text); margin:0;">
-                        <strong>Type:</strong> ${normalizeType(e.predicted_event_type)} | 
+                        <strong>Type:</strong> <span style="color:#ef4444; font-weight:700;">${normalizeType(e.predicted_event_type)}</span> | 
                         <strong>Confidence:</strong> <span style="color:var(--cyan); font-weight:700;">${Number(e.confidence).toFixed(1)}%</span> | 
                         <strong>Persistence:</strong> <span style="color:#f59e0b; font-weight:700;">${e.persistence_score}%</span> | 
                         <strong>FRP:</strong> ${e.mean_frp ? Number(e.mean_frp).toFixed(1) : "—"} MW | 
@@ -27561,12 +27763,13 @@ function updateAlerts() {
             `;
         } else if (e.is_live_nasa) {
             item.style.borderLeft = "4px solid #ef4444";
-            item.style.background = "rgba(239, 68, 68, 0.08)";
+            item.style.background = "var(--panel-light)";
+            item.style.boxShadow = "0 2px 10px rgba(0, 0, 0, 0.05)";
             item.innerHTML = `
                 <div>
                     <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
                         <span class="badge" style="background:#ef4444; color:#fff; font-size:10px; font-weight:800; padding:2px 6px;">🚨 LIVE NASA SATELLITE DETECTION</span>
-                        <strong style="color:#ef4444">${escapeHTML(e.source_id)} [${escapeHTML(e.state)}]</strong>
+                        <strong style="color:var(--text); font-weight:800;">${escapeHTML(e.source_id)} [${escapeHTML(e.state)}]</strong>
                     </div>
                     <p style="font-size:12px; color:var(--text); margin:0;">
                         <strong>Type:</strong> ${normalizeType(e.predicted_event_type)} | 
@@ -27582,6 +27785,7 @@ function updateAlerts() {
                 </div>
             `;
         } else {
+            item.style.background = "var(--panel-light)";
             item.innerHTML = `
                 <div>
                     <strong>${escapeHTML(e.source_id)} [${escapeHTML(e.state)}] - Baseline Monitored Facility</strong>
@@ -27595,6 +27799,10 @@ function updateAlerts() {
             `;
         }
         list.appendChild(item);
+
+        if (window.triggerAutoDispatchIfEligible) {
+            window.triggerAutoDispatchIfEligible(e);
+        }
     });
 }
 
@@ -27604,10 +27812,14 @@ function showEventDetails(sourceId) {
     const container = document.getElementById("details-content");
     if (!event || !container) return;
 
-    const dbSec = document.getElementById("database-section");
-    if (dbSec && !dbSec.classList.contains("hidden")) {
-        dbSec.classList.add("hidden");
-        document.getElementById("dashboard-section")?.classList.remove("hidden");
+    if (window.navigateToView) {
+        window.navigateToView("dashboard-section");
+    } else {
+        const dbSec = document.getElementById("database-section");
+        if (dbSec && !dbSec.classList.contains("hidden")) {
+            dbSec.classList.add("hidden");
+            document.getElementById("dashboard-section")?.classList.remove("hidden");
+        }
     }
 
     const dateObj = new Date();
@@ -27711,21 +27923,39 @@ function showEventDetails(sourceId) {
             attribution: 'NASA GIBS Active Fires'
         }).addTo(nasaMiniMap);
 
-        const hotspotMarker = L.circleMarker([lat, lon], {
-            radius: 12,
-            fillColor: "#ef4444",
-            color: "#ffffff",
-            weight: 3,
-            fillOpacity: 0.9
-        }).addTo(nasaMiniMap);
+        if (normalizeType(event.predicted_event_type) === "Industrial") {
+            const pulsingIcon = L.divIcon({
+                className: 'pulsing-industrial-beacon',
+                html: '<div class="beacon-ring"></div><div class="beacon-core"></div>',
+                iconSize: [28, 28],
+                iconAnchor: [14, 14]
+            });
+            const beaconMarker = L.marker([lat, lon], { icon: pulsingIcon }).addTo(nasaMiniMap);
+            beaconMarker.bindPopup(`
+                <div style="color:#000;">
+                    <strong style="color:#ef4444;">🏭 ACTIVE INDUSTRIAL FIRE HOTSPOT</strong><br>
+                    Lat: ${lat.toFixed(4)}°, Lon: ${lon.toFixed(4)}°<br>
+                    Confidence: ${Number(event.confidence).toFixed(1)}%<br>
+                    Persistence: ${event.persistence_score || 85}%
+                </div>
+            `).openPopup();
+        } else {
+            const hotspotMarker = L.circleMarker([lat, lon], {
+                radius: 12,
+                fillColor: getEventColor(normalizeType(event.predicted_event_type)),
+                color: "#ffffff",
+                weight: 3,
+                fillOpacity: 0.9
+            }).addTo(nasaMiniMap);
 
-        hotspotMarker.bindPopup(`
-            <div style="color:#000;">
-                <strong>🔥 Thermal Hotspot Location</strong><br>
-                Lat: ${lat.toFixed(4)}°, Lon: ${lon.toFixed(4)}°<br>
-                Confidence: ${Number(event.confidence).toFixed(1)}%
-            </div>
-        `).openPopup();
+            hotspotMarker.bindPopup(`
+                <div style="color:#000;">
+                    <strong>🔥 Thermal Hotspot Location</strong><br>
+                    Lat: ${lat.toFixed(4)}°, Lon: ${lon.toFixed(4)}°<br>
+                    Confidence: ${Number(event.confidence).toFixed(1)}%
+                </div>
+            `).openPopup();
+        }
     }, 100);
 }
 
@@ -27855,18 +28085,20 @@ function setupPredictionForm() {
                 );
                 showToast(`Critical Alert ${newEvent.source_id} routed to Alerts Center!`, "warning");
 
-                // Make sure dashboard section is visible and scroll to Alerts Section
-                const dbSec = document.getElementById("database-section");
-                if (dbSec && !dbSec.classList.contains("hidden")) {
-                    dbSec.classList.add("hidden");
-                    document.getElementById("dashboard-section")?.classList.remove("hidden");
-                }
-
-                const alertsSec = document.getElementById("alerts-section");
-                if (alertsSec) {
-                    setTimeout(() => {
-                        alertsSec.scrollIntoView({ behavior: "smooth", block: "start" });
-                    }, 350);
+                if (window.navigateToView) {
+                    window.navigateToView("alerts-section");
+                } else {
+                    const dbSec = document.getElementById("database-section");
+                    if (dbSec && !dbSec.classList.contains("hidden")) {
+                        dbSec.classList.add("hidden");
+                        document.getElementById("dashboard-section")?.classList.remove("hidden");
+                    }
+                    const alertsSec = document.getElementById("alerts-section");
+                    if (alertsSec) {
+                        setTimeout(() => {
+                            alertsSec.scrollIntoView({ behavior: "smooth", block: "start" });
+                        }, 350);
+                    }
                 }
             } else {
                 showDramaticBannerAlert(
@@ -27999,6 +28231,40 @@ function setupNationalAuthorityAlerts() {
         showDramaticBannerAlert(`Dispatched Official Incident Brief (${criticalCount} Critical Anomalies in ${targetState}) to NDMA & State EOC. Ref: ${dispatchId}`, "AUTHORITY DISPATCH TRANSMITTED");
         showToast(`Dispatched to NDMA & State EOC [${dispatchId}]`, "success");
     });
+
+    // AUTOMATIC RAPID DISPATCH LISTENER
+    const autoDispatchToggle = document.getElementById("auto-dispatch-toggle");
+    let autoDispatchedSet = new Set();
+
+    window.triggerAutoDispatchIfEligible = function(event) {
+        if (!autoDispatchToggle || !autoDispatchToggle.checked) return;
+        if (!event || autoDispatchedSet.has(String(event.source_id))) return;
+
+        const isInd = normalizeType(event.predicted_event_type) === "Industrial";
+        const isCriticalScore = (Number(event.confidence) >= 88 || Number(event.persistence_score) >= 88);
+
+        if (isInd && isCriticalScore) {
+            autoDispatchedSet.add(String(event.source_id));
+            const autoId = "AUTO-NDMA-" + Date.now().toString().slice(-5);
+            
+            try {
+                fetch("/api/v1/alerts/dispatch", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        state: event.state || "National",
+                        priority: "CRITICAL_P1",
+                        directive: `[AUTOMATIC RAPID LEVEL-1 DISPATCH] High-Severity Industrial Fire Anomaly ${event.source_id} detected. Instant dispatch triggered to District Fire Operations.`,
+                        critical_count: 1
+                    })
+                });
+            } catch (_) {}
+
+            setTimeout(() => {
+                showToast(`[AUTO-DISPATCH] Critical Industrial Fire ${event.source_id} transmitted to NDMA & State EOC (${autoId})`, "warning");
+            }, 600);
+        }
+    };
 }
     </script>
 
