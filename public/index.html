@@ -1558,11 +1558,11 @@ path.leaflet-interactive.blinking-industrial-hotspot {
                                 </select>
                             </div>
                             <div class="input-group-custom">
-                                <label for="latitude">Latitude</label>
+                                <label for="latitude">Latitude <span style="font-size:11px; font-weight:normal; color:var(--cyan); margin-left:4px;"><i class="fa-solid fa-map-pin"></i> (or click on map)</span></label>
                                 <input type="number" step="any" id="latitude" placeholder="e.g. 20.7957" required>
                             </div>
                             <div class="input-group-custom">
-                                <label for="longitude">Longitude</label>
+                                <label for="longitude">Longitude <span style="font-size:11px; font-weight:normal; color:var(--cyan); margin-left:4px;"><i class="fa-solid fa-map-pin"></i> (auto-filled)</span></label>
                                 <input type="number" step="any" id="longitude" placeholder="e.g. 85.2547" required>
                             </div>
                             <div class="input-group-custom">
@@ -27355,6 +27355,54 @@ function initializeMap() {
 
     // Collapsed: true creates the neat square layers icon button shown in Image 3
     L.control.layers(baseLayers, overlays, { position: "topright", collapsed: true }).addTo(map);
+
+    // CLICK ON MAP TO AUTOMATICALLY CAPTURE LATITUDE & LONGITUDE FOR PREDICTION
+    let mapClickPinMarker = null;
+    map.on("click", (e) => {
+        const clickedLat = parseFloat(e.latlng.lat.toFixed(5));
+        const clickedLng = parseFloat(e.latlng.lng.toFixed(5));
+
+        const latInput = document.getElementById("latitude") || document.getElementById("pred-lat");
+        const lngInput = document.getElementById("longitude") || document.getElementById("pred-lng");
+        const stateSelect = document.getElementById("pred-state") || document.getElementById("state");
+
+        if (latInput) latInput.value = clickedLat;
+        if (lngInput) lngInput.value = clickedLng;
+
+        const detectedState = getNearestState(clickedLat, clickedLng);
+        if (stateSelect && detectedState) {
+            stateSelect.value = detectedState;
+        }
+
+        // Add or move the map click pin marker
+        if (mapClickPinMarker) {
+            mapClickPinMarker.setLatLng([clickedLat, clickedLng]);
+        } else {
+            mapClickPinMarker = L.marker([clickedLat, clickedLng], {
+                title: "Selected Coordinates for AI Prediction",
+                zIndexOffset: 1000
+            }).addTo(map);
+        }
+
+        mapClickPinMarker.bindPopup(`
+            <div style="font-family:inherit; min-width:180px; padding:4px;">
+                <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+                    <span style="color:#06b6d4; font-size:14px;"><i class="fa-solid fa-location-crosshairs"></i></span>
+                    <strong style="color:var(--text, #0f172a); font-size:13px;">Target Coordinates</strong>
+                </div>
+                <div style="font-size:12px; color:#475569; line-height:1.5;">
+                    <div><strong>Lat:</strong> ${clickedLat}° N</div>
+                    <div><strong>Lng:</strong> ${clickedLng}° E</div>
+                    <div><strong>Region:</strong> ${detectedState}</div>
+                </div>
+                <div style="margin-top:6px; font-size:11px; color:#06b6d4; font-weight:700;">
+                    ✓ Copied to AI Predictor Form
+                </div>
+            </div>
+        `).openPopup();
+
+        showToast(`Selected Map Point: ${clickedLat}° N, ${clickedLng}° E (${detectedState})`, "info");
+    });
 }
 
 /* FILTER EVENT LISTENERS: PANS & FILTERS PER SELECTED STATE */
