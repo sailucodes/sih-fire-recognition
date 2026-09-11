@@ -370,73 +370,80 @@ async function updateNasaFirmsWidget(forceRefresh = false) {
     let timeStr = now.toUTCString().replace("GMT", "UTC");
 
     try {
-        const nasaUrl = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${mapKey}/VIIRS_SNPP_NRT/68,6.5,97.5,37.5/1`;
-        const res = await fetch(nasaUrl);
-        if (res.ok) {
-            const csvText = await res.text();
-            if (csvText.includes("latitude")) {
-                const lines = csvText.trim().split("\n");
-                const headers = lines[0].split(",").map(h => h.trim());
-                const latIdx = headers.indexOf("latitude");
-                const lonIdx = headers.indexOf("longitude");
-                const frpIdx = headers.indexOf("frp");
-                const brightIdx = headers.indexOf("bright_ti4") !== -1 ? headers.indexOf("bright_ti4") : headers.indexOf("brightness");
-                const confIdx = headers.indexOf("confidence");
+        // Query 1-day satellite pass; if 0 detections (early morning UTC before daily afternoon orbit), seamlessly query rolling 48h window (/2)
+        let nasaUrl = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${mapKey}/VIIRS_SNPP_NRT/68,6.5,97.5,37.5/1`;
+        let res = await fetch(nasaUrl);
+        let csvText = res.ok ? await res.text() : "";
+        let lines = csvText.trim().split("\n");
 
-                const liveHotspots = [];
-                let liveCritical = 0;
+        if (!csvText.includes("latitude") || lines.length <= 1) {
+            nasaUrl = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${mapKey}/VIIRS_SNPP_NRT/68,6.5,97.5,37.5/2`;
+            res = await fetch(nasaUrl);
+            csvText = res.ok ? await res.text() : "";
+            lines = csvText.trim().split("\n");
+        }
 
-                for (let i = 1; i < lines.length; i++) {
-                    const cols = lines[i].split(",").map(c => c.trim());
-                    if (cols.length >= headers.length) {
-                        const lat = parseFloat(cols[latIdx]);
-                        const lng = parseFloat(cols[lonIdx]);
-                        const frp = parseFloat(cols[frpIdx]) || 8.0;
-                        const bright = parseFloat(cols[brightIdx]) || 325.0;
-                        const conf = cols[confIdx] || "n";
+        if (csvText.includes("latitude") && lines.length > 1) {
+            const headers = lines[0].split(",").map(h => h.trim());
+            const latIdx = headers.indexOf("latitude");
+            const lonIdx = headers.indexOf("longitude");
+            const frpIdx = headers.indexOf("frp");
+            const brightIdx = headers.indexOf("bright_ti4") !== -1 ? headers.indexOf("bright_ti4") : headers.indexOf("brightness");
+            const confIdx = headers.indexOf("confidence");
 
-                        if (!isNaN(lat) && !isNaN(lng)) {
-                            const isCrit = frp >= 25.0 || bright >= 350.0 || conf === "h";
-                            if (isCrit) liveCritical++;
-                            liveHotspots.push({
-                                source_id: `NASA_LIVE_${i}`,
-                                state: getNearestState(lat, lng),
-                                latitude: lat,
-                                longitude: lng,
-                                predicted_event_type: frp >= 30 ? "Industrial" : (lat >= 28 && lng <= 77 ? "Agricultural" : "Forest/Natural"),
-                                confidence: conf === "h" ? 94.5 : (conf === "l" ? 64.0 : 84.0),
-                                persistence_score: Math.min(95, Math.round(50 + (frp * 1.1))),
-                                landcover: frp >= 30 ? "Built-up" : "Tree cover",
-                                mean_frp: frp,
-                                is_live_nasa: true
-                            });
-                        }
+            const liveHotspots = [];
+            let liveCritical = 0;
+
+            for (let i = 1; i < lines.length; i++) {
+                const cols = lines[i].split(",").map(c => c.trim());
+                if (cols.length >= headers.length) {
+                    const lat = parseFloat(cols[latIdx]);
+                    const lng = parseFloat(cols[lonIdx]);
+                    const frp = parseFloat(cols[frpIdx]) || 8.0;
+                    const bright = parseFloat(cols[brightIdx]) || 325.0;
+                    const conf = cols[confIdx] || "n";
+
+                    if (!isNaN(lat) && !isNaN(lng)) {
+                        const isCrit = frp >= 25.0 || bright >= 350.0 || conf === "h";
+                        if (isCrit) liveCritical++;
+                        liveHotspots.push({
+                            source_id: `NASA_LIVE_${i}`,
+                            state: getNearestState(lat, lng),
+                            latitude: lat,
+                            longitude: lng,
+                            predicted_event_type: frp >= 30 ? "Industrial" : (lat >= 28 && lng <= 77 ? "Agricultural" : "Forest/Natural"),
+                            confidence: conf === "h" ? 94.5 : (conf === "l" ? 64.0 : 84.0),
+                            persistence_score: Math.min(95, Math.round(50 + (frp * 1.1))),
+                            landcover: frp >= 30 ? "Built-up" : "Tree cover",
+                            mean_frp: frp,
+                            is_live_nasa: true
+                        });
                     }
                 }
+            }
 
-                if (liveHotspots.length > 0) {
-                    setText("nasa-live-count", liveHotspots.length);
-                    setText("nasa-live-critical", liveCritical);
-                    setText("nasa-last-update", timeStr + " (LIVE VIIRS)");
+            if (liveHotspots.length > 0) {
+                setText("nasa-live-count", liveHotspots.length);
+                setText("nasa-live-critical", liveCritical);
+                setText("nasa-last-update", timeStr + " (LIVE VIIRS)");
 
-                    // Ingest ALL live satellite detections into allEvents
-                    let added = 0;
-                    liveHotspots.forEach(lh => {
-                        if (!allEvents.some(ev => String(ev.source_id) === String(lh.source_id))) {
-                            allEvents.unshift(lh);
-                            added++;
-                        }
-                    });
-
-                    if (added > 0 || forceRefresh) {
-                        filteredEvents = [...allEvents];
-                        updateDashboard();
-                        renderMarkers();
-                        renderTable();
-                        updateAlerts();
+                // Ingest ALL live satellite detections into allEvents
+                let added = 0;
+                liveHotspots.forEach(lh => {
+                    if (!allEvents.some(ev => String(ev.source_id) === String(lh.source_id))) {
+                        allEvents.unshift(lh);
+                        added++;
                     }
-                    return liveHotspots.length;
+                });
+
+                if (added > 0 || forceRefresh) {
+                    filteredEvents = [...allEvents];
+                    updateDashboard();
+                    renderMarkers();
+                    renderTable();
+                    updateAlerts();
                 }
+                return liveHotspots.length;
             }
         }
     } catch (e) {
