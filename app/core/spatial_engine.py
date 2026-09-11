@@ -131,9 +131,49 @@ INDIAN_STATE_CENTROIDS = {
     "Puducherry": (11.9416, 79.8083)
 }
 
+def is_in_water(lat: float, lon: float) -> bool:
+    if lat < 8.0 and lon < 92.0:
+        return True
+    if 8.3 <= lat <= 9.9 and 78.8 <= lon <= 79.7:
+        return True
+    if 8.0 <= lat <= 14.5 and lon < 74.5:
+        if 10.0 <= lat <= 12.0 and 71.8 <= lon <= 74.0:
+            return False
+        return True
+    if 14.5 < lat <= 17.5 and lon < 72.8:
+        return True
+    if 17.5 < lat <= 20.5 and lon < 72.0:
+        return True
+    if 20.5 < lat <= 22.5 and lon < 69.2:
+        return True
+    if 9.8 <= lat <= 15.5 and 80.5 < lon < 92.0:
+        return True
+    if 15.5 < lat <= 18.0 and 82.5 < lon < 92.0:
+        return True
+    if 18.0 < lat <= 20.5 and 85.0 < lon < 92.0:
+        return True
+    if 20.5 < lat <= 21.8 and 87.5 < lon < 92.0:
+        return True
+    return False
+
 def deduce_indian_state(lat: float, lon: float) -> str:
     """Accurately identify the nearest Indian state or union territory from coordinates."""
     try:
+        if is_in_water(lat, lon):
+            return "Offshore Waters (Marine Body)"
+        if 5.8 <= lat <= 9.9 and 79.5 <= lon <= 82.0:
+            return "Sri Lanka (Non-Indian Region)"
+        if (lat > 28.05 and 88.0 <= lon <= 89.0) or (lat > 32.0 and lon > 78.5) or (lat > 28.5 and lon >= 92.0):
+            return "China / Tibet (Non-Indian Region)"
+        if (23.5 <= lat < 28.0 and lon < 70.2) or (28.0 <= lat < 30.5 and lon < 72.2) or (30.5 <= lat < 35.5 and lon < 74.0):
+            return "Pakistan (Non-Indian Region)"
+        if 21.6 <= lat <= 25.5 and 88.8 <= lon <= 92.6:
+            return "Bangladesh (Non-Indian Region)"
+        if 26.3 <= lat <= 30.5 and 80.0 <= lon <= 88.2:
+            return "Nepal (Non-Indian Region)"
+        if 26.7 <= lat <= 28.3 and 88.8 <= lon <= 92.1:
+            return "Bhutan (Non-Indian Region)"
+
         best_state = "National"
         min_dist = float("inf")
         for st, (c_lat, c_lon) in INDIAN_STATE_CENTROIDS.items():

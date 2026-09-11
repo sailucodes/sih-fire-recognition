@@ -260,7 +260,6 @@ function showDramaticBannerAlert(message, title = "CRITICAL THERMAL ANOMALY DETE
     `;
 
     alertBanner.style.display = "block";
-    alertBanner.classList.add("pulse-glow");
 
     setTimeout(() => closeDramaticBanner(), 8000);
 }
@@ -269,7 +268,6 @@ function closeDramaticBanner() {
     const banner = document.getElementById("dramatic-alert-banner");
     if (banner) {
         banner.style.display = "none";
-        banner.classList.remove("pulse-glow");
     }
 }
 
@@ -301,29 +299,63 @@ function showToast(message, type = "info") {
     }, 3500);
 }
 
+// CHECK IF POINT IS IN OPEN WATER / OCEANS (Arabian Sea, Bay of Bengal, Indian Ocean)
+function isPointInWater(lat, lon) {
+    if (isNaN(lat) || isNaN(lon)) return false;
+    // Deep Indian Ocean south of mainland India (lat < 8.0), excluding Andaman & Nicobar (lon > 92.0)
+    if (lat < 8.0 && lon < 92.0) return true;
+
+    // Gulf of Mannar & Palk Strait (water body between Tamil Nadu & Sri Lanka)
+    if (lat >= 8.3 && lat <= 9.9 && lon >= 78.8 && lon <= 79.7) return true;
+
+    // Arabian Sea (West of Indian Peninsula)
+    if (lat >= 8.0 && lat <= 14.5 && lon < 74.5) {
+        // Exclude Lakshadweep islands (10.0-12.0 N, 71.8-74.0 E)
+        if (lat >= 10.0 && lat <= 12.0 && lon >= 71.8 && lon <= 74.0) return false;
+        return true;
+    }
+    if (lat > 14.5 && lat <= 17.5 && lon < 72.8) return true;
+    if (lat > 17.5 && lat <= 20.5 && lon < 72.0) return true;
+    if (lat > 20.5 && lat <= 22.5 && lon < 69.2) return true;
+
+    // Bay of Bengal (East of Indian Peninsula)
+    if (lat >= 9.8 && lat <= 15.5 && lon > 80.5 && lon < 92.0) return true;
+    if (lat > 15.5 && lat <= 18.0 && lon > 82.5 && lon < 92.0) return true;
+    if (lat > 18.0 && lat <= 20.5 && lon > 85.0 && lon < 92.0) return true;
+    if (lat > 20.5 && lat <= 21.8 && lon > 87.5 && lon < 92.0) return true;
+
+    return false;
+}
+
 // SOVEREIGN INDIAN TERRITORIAL GEOSPATIAL BOUNDARY CHECK
 function isPointInsideIndia(lat, lon) {
     if (isNaN(lat) || isNaN(lon)) return false;
+    // Open marine waters are not terrestrial Indian land
+    if (isPointInWater(lat, lon)) return false;
+
     // Outer bounding envelope of the Indian Subcontinent
     if (lat < 6.5 || lat > 37.2 || lon < 68.0 || lon > 97.5) return false;
 
-    // 1. Exclude Tibet & Xinjiang (China) - North & East of Himalayas
-    if (lat > 32.0 && lon > 79.2) return false; // Tibet / Aksai Chin north
-    if (lat > 28.3 && lon >= 80.0 && lon <= 88.3) return false; // Nepal & Southern Tibet
-    if (lat > 28.0 && lon >= 88.5 && lon <= 92.0) return false; // Bhutan & Tibet border
-    if (lat > 29.5 && lon > 92.0) return false; // Northern Tibet / China
-    if (lat > 28.4 && lon >= 91.5 && lon <= 93.5) return false; // Tibet border
+    // 1. Exclude Sri Lanka (Lat 5.8 to 9.9, Lon 79.5 to 82.0)
+    if (lat >= 5.8 && lat <= 9.9 && lon >= 79.5 && lon <= 82.0) return false;
 
-    // 2. Exclude Pakistan (West of the border)
+    // 2. Exclude Tibet & Xinjiang (China) - North of Himalayas
+    if (lat > 32.0 && lon > 78.5) return false; // Tibet / Aksai Chin / Xinjiang north
+    if (lat > 28.05 && lon >= 88.0 && lon <= 89.0) return false; // North of Sikkim (Tibet, China)
+    if (lat > 27.8 && lon >= 80.0 && lon <= 88.2) return false; // Nepal & Southern Tibet
+    if (lat > 28.0 && lon >= 88.8 && lon <= 92.0) return false; // Bhutan & Tibet border
+    if (lat > 28.5 && lon >= 92.0) return false; // Northern Tibet / China (north of Arunachal)
+
+    // 3. Exclude Pakistan (West of border)
     if (lat >= 23.5 && lat < 28.0 && lon < 70.2) return false; // Sindh / Thar border
     if (lat >= 28.0 && lat < 30.5 && lon < 72.2) return false; // Southern Punjab (PK)
     if (lat >= 30.5 && lat < 32.5 && lon < 74.0) return false; // Lahore / Gujranwala
     if (lat >= 32.5 && lat <= 35.5 && lon < 73.8) return false; // Rawalpindi / KPK
 
-    // 3. Exclude Bangladesh (Inside the Bengal enclave)
-    if (lat >= 21.8 && lat <= 25.2 && lon >= 89.0 && lon <= 91.4) return false;
+    // 4. Exclude Bangladesh (Inside the Bengal enclave)
+    if (lat >= 21.6 && lat <= 25.5 && lon >= 88.8 && lon <= 92.6) return false;
 
-    // 4. Exclude Myanmar (East of border)
+    // 5. Exclude Myanmar (East of border)
     if (lat < 24.0 && lon > 93.5) return false;
     if (lat >= 24.0 && lat <= 27.0 && lon > 95.5) return false;
 
@@ -331,6 +363,27 @@ function isPointInsideIndia(lat, lon) {
 }
 
 function getNearestState(lat, lng) {
+    if (isPointInWater(lat, lng)) {
+        return "Offshore Waters (Marine Body)";
+    }
+    if (lat >= 5.8 && lat <= 9.9 && lng >= 79.5 && lng <= 82.0) {
+        return "Sri Lanka (Non-Indian Region)";
+    }
+    if ((lat > 28.05 && lng >= 88.0 && lng <= 89.0) || (lat > 32.0 && lng > 78.5) || (lat > 28.5 && lng >= 92.0)) {
+        return "China / Tibet (Non-Indian Region)";
+    }
+    if ((lat >= 23.5 && lat < 28.0 && lng < 70.2) || (lat >= 28.0 && lat < 30.5 && lng < 72.2) || (lat >= 30.5 && lat < 35.5 && lng < 74.0)) {
+        return "Pakistan (Non-Indian Region)";
+    }
+    if (lat >= 21.6 && lat <= 25.5 && lng >= 88.8 && lng <= 92.6) {
+        return "Bangladesh (Non-Indian Region)";
+    }
+    if (lat >= 26.3 && lat <= 30.5 && lng >= 80.0 && lng <= 88.2) {
+        return "Nepal (Non-Indian Region)";
+    }
+    if (lat >= 26.7 && lat <= 28.3 && lng >= 88.8 && lng <= 92.1) {
+        return "Bhutan (Non-Indian Region)";
+    }
     if (!isPointInsideIndia(lat, lng)) {
         return "Cross-Border / International";
     }
@@ -416,6 +469,14 @@ window.manualSyncNasa = async function() {
 
 // MULTI-MODAL SPATIAL CLASSIFIER FOR REAL-TIME SATELLITE ANOMALIES
 function classifyLiveSatelliteHotspot(lat, lng, frp, bright, conf) {
+    if (isPointInWater(lat, lng)) {
+        return {
+            type: "Other",
+            landcover: "Water Body / Marine",
+            confidence: 0,
+            persistence: 0
+        };
+    }
     // 1. Calculate proximity to known industrial facilities from preloaded ground truth
     let minIndustryDist = 999;
     if (typeof INITIAL_563_EVENTS !== "undefined" && Array.isArray(INITIAL_563_EVENTS)) {
@@ -538,9 +599,9 @@ async function updateNasaFirmsWidget(forceRefresh = false) {
                     const conf = cols[confIdx] || "n";
 
                     if (!isNaN(lat) && !isNaN(lng)) {
-                        // Strictly filter to sovereign Indian territory as required by SIH
-                        if (!isPointInsideIndia(lat, lng)) {
-                            continue; // Skip cross-border detections in Tibet/China, Pakistan, Myanmar, etc.
+                        // Strictly filter to sovereign Indian territory and exclude open water as required by SIH
+                        if (!isPointInsideIndia(lat, lng) || isPointInWater(lat, lng)) {
+                            continue; // Skip water and cross-border detections
                         }
 
                         const classification = classifyLiveSatelliteHotspot(lat, lng, frp, bright, conf);
@@ -677,24 +738,42 @@ function applyLanguageTranslations(lang) {
 }
 
 function processVoiceCommand(command) {
+    if (!command) return;
+    const cmd = command.toLowerCase().trim();
     const stateFilter = document.getElementById("state-filter");
     const typeFilter = document.getElementById("type-filter");
 
-    const matchedState = Object.keys(stateCoordinates).find(st => command.includes(st.toLowerCase()));
+    // Match state / jurisdiction names
+    const matchedState = Object.keys(stateCoordinates).find(st => cmd.includes(st.toLowerCase()));
     if (matchedState && stateFilter) {
         stateFilter.value = matchedState;
         const coords = stateCoordinates[matchedState];
         if (coords && map) {
             map.setView([coords.lat, coords.lng], coords.zoom);
         }
+        showToast(`Voice Command: Focused on ${matchedState}`, "info");
     }
 
-    if (command.includes("industrial")) {
+    // Match Event Types (handles "industry", "industrial", "industries", "factory", etc.)
+    if (cmd.includes("industr") || cmd.includes("factory") || cmd.includes("plant") || cmd.includes("refinery") || cmd.includes("steel")) {
         if (typeFilter) typeFilter.value = "Industrial";
-    } else if (command.includes("forest")) {
+        showToast("Voice Command: Filtered to Industrial Fires", "success");
+    } else if (cmd.includes("forest") || cmd.includes("jungle") || cmd.includes("wildfire") || cmd.includes("tree") || cmd.includes("natural")) {
         if (typeFilter) typeFilter.value = "Forest/Natural";
-    } else if (command.includes("reset")) {
+        showToast("Voice Command: Filtered to Forest/Natural Fires", "success");
+    } else if (cmd.includes("agri") || cmd.includes("farm") || cmd.includes("crop") || cmd.includes("stubble") || cmd.includes("field")) {
+        if (typeFilter) typeFilter.value = "Agricultural";
+        showToast("Voice Command: Filtered to Agricultural Crop Fires", "success");
+    } else if (cmd.includes("other") || cmd.includes("unknown")) {
+        if (typeFilter) typeFilter.value = "Other";
+        showToast("Voice Command: Filtered to Other Anomalies", "success");
+    } else if (cmd.includes("live") || cmd.includes("satellite") || cmd.includes("nasa") || cmd.includes("today")) {
+        document.getElementById("live-only-btn")?.click();
+        showToast("Voice Command: Displaying Live Satellite Hotspots", "success");
+        return;
+    } else if (cmd.includes("reset") || cmd.includes("clear") || cmd.includes("show all") || cmd.includes("all fires") || cmd.includes("all")) {
         document.getElementById("reset-btn")?.click();
+        showToast("Voice Command: All Filters Reset", "info");
         return;
     }
 
@@ -732,23 +811,32 @@ function initializeSidebarAndNavigation() {
     const navItems = document.querySelectorAll(".nav-item");
     const allViews = [
         "dashboard-section",
-        "map-section",
         "prediction-section",
         "alerts-section",
         "database-section"
     ];
 
     window.navigateToView = function(targetViewId) {
+        // If map-section requested, route smoothly to the map panel inside dashboard-section
+        if (targetViewId === "map-section") {
+            targetViewId = "dashboard-section";
+            setTimeout(() => {
+                const mapEl = document.getElementById("map");
+                if (mapEl) mapEl.scrollIntoView({ behavior: "smooth", block: "center" });
+            }, 100);
+        }
+
         // Highlight corresponding nav item
         navItems.forEach(i => {
-            if (i.getAttribute("data-target") === targetViewId) {
+            const dt = i.getAttribute("data-target");
+            if (dt === targetViewId || (targetViewId === "dashboard-section" && dt === "map-section")) {
                 i.classList.add("active");
             } else {
                 i.classList.remove("active");
             }
         });
 
-        // Hide all views, display target view only
+        // Hide other views, display target view only
         allViews.forEach(vid => {
             const el = document.getElementById(vid);
             if (el) {
@@ -764,7 +852,7 @@ function initializeSidebarAndNavigation() {
 
         window.scrollTo({ top: 0, behavior: "smooth" });
 
-        if (targetViewId === "map-section" && map) {
+        if (targetViewId === "dashboard-section" && map) {
             setTimeout(() => {
                 map.invalidateSize();
             }, 180);
@@ -783,7 +871,7 @@ function initializeSidebarAndNavigation() {
     });
 }
 
-/* AUTHENTICATION MODAL */
+/* AUTHENTICATION MODAL (PERSISTENT LOGIN & REAL REGISTRATION) */
 function initializeAuthModal() {
     const modal = document.getElementById("auth-modal");
     const openBtn = document.getElementById("open-auth-btn");
@@ -795,20 +883,73 @@ function initializeAuthModal() {
     const googleBtn = document.getElementById("google-auth-btn");
     const emailInput = document.getElementById("login-email");
     const passwordInput = document.getElementById("login-password");
+    const loginErrorMsg = document.getElementById("login-error-msg");
+    const regMsg = document.getElementById("reg-msg");
+    const navLogin = document.getElementById("nav-login");
 
-    const demoInstantBtn = document.getElementById("demo-instant-btn");
-    demoInstantBtn?.addEventListener("click", () => {
-        const demoUser = {
-            email: "evaluator@sih.gov.in",
-            name: "Command Evaluator (Demo Mode)",
-            auth: "demo"
-        };
-        localStorage.setItem("sih_auth_user", JSON.stringify(demoUser));
-        modal?.classList.remove("open");
-        const navLogin = document.getElementById("nav-login");
-        if (navLogin) navLogin.textContent = "Evaluator (Demo)";
-        showDramaticBannerAlert("Authenticated in Instant Demo Access Mode for SIH Evaluation", "COMMAND ACCESS GRANTED");
-        showToast("Logged in as Evaluator / Command Officer (Demo Mode)", "success");
+    function getRegisteredUsers() {
+        try {
+            let users = JSON.parse(localStorage.getItem("sih_registered_users") || "[]");
+            if (!users || users.length === 0) {
+                users = [
+                    {
+                        email: "admin@sih.gov.in",
+                        password: "admin",
+                        name: "Command Officer",
+                        org: "National Disaster Management Authority"
+                    }
+                ];
+                localStorage.setItem("sih_registered_users", JSON.stringify(users));
+            }
+            return users;
+        } catch (_) {
+            return [];
+        }
+    }
+
+    function updateNavUser(user) {
+        if (!user) {
+            if (navLogin) navLogin.textContent = "Login / Register";
+            if (openBtn) openBtn.onclick = () => modal?.classList.add("open");
+            return;
+        }
+        const displayName = (user.name || user.email || "Officer").split(' ')[0];
+        if (navLogin) navLogin.textContent = `${displayName}`;
+        if (openBtn) {
+            openBtn.onclick = () => {
+                if (confirm(`Signed in as ${user.email} (${user.name || 'User'}). Do you want to sign out?`)) {
+                    localStorage.removeItem("sih_auth_user");
+                    updateNavUser(null);
+                    showToast("Signed out successfully", "info");
+                    modal?.classList.add("open");
+                }
+            };
+        }
+    }
+
+    // CHECK PERSISTENT SESSION ON PAGE LOAD
+    const existingUserJson = localStorage.getItem("sih_auth_user");
+    if (existingUserJson) {
+        try {
+            const existingUser = JSON.parse(existingUserJson);
+            updateNavUser(existingUser);
+        } catch (_) {
+            modal?.classList.add("open");
+        }
+    } else {
+        // First time opening the website: automatically prompt login modal
+        modal?.classList.add("open");
+    }
+
+    openBtn?.addEventListener("click", () => {
+        if (!localStorage.getItem("sih_auth_user")) {
+            modal?.classList.add("open");
+        }
+    });
+
+    closeBtn?.addEventListener("click", () => modal?.classList.remove("open"));
+    modal?.addEventListener("click", (e) => {
+        if (e.target === modal) modal.classList.remove("open");
     });
 
     // Tab switching between Login and Register
@@ -817,6 +958,7 @@ function initializeAuthModal() {
         tabRegister?.classList.remove("active");
         loginForm?.classList.remove("hidden");
         registerForm?.classList.add("hidden");
+        if (loginErrorMsg) loginErrorMsg.classList.add("hidden");
     });
 
     tabRegister?.addEventListener("click", () => {
@@ -824,7 +966,11 @@ function initializeAuthModal() {
         tabLogin?.classList.remove("active");
         registerForm?.classList.remove("hidden");
         loginForm?.classList.add("hidden");
+        if (regMsg) regMsg.classList.add("hidden");
     });
+
+    document.getElementById("switch-to-register")?.addEventListener("click", () => tabRegister?.click());
+    document.getElementById("switch-to-login")?.addEventListener("click", () => tabLogin?.click());
 
     // Realistic Dynamic Google OAuth Account Chooser (Device/System-Specific)
     const googleModal = document.getElementById("google-oauth-modal");
@@ -932,21 +1078,7 @@ function initializeAuthModal() {
 
         googleModal?.classList.remove("open");
         googleSigningIn?.classList.add("hidden");
-        const navLogin = document.getElementById("nav-login");
-        const displayName = name.split(' ')[0] || "User";
-        if (navLogin) navLogin.textContent = `${displayName} (Google)`;
-
-        const openAuthBtn = document.getElementById("open-auth-btn");
-        if (openAuthBtn) {
-            openAuthBtn.onclick = () => {
-                if (confirm(`Signed in as ${email}. Do you want to sign out?`)) {
-                    localStorage.removeItem("sih_auth_user");
-                    if (navLogin) navLogin.textContent = "Login / Register";
-                    showToast("Signed out successfully", "info");
-                    openAuthBtn.onclick = () => modal?.classList.add("open");
-                }
-            };
-        }
+        updateNavUser(user);
 
         showDramaticBannerAlert(`Authenticated with Google: ${email} (${name})`, "GOOGLE SIGN-IN VERIFIED");
         showToast(`Signed in as ${email}`, "success");
@@ -978,54 +1110,108 @@ function initializeAuthModal() {
         }
     });
 
-    // Login Form Submit
+    // Login Form Submit (Email + Password with validation)
     loginForm?.addEventListener("submit", async (e) => {
         e.preventDefault();
-        const email = emailInput?.value || "";
-        const password = passwordInput?.value || "";
-        try {
-            const res = await fetch("/api/v1/auth/login", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password })
-            });
-            if (res.ok) {
-                modal?.classList.remove("open");
-                showToast(`Welcome back, authenticated as ${email}`, "success");
-                return;
+        const email = (emailInput?.value || "").trim();
+        const password = (passwordInput?.value || "").trim();
+
+        if (loginErrorMsg) loginErrorMsg.classList.add("hidden");
+
+        if (!email || !email.includes("@") || !email.includes(".")) {
+            if (loginErrorMsg) {
+                loginErrorMsg.textContent = "Please enter a valid email address.";
+                loginErrorMsg.classList.remove("hidden");
             }
-        } catch (_) {}
+            showToast("Invalid email format", "alert");
+            return;
+        }
+
+        const registeredUsers = getRegisteredUsers();
+        const found = registeredUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+
+        if (!found) {
+            if (loginErrorMsg) {
+                loginErrorMsg.textContent = "Invalid email. Account not registered. Please click 'Create an account' below.";
+                loginErrorMsg.classList.remove("hidden");
+            }
+            showToast("Account not found. Please register.", "alert");
+            return;
+        }
+
+        if (found.password && found.password !== password) {
+            if (loginErrorMsg) {
+                loginErrorMsg.textContent = "Invalid password. Please check your password.";
+                loginErrorMsg.classList.remove("hidden");
+            }
+            showToast("Invalid password", "alert");
+            return;
+        }
+
+        const user = { email: found.email, name: found.name || "Officer", org: found.org, auth: "email" };
+        localStorage.setItem("sih_auth_user", JSON.stringify(user));
         modal?.classList.remove("open");
-        showToast("Authenticated successfully. Welcome back!", "success");
+        updateNavUser(user);
+        showToast(`Welcome back, ${user.name}!`, "success");
     });
 
-    // Register Form Submit
+    // Register Form Submit (Email + Password registration for future login)
     registerForm?.addEventListener("submit", async (e) => {
         e.preventDefault();
-        const name = document.getElementById("reg-name")?.value || "";
-        const email = document.getElementById("reg-email")?.value || "";
-        const password = document.getElementById("reg-password")?.value || "";
-        const org = document.getElementById("reg-org")?.value || "State Emergency Operations";
+        const name = (document.getElementById("reg-name")?.value || "").trim();
+        const email = (document.getElementById("reg-email")?.value || "").trim();
+        const password = (document.getElementById("reg-password")?.value || "").trim();
+        const org = (document.getElementById("reg-org")?.value || "State Emergency Operations").trim();
 
-        try {
-            const res = await fetch("/api/v1/auth/register", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name, email, password, organization: org })
-            });
-            if (res.ok) {
-                modal?.classList.remove("open");
-                showToast(`Account created & logged in: ${email}`, "success");
-                return;
-            } else {
-                const errData = await res.json();
-                showToast(errData.error || "Registration failed", "alert");
-                return;
+        if (regMsg) regMsg.classList.add("hidden");
+
+        if (!name || !email || !password) {
+            if (regMsg) {
+                regMsg.textContent = "Please fill in all required fields.";
+                regMsg.classList.remove("hidden");
             }
-        } catch (_) {
-            modal?.classList.remove("open");
-            showToast(`Account registered for ${email}`, "success");
+            return;
         }
+
+        if (!email.includes("@") || !email.includes(".")) {
+            if (regMsg) {
+                regMsg.textContent = "Please enter a valid email address.";
+                regMsg.classList.remove("hidden");
+            }
+            return;
+        }
+
+        if (password.length < 3) {
+            if (regMsg) {
+                regMsg.textContent = "Password must be at least 3 characters.";
+                regMsg.classList.remove("hidden");
+            }
+            return;
+        }
+
+        const registeredUsers = getRegisteredUsers();
+        const existing = registeredUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+        if (existing) {
+            if (regMsg) {
+                regMsg.textContent = "An account with this email already exists. Please sign in.";
+                regMsg.classList.remove("hidden");
+            }
+            showToast("Account already exists. Please sign in.", "alert");
+            return;
+        }
+
+        // Save new user for future logins
+        const newUser = { name, email, password, org };
+        registeredUsers.push(newUser);
+        localStorage.setItem("sih_registered_users", JSON.stringify(registeredUsers));
+
+        // Auto-login newly registered user
+        const authUser = { email, name, org, auth: "email" };
+        localStorage.setItem("sih_auth_user", JSON.stringify(authUser));
+
+        modal?.classList.remove("open");
+        updateNavUser(authUser);
+        showToast(`Account created! Welcome, ${name}!`, "success");
     });
 }
 
@@ -1512,17 +1698,14 @@ function renderMarkers() {
 
     filteredEvents.forEach(e => {
         const isInd = normalizeType(e.predicted_event_type) === "Industrial";
-        // ONLY present/live/active detections blink (real-time NASA detections or freshly predicted active events)
-        const isLiveOrPresent = Boolean(e.is_live_nasa || String(e.source_id).startsWith("PRED_"));
-        const shouldBlink = isInd && isLiveOrPresent;
 
         const marker = L.circleMarker([e.latitude, e.longitude], {
-            radius: shouldBlink ? 10 : (isInd ? 9 : 8),
+            radius: isInd ? 9 : 7.5,
             fillColor: getEventColor(normalizeType(e.predicted_event_type)),
-            color: shouldBlink ? "#ffffff" : "#ffffff", 
-            weight: shouldBlink ? 2.5 : 1.5, 
-            fillOpacity: shouldBlink ? 0.95 : 0.82,
-            className: shouldBlink ? "blinking-industrial-hotspot" : ""
+            color: "#ffffff", 
+            weight: 1.5, 
+            fillOpacity: 0.88,
+            className: ""
         });
         
         const pScore = Number(e.persistence_score) || 0;
@@ -1830,44 +2013,22 @@ function showEventDetails(sourceId) {
             attribution: 'NASA GIBS Active Fires'
         }).addTo(nasaMiniMap);
 
-        const isInd = normalizeType(event.predicted_event_type) === "Industrial";
-        const isLiveOrPresent = Boolean(event.is_live_nasa || String(event.source_id).startsWith("PRED_"));
-        const shouldBlink = isInd && isLiveOrPresent;
+        const hotspotMarker = L.circleMarker([lat, lon], {
+            radius: 12,
+            fillColor: getEventColor(normalizeType(event.predicted_event_type)),
+            color: "#ffffff",
+            weight: 3,
+            fillOpacity: 0.95
+        }).addTo(nasaMiniMap);
 
-        if (shouldBlink) {
-            const pulsingIcon = L.divIcon({
-                className: 'pulsing-industrial-beacon',
-                html: '<div class="beacon-ring"></div><div class="beacon-core"></div>',
-                iconSize: [28, 28],
-                iconAnchor: [14, 14]
-            });
-            const beaconMarker = L.marker([lat, lon], { icon: pulsingIcon }).addTo(nasaMiniMap);
-            beaconMarker.bindPopup(`
-                <div style="color:#000;">
-                    <strong style="color:#e11d48;">🏭 ACTIVE INDUSTRIAL FIRE HOTSPOT (LIVE)</strong><br>
-                    Lat: ${lat.toFixed(4)}°, Lon: ${lon.toFixed(4)}°<br>
-                    Confidence: ${Number(event.confidence).toFixed(1)}%<br>
-                    Persistence: ${event.persistence_score || 85}%
-                </div>
-            `).openPopup();
-        } else {
-            const hotspotMarker = L.circleMarker([lat, lon], {
-                radius: 12,
-                fillColor: getEventColor(normalizeType(event.predicted_event_type)),
-                color: "#ffffff",
-                weight: 3,
-                fillOpacity: 0.9
-            }).addTo(nasaMiniMap);
-
-            hotspotMarker.bindPopup(`
-                <div style="color:#000;">
-                    <strong>🔥 Thermal Hotspot Location</strong><br>
-                    Lat: ${lat.toFixed(4)}°, Lon: ${lon.toFixed(4)}°<br>
-                    Type: ${normalizeType(event.predicted_event_type)}<br>
-                    Confidence: ${Number(event.confidence).toFixed(1)}%
-                </div>
-            `).openPopup();
-        }
+        hotspotMarker.bindPopup(`
+            <div style="color:#000;">
+                <strong style="color:${getEventColor(normalizeType(event.predicted_event_type))}; font-size:13px;">🔥 ${normalizeType(event.predicted_event_type).toUpperCase()} HOTSPOT</strong><br>
+                Lat: ${lat.toFixed(4)}°, Lon: ${lon.toFixed(4)}°<br>
+                Confidence: ${Number(event.confidence).toFixed(1)}%<br>
+                Persistence: ${event.persistence_score || 85}%
+            </div>
+        `).openPopup();
     }, 100);
 }
 
@@ -1922,71 +2083,77 @@ function setupPredictionForm() {
                 return;
             }
 
+            const inWater = isPointInWater(lat, lng);
+            const isSubThreshold = frp < 1.0;
+            const isNoHotspot = inWater || isSubThreshold;
+
             let newEvent = {
                 source_id: "PRED_" + Math.random().toString(36).substring(2, 7).toUpperCase(),
                 state: derivedState,
                 latitude: lat,
                 longitude: lng,
-                predicted_event_type: "Industrial",
-                confidence: 91.5,
-                persistence_score: 90,
-                landcover: "Built-up",
+                predicted_event_type: isNoHotspot ? (inWater ? "No Hotspot (Water Body)" : "No Hotspot (Normal Surface)") : "Industrial",
+                confidence: isNoHotspot ? 0.0 : 91.5,
+                persistence_score: isNoHotspot ? 0 : 90,
+                landcover: inWater ? "Marine Water Body" : (isSubThreshold ? "Normal Ambient Background" : "Built-up"),
                 mean_frp: frp
             };
 
-            // Live connection to Python Random Forest M3 classification model & SQLite database
-            let predSucceeded = false;
-            try {
-                const predRes = await fetch("/api/v1/predict", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        latitude: lat,
-                        longitude: lng,
-                        mean_frp: frp,
-                        state: derivedState
-                    })
-                });
-                if (predRes.ok) {
-                    const predData = await predRes.json();
-                    newEvent.source_id = predData.source_id || newEvent.source_id;
-                    newEvent.predicted_event_type = predData.predicted_event_type || predData.event_type || "Industrial";
-                    newEvent.confidence = parseFloat(predData.confidence || predData.confidence_pct || 91.5);
-                    newEvent.persistence_score = parseFloat(predData.persistence_score || 90);
-                    newEvent.state = predData.state || derivedState;
-                    predSucceeded = true;
+            if (!isNoHotspot) {
+                // Live connection to Python Random Forest M3 classification model & SQLite database
+                let predSucceeded = false;
+                try {
+                    const predRes = await fetch("/api/v1/predict", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            latitude: lat,
+                            longitude: lng,
+                            mean_frp: frp,
+                            state: derivedState
+                        })
+                    });
+                    if (predRes.ok) {
+                        const predData = await predRes.json();
+                        newEvent.source_id = predData.source_id || newEvent.source_id;
+                        newEvent.predicted_event_type = predData.predicted_event_type || predData.event_type || "Industrial";
+                        newEvent.confidence = parseFloat(predData.confidence || predData.confidence_pct || 91.5);
+                        newEvent.persistence_score = parseFloat(predData.persistence_score || 90);
+                        newEvent.state = predData.state || derivedState;
+                        predSucceeded = true;
+                    }
+                } catch (_) {}
+
+                // Dynamic realistic calculation for client-side / static Vercel deployment:
+                if (!predSucceeded) {
+                    let dynConf = 88.0 + Math.min(10.5, Math.max(0, (frp - 15) * 0.35));
+                    let dynPers = 86.0 + Math.min(12.0, Math.max(0, (frp - 15) * 0.45));
+                    if (frp >= 25) {
+                        dynConf = Math.min(98.8, Math.max(91.0, 91.5 + (frp - 25) * 0.2));
+                        dynPers = Math.min(97.5, Math.max(89.0, 89.5 + (frp - 25) * 0.25));
+                    }
+                    newEvent.confidence = parseFloat(dynConf.toFixed(1));
+                    newEvent.persistence_score = Math.round(dynPers);
                 }
-            } catch (_) {}
 
-            // Dynamic realistic calculation for client-side / static Vercel deployment:
-            if (!predSucceeded) {
-                let dynConf = 88.0 + Math.min(10.5, Math.max(0, (frp - 15) * 0.35));
-                let dynPers = 86.0 + Math.min(12.0, Math.max(0, (frp - 15) * 0.45));
-                if (frp >= 25) {
-                    dynConf = Math.min(98.8, Math.max(91.0, 91.5 + (frp - 25) * 0.2));
-                    dynPers = Math.min(97.5, Math.max(89.0, 89.5 + (frp - 25) * 0.25));
+                allEvents.unshift(newEvent);
+                saveDatabase(allEvents);
+
+                // Ensure newly predicted alert is not blocked by dismissed alerts set
+                dismissedAlertIds.delete(String(newEvent.source_id).trim());
+
+                // Ensure current state filter does not hide this newly predicted event
+                const stateFilter = document.getElementById("state-filter");
+                if (stateFilter && stateFilter.value !== "All" && stateFilter.value !== derivedState) {
+                    stateFilter.value = "All";
                 }
-                newEvent.confidence = parseFloat(dynConf.toFixed(1));
-                newEvent.persistence_score = Math.round(dynPers);
+                
+                if (map) {
+                    map.setView([lat, lng], 8);
+                }
+
+                applyFilters();
             }
-
-            allEvents.unshift(newEvent);
-            saveDatabase(allEvents);
-
-            // Ensure newly predicted alert is not blocked by dismissed alerts set
-            dismissedAlertIds.delete(String(newEvent.source_id).trim());
-
-            // Ensure current state filter does not hide this newly predicted event
-            const stateFilter = document.getElementById("state-filter");
-            if (stateFilter && stateFilter.value !== "All" && stateFilter.value !== derivedState) {
-                stateFilter.value = "All";
-            }
-            
-            if (map) {
-                map.setView([lat, lng], 8);
-            }
-
-            applyFilters();
 
             // RENDER PREDICTION MINI-MAP WINDOW RIGHT ON SCREEN (LIKE SATELLITE GIBS WINDOW)
             const resultPanel = document.getElementById("prediction-result-panel");
@@ -1996,32 +2163,54 @@ function setupPredictionForm() {
             if (resultPanel && summaryCard) {
                 resultPanel.classList.remove("hidden");
                 if (badgeType) {
-                    badgeType.textContent = newEvent.predicted_event_type.toUpperCase();
-                    badgeType.style.background = getEventColor(newEvent.predicted_event_type) + "22";
-                    badgeType.style.color = getEventColor(newEvent.predicted_event_type);
+                    badgeType.textContent = isNoHotspot ? "NO HOTSPOT" : newEvent.predicted_event_type.toUpperCase();
+                    badgeType.style.background = isNoHotspot ? "#10b98122" : (getEventColor(newEvent.predicted_event_type) + "22");
+                    badgeType.style.color = isNoHotspot ? "#10b981" : getEventColor(newEvent.predicted_event_type);
                 }
 
-                summaryCard.innerHTML = `
-                    <div style="display:flex; flex-direction:column; gap:10px; font-size:13px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:8px;">
-                            <strong style="color:var(--text); font-size:14px;">🔥 ${escapeHTML(newEvent.source_id)}</strong>
-                            <span style="font-weight:700; color:${getEventColor(newEvent.predicted_event_type)};">${escapeHTML(newEvent.predicted_event_type)}</span>
+                if (isNoHotspot) {
+                    summaryCard.innerHTML = `
+                        <div style="display:flex; flex-direction:column; gap:10px; font-size:13px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:8px;">
+                                <strong style="color:var(--text); font-size:14px;">📍 ${escapeHTML(newEvent.source_id)}</strong>
+                                <span style="font-weight:700; color:#10b981;"><i class="fa-solid fa-circle-check"></i> NO HOTSPOT DETECTED</span>
+                            </div>
+                            <div><strong>Jurisdiction:</strong> ${escapeHTML(derivedState)}</div>
+                            <div><strong>Coordinates:</strong> ${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E</div>
+                            <div><strong>Thermal Status:</strong> <span style="color:#10b981; font-weight:700;">Normal Ambient Background</span></div>
+                            <div><strong>AI Confidence:</strong> 0.0% (No thermal radiation detected)</div>
+                            <div><strong>Mean FRP:</strong> ${frp.toFixed(1)} MW (Sub-threshold)</div>
+                            <div><strong>Surface Type:</strong> ${escapeHTML(newEvent.landcover)}</div>
+                            <div style="margin-top:8px;">
+                                <button class="btn-secondary" style="width:100%; padding:8px;" onclick="window.navigateToView('dashboard-section')">
+                                    <i class="fa-solid fa-earth-americas"></i> Full GIS Dashboard Map
+                                </button>
+                            </div>
                         </div>
-                        <div><strong>Jurisdiction:</strong> ${escapeHTML(derivedState)}</div>
-                        <div><strong>Coordinates:</strong> ${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E</div>
-                        <div><strong>AI Confidence:</strong> <span style="color:var(--cyan); font-weight:700;">${newEvent.confidence.toFixed(1)}%</span></div>
-                        <div><strong>Temporal Persistence:</strong> <span style="color:#f59e0b; font-weight:700;">${newEvent.persistence_score}%</span></div>
-                        <div><strong>Mean FRP:</strong> ${frp.toFixed(1)} MW</div>
-                        <div style="margin-top:8px; display:flex; gap:8px;">
-                            <button class="btn-secondary" style="flex:1; padding:8px;" onclick="window.navigateToView('map-section')">
-                                <i class="fa-solid fa-earth-americas"></i> Full GIS Map
-                            </button>
-                            <button class="btn-authority" style="flex:1; padding:8px;" onclick="window.inspectAndDispatch('${escapeHTML(newEvent.source_id)}')">
-                                <i class="fa-solid fa-paper-plane"></i> Dispatch
-                            </button>
+                    `;
+                } else {
+                    summaryCard.innerHTML = `
+                        <div style="display:flex; flex-direction:column; gap:10px; font-size:13px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:8px;">
+                                <strong style="color:var(--text); font-size:14px;">🔥 ${escapeHTML(newEvent.source_id)}</strong>
+                                <span style="font-weight:700; color:${getEventColor(newEvent.predicted_event_type)};">${escapeHTML(newEvent.predicted_event_type)}</span>
+                            </div>
+                            <div><strong>Jurisdiction:</strong> ${escapeHTML(derivedState)}</div>
+                            <div><strong>Coordinates:</strong> ${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E</div>
+                            <div><strong>AI Confidence:</strong> <span style="color:var(--cyan); font-weight:700;">${newEvent.confidence.toFixed(1)}%</span></div>
+                            <div><strong>Temporal Persistence:</strong> <span style="color:#f59e0b; font-weight:700;">${newEvent.persistence_score}%</span></div>
+                            <div><strong>Mean FRP:</strong> ${frp.toFixed(1)} MW</div>
+                            <div style="margin-top:8px; display:flex; gap:8px;">
+                                <button class="btn-secondary" style="flex:1; padding:8px;" onclick="window.navigateToView('dashboard-section')">
+                                    <i class="fa-solid fa-earth-americas"></i> Full GIS Map
+                                </button>
+                                <button class="btn-authority" style="flex:1; padding:8px;" onclick="window.inspectAndDispatch('${escapeHTML(newEvent.source_id)}')">
+                                    <i class="fa-solid fa-paper-plane"></i> Dispatch
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                `;
+                    `;
+                }
 
                 setTimeout(() => {
                     if (window.predMiniMapInstance) {
@@ -2036,44 +2225,43 @@ function setupPredictionForm() {
                         attribution: '&copy; OpenStreetMap'
                     }).addTo(pMap);
 
-                    const isInd = normalizeType(newEvent.predicted_event_type) === "Industrial";
-                    if (isInd) {
-                        const pulsingIcon = L.divIcon({
-                            className: 'pulsing-industrial-beacon',
-                            html: '<div class="beacon-ring"></div><div class="beacon-core"></div>',
-                            iconSize: [28, 28],
-                            iconAnchor: [14, 14]
-                        });
-                        const bMarker = L.marker([lat, lng], { icon: pulsingIcon }).addTo(pMap);
-                        bMarker.bindPopup(`<strong>🏭 Predicted Active Industrial Fire</strong><br>Lat: ${lat.toFixed(4)}, Lon: ${lng.toFixed(4)}<br>Conf: ${newEvent.confidence}%`).openPopup();
-                    } else {
-                        const cMarker = L.circleMarker([lat, lng], {
-                            radius: 10,
-                            fillColor: getEventColor(newEvent.predicted_event_type),
-                            color: "#ffffff",
-                            weight: 2,
-                            fillOpacity: 0.9
-                        }).addTo(pMap);
-                        cMarker.bindPopup(`<strong>🔥 ${newEvent.predicted_event_type} Hotspot</strong><br>Lat: ${lat.toFixed(4)}, Lon: ${lng.toFixed(4)}`).openPopup();
-                    }
+                    const markerColor = isNoHotspot ? "#10b981" : getEventColor(newEvent.predicted_event_type);
+                    const pMarker = L.circleMarker([lat, lng], {
+                        radius: 11,
+                        fillColor: markerColor,
+                        color: "#ffffff",
+                        weight: 2.5,
+                        fillOpacity: 0.95
+                    }).addTo(pMap);
+
+                    pMarker.bindPopup(`
+                        <strong>${isNoHotspot ? '🟢 Normal / No Hotspot' : '🔥 ' + newEvent.predicted_event_type}</strong><br>
+                        Lat: ${lat.toFixed(4)}, Lon: ${lng.toFixed(4)}<br>
+                        ${isNoHotspot ? 'Thermal status: Normal' : 'Confidence: ' + newEvent.confidence + '%'}
+                    `).openPopup();
+
                     resultPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
                 }, 150);
             }
 
-            const isCrit = (newEvent.confidence >= 88 || newEvent.persistence_score >= 88);
-
-            if (isCrit) {
-                showDramaticBannerAlert(
-                    `🚨 CRITICAL THREAT DETECTED: AI Classification [${newEvent.predicted_event_type}] with ${newEvent.confidence.toFixed(1)}% Confidence & ${newEvent.persistence_score}% Persistence in ${derivedState}. Routed directly to Alerts Center!`,
-                    "CRITICAL THERMAL ALERT GENERATED"
-                );
-                showToast(`Critical Alert ${newEvent.source_id} routed to Alerts Center!`, "warning");
+            if (isNoHotspot) {
+                showToast("Thermal Verification: No hotspot detected at coordinates (Normal Ambient)", "info");
+                showDramaticBannerAlert(`Coordinates ${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E in ${derivedState} checked: No thermal hotspot or fire anomaly detected (Normal Background).`, "NO THERMAL HOTSPOT DETECTED");
             } else {
-                showDramaticBannerAlert(
-                    `AI Classification [${newEvent.predicted_event_type}]: ${newEvent.confidence.toFixed(1)}% Confidence | ${newEvent.persistence_score}% Persistence in ${derivedState}`,
-                    "AI CLASSIFICATION & PERSISTENCE SAVED"
-                );
-                showToast(`Logged ${newEvent.source_id} (${newEvent.predicted_event_type}) in database.`, "success");
+                const isCrit = (newEvent.confidence >= 88 || newEvent.persistence_score >= 88);
+                if (isCrit) {
+                    showDramaticBannerAlert(
+                        `🚨 CRITICAL THREAT DETECTED: AI Classification [${newEvent.predicted_event_type}] with ${newEvent.confidence.toFixed(1)}% Confidence & ${newEvent.persistence_score}% Persistence in ${derivedState}. Routed directly to Alerts Center!`,
+                        "CRITICAL THERMAL ALERT GENERATED"
+                    );
+                    showToast(`Critical Alert ${newEvent.source_id} routed to Alerts Center!`, "warning");
+                } else {
+                    showDramaticBannerAlert(
+                        `AI Classification [${newEvent.predicted_event_type}]: ${newEvent.confidence.toFixed(1)}% Confidence | ${newEvent.persistence_score}% Persistence in ${derivedState}`,
+                        "AI CLASSIFICATION & PERSISTENCE SAVED"
+                    );
+                    showToast(`Logged ${newEvent.source_id} (${newEvent.predicted_event_type}) in database.`, "success");
+                }
             }
         } finally {
             setTimeout(() => {
