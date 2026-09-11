@@ -946,6 +946,7 @@ function applyFilters() {
         return matchState && matchType && matchConf && matchLandcover && matchSearch && matchLiveOnly;
     });
 
+    currentTablePage = 1;
     updateDashboard();
     renderMarkers();
     renderTable();
@@ -1110,18 +1111,30 @@ function updateDashboard() {
     setText("database-count-badge", `${filteredEvents.length} TOTAL RECORDS`);
 }
 
+let currentTablePage = 1;
+const ROWS_PER_PAGE = 50;
+
 function renderTable() {
     const tbody = document.getElementById("table-body");
+    const paginationInfo = document.getElementById("pagination-info");
+    const paginationControls = document.getElementById("pagination-controls");
     if (!tbody) return;
     tbody.innerHTML = "";
 
     if (filteredEvents.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color: var(--muted);">No thermal events match current filter conditions.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color: var(--muted); padding:30px;">No thermal events match current filter conditions.</td></tr>`;
+        if (paginationInfo) paginationInfo.innerText = "Showing 0 of 0 records";
+        if (paginationControls) paginationControls.innerHTML = "";
         return;
     }
 
-    const displayLimit = 50;
-    const toRender = filteredEvents.slice(0, displayLimit);
+    const totalPages = Math.ceil(filteredEvents.length / ROWS_PER_PAGE);
+    if (currentTablePage > totalPages) currentTablePage = totalPages;
+    if (currentTablePage < 1) currentTablePage = 1;
+
+    const startIdx = (currentTablePage - 1) * ROWS_PER_PAGE;
+    const endIdx = Math.min(startIdx + ROWS_PER_PAGE, filteredEvents.length);
+    const toRender = filteredEvents.slice(startIdx, endIdx);
 
     const rowsHtml = toRender.map(e => `
         <tr>
@@ -1132,9 +1145,9 @@ function renderTable() {
             <td><strong style="color:var(--cyan)">${e.persistence_score}%</strong></td>
             <td>${e.latitude ? Number(e.latitude).toFixed(4) : "—"}</td>
             <td>${e.longitude ? Number(e.longitude).toFixed(4) : "—"}</td>
-            <td>${e.mean_frp ? Number(e.mean_frp).toFixed(1) : "—"}</td>
+            <td>${e.mean_frp ? Number(e.mean_frp).toFixed(1) + " MW" : "—"}</td>
             <td>
-                <button class="btn-secondary" onclick="showEventDetails('${escapeHTML(e.source_id)}')">View</button>
+                <button class="btn-secondary" style="padding: 5px 10px; font-size:12px;" onclick="showEventDetails('${escapeHTML(e.source_id)}')">View</button>
                 <button class="btn-delete-source" title="Delete thermal source from database" onclick="window.deleteSource('${escapeHTML(e.source_id)}')"><i class="fa-solid fa-trash-can"></i></button>
             </td>
         </tr>
@@ -1142,11 +1155,89 @@ function renderTable() {
 
     tbody.innerHTML = rowsHtml;
 
-    if (filteredEvents.length > displayLimit) {
-        const trMore = document.createElement("tr");
-        trMore.innerHTML = `<td colspan="9" style="text-align:center; color:var(--muted); font-size:12px; padding:10px;">Showing top ${displayLimit} of ${filteredEvents.length} records. Filter or search to narrow results.</td>`;
-        tbody.appendChild(trMore);
+    if (paginationInfo) {
+        paginationInfo.innerHTML = `Showing <strong>${startIdx + 1}</strong> to <strong>${endIdx}</strong> of <strong>${filteredEvents.length}</strong> records (Page ${currentTablePage} of ${totalPages})`;
     }
+
+    if (paginationControls) {
+        renderPaginationButtons(paginationControls, totalPages);
+    }
+}
+
+function renderPaginationButtons(container, totalPages) {
+    container.innerHTML = "";
+    if (totalPages <= 1) return;
+
+    // Previous Button
+    const prevBtn = document.createElement("button");
+    prevBtn.className = `btn-page ${currentTablePage === 1 ? 'disabled' : ''}`;
+    prevBtn.innerHTML = `<i class="fa-solid fa-chevron-left"></i> Prev`;
+    prevBtn.disabled = currentTablePage === 1;
+    prevBtn.onclick = () => {
+        if (currentTablePage > 1) {
+            currentTablePage--;
+            renderTable();
+            document.getElementById("database-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+    };
+    container.appendChild(prevBtn);
+
+    // Numbered page buttons (e.g. 1, 2, 3, 4, 5...)
+    let startPage = Math.max(1, currentTablePage - 2);
+    let endPage = Math.min(totalPages, startPage + 4);
+    if (endPage - startPage < 4) {
+        startPage = Math.max(1, endPage - 4);
+    }
+
+    if (startPage > 1) {
+        container.appendChild(createPageBtn(1));
+        if (startPage > 2) {
+            const ellipsis = document.createElement("span");
+            ellipsis.className = "page-ellipsis";
+            ellipsis.innerText = "...";
+            container.appendChild(ellipsis);
+        }
+    }
+
+    for (let p = startPage; p <= endPage; p++) {
+        container.appendChild(createPageBtn(p));
+    }
+
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            const ellipsis = document.createElement("span");
+            ellipsis.className = "page-ellipsis";
+            ellipsis.innerText = "...";
+            container.appendChild(ellipsis);
+        }
+        container.appendChild(createPageBtn(totalPages));
+    }
+
+    // Next Button
+    const nextBtn = document.createElement("button");
+    nextBtn.className = `btn-page ${currentTablePage === totalPages ? 'disabled' : ''}`;
+    nextBtn.innerHTML = `Next <i class="fa-solid fa-chevron-right"></i>`;
+    nextBtn.disabled = currentTablePage === totalPages;
+    nextBtn.onclick = () => {
+        if (currentTablePage < totalPages) {
+            currentTablePage++;
+            renderTable();
+            document.getElementById("database-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+    };
+    container.appendChild(nextBtn);
+}
+
+function createPageBtn(pageNum) {
+    const btn = document.createElement("button");
+    btn.className = `btn-page ${pageNum === currentTablePage ? 'active' : ''}`;
+    btn.innerText = pageNum;
+    btn.onclick = () => {
+        currentTablePage = pageNum;
+        renderTable();
+        document.getElementById("database-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+    return btn;
 }
 
 window.deleteSource = async function(sourceId) {
@@ -1212,8 +1303,13 @@ window.dismissAlert = async function(sourceId) {
 };
 
 window.clearAllAlerts = async function() {
-    const criticalEvents = filteredEvents.filter(e => e.confidence >= ALERT_RULES.CRITICAL);
-    criticalEvents.forEach(e => dismissedAlertIds.add(String(e.source_id).trim()));
+    // Dismiss ALL live NASA satellite detections and all critical/high alerts
+    filteredEvents.forEach(e => {
+        dismissedAlertIds.add(String(e.source_id).trim());
+    });
+    allEvents.forEach(e => {
+        dismissedAlertIds.add(String(e.source_id).trim());
+    });
 
     try {
         await fetch(`/api/v1/alerts`, { method: "DELETE" });
