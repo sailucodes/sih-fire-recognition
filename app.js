@@ -231,9 +231,9 @@ function normalizeType(type) {
 
 function getEventColor(type) {
     switch (normalizeType(type)) {
-        case "Industrial": return "#f43f5e";
+        case "Industrial": return "#e11d48";
         case "Forest/Natural": return "#22c55e";
-        case "Agricultural": return "#10b981";
+        case "Agricultural": return "#f59e0b";
         default: return "#22d3ee";
     }
 }
@@ -826,14 +826,82 @@ function initializeAuthModal() {
         loginForm?.classList.add("hidden");
     });
 
-    // Realistic Google OAuth Account Chooser
+    // Realistic Dynamic Google OAuth Account Chooser (Device/System-Specific)
     const googleModal = document.getElementById("google-oauth-modal");
     const closeGoogleModalBtn = document.getElementById("close-google-modal-btn");
-    const googleAccounts = document.querySelectorAll(".google-acc-row");
     const googleSigningIn = document.getElementById("google-signing-in-indicator");
+    const customEmailInput = document.getElementById("custom-google-email-input");
+    const customNameInput = document.getElementById("custom-google-name-input");
+    const customEmailSubmit = document.getElementById("custom-google-email-submit");
+
+    function saveDeviceAccount(email, name) {
+        try {
+            let accounts = JSON.parse(localStorage.getItem("sih_device_google_accounts") || "[]");
+            accounts = accounts.filter(a => a.email.toLowerCase() !== email.toLowerCase());
+            accounts.unshift({ email, name });
+            if (accounts.length > 5) accounts = accounts.slice(0, 5);
+            localStorage.setItem("sih_device_google_accounts", JSON.stringify(accounts));
+        } catch (_) {}
+    }
+
+    function renderDeviceAccounts() {
+        const container = document.getElementById("dynamic-device-accounts");
+        if (!container) return;
+        let accounts = [];
+        try {
+            accounts = JSON.parse(localStorage.getItem("sih_device_google_accounts") || "[]");
+        } catch (_) {}
+
+        if (accounts.length === 0) {
+            container.innerHTML = `
+                <div style="padding: 14px 10px; color: #9aa0a6; font-size: 13px; font-style: italic; text-align: center; border: 1px dashed #3c4043; border-radius: 8px; margin-bottom: 8px;">
+                    <i class="fa-solid fa-laptop" style="margin-right: 6px;"></i> No Google accounts saved on this device yet.<br>Enter your account below to sign in.
+                </div>
+            `;
+            return;
+        }
+
+        const colors = ["#2e7d32", "#0288d1", "#43a047", "#5c6bc0", "#d81b60"];
+        container.innerHTML = accounts.map((acc, idx) => {
+            const initial = (acc.name || acc.email).charAt(0).toUpperCase();
+            const color = colors[idx % colors.length];
+            return `
+                <div class="google-acc-row" data-email="${escapeHTML(acc.email)}" data-name="${escapeHTML(acc.name)}" style="display: flex; align-items: center; gap: 14px; padding: 12px 10px; cursor: pointer; border-radius: 8px; transition: background 0.15s ease; border-bottom: 1px solid #282a2c;">
+                    <div style="width: 36px; height: 36px; border-radius: 50%; background: ${color}; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 15px;">${initial}</div>
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-size: 14px; font-weight: 500; color: #e3e3e3;">${escapeHTML(acc.name)}</div>
+                        <div style="font-size: 12.5px; color: #9aa0a6;">${escapeHTML(acc.email)}</div>
+                    </div>
+                    <button type="button" class="btn-remove-acc" data-email="${escapeHTML(acc.email)}" title="Remove from this device" style="background:none; border:none; color:#70757a; cursor:pointer; padding:6px; font-size:12px; border-radius:4px;">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            `;
+        }).join("");
+
+        container.querySelectorAll(".google-acc-row").forEach(row => {
+            row.addEventListener("mouseenter", () => row.style.background = "#303134");
+            row.addEventListener("mouseleave", () => row.style.background = "transparent");
+            row.addEventListener("click", async (e) => {
+                if (e.target.closest(".btn-remove-acc")) {
+                    e.stopPropagation();
+                    const removeEmail = e.target.closest(".btn-remove-acc").getAttribute("data-email");
+                    let list = JSON.parse(localStorage.getItem("sih_device_google_accounts") || "[]");
+                    list = list.filter(a => a.email.toLowerCase() !== removeEmail.toLowerCase());
+                    localStorage.setItem("sih_device_google_accounts", JSON.stringify(list));
+                    renderDeviceAccounts();
+                    return;
+                }
+                const email = row.getAttribute("data-email");
+                const name = row.getAttribute("data-name");
+                await executeGoogleSignIn(email, name);
+            });
+        });
+    }
 
     googleBtn?.addEventListener("click", () => {
         modal?.classList.remove("open");
+        renderDeviceAccounts();
         googleModal?.classList.add("open");
         googleSigningIn?.classList.add("hidden");
     });
@@ -846,21 +914,8 @@ function initializeAuthModal() {
         if (e.target === googleModal) googleModal.classList.remove("open");
     });
 
-    const customGoogleForm = document.getElementById("custom-google-login-form");
-    const useAnotherBtn = document.getElementById("use-another-account-row");
-    const customEmailInput = document.getElementById("custom-google-email-input");
-    const customEmailSubmit = document.getElementById("custom-google-email-submit");
-
-    useAnotherBtn?.addEventListener("click", () => {
-        customGoogleForm?.classList.toggle("hidden");
-        if (!customGoogleForm?.classList.contains("hidden")) {
-            customEmailInput?.focus();
-        }
-    });
-
     async function executeGoogleSignIn(email, name) {
         googleSigningIn?.classList.remove("hidden");
-        if (customGoogleForm) customGoogleForm.classList.add("hidden");
 
         try {
             await fetch("/api/v1/auth/google", {
@@ -869,6 +924,8 @@ function initializeAuthModal() {
                 body: JSON.stringify({ email, name })
             });
         } catch (_) {}
+
+        saveDeviceAccount(email, name);
 
         const user = { email, name, auth: "google" };
         localStorage.setItem("sih_auth_user", JSON.stringify(user));
@@ -901,8 +958,9 @@ function initializeAuthModal() {
             showToast("Please enter a valid Google email address", "alert");
             return;
         }
+        const customName = customNameInput?.value?.trim();
         const userPart = email.split("@")[0];
-        const formattedName = userPart.charAt(0).toUpperCase() + userPart.slice(1);
+        const formattedName = customName || (userPart.charAt(0).toUpperCase() + userPart.slice(1));
         executeGoogleSignIn(email, formattedName);
     });
 
@@ -913,15 +971,11 @@ function initializeAuthModal() {
         }
     });
 
-    googleAccounts.forEach(row => {
-        if (row.id === "use-another-account-row") return;
-        row.addEventListener("mouseenter", () => row.style.background = "#303134");
-        row.addEventListener("mouseleave", () => row.style.background = "transparent");
-        row.addEventListener("click", async () => {
-            const email = row.getAttribute("data-email");
-            const name = row.getAttribute("data-name");
-            await executeGoogleSignIn(email, name);
-        });
+    customNameInput?.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            customEmailSubmit?.click();
+        }
     });
 
     // Login Form Submit
@@ -983,36 +1037,36 @@ function initializeMap() {
     const mapElement = document.getElementById("map");
     if (!mapElement) return;
 
-    // Base Layer 1: ESRI High-Resolution Satellite (Default view)
+    // Base Layer 1: OpenStreetMap (Standard Street OSM - Default view)
+    const osmLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap contributors (OSM)"
+    });
+
+    // Base Layer 2: ESRI High-Resolution Satellite
     const satelliteLayer = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
         maxZoom: 19,
         attribution: "Tiles &copy; Esri"
     });
 
-    // Base Layer 2: Dark Tactical GIS
+    // Base Layer 3: Dark Tactical GIS
     const darkLayer = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
         maxZoom: 19,
         attribution: "&copy; CartoDB & OpenStreetMap"
     });
 
-    // Base Layer 3: Standard Street GIS
-    const streetLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
-        attribution: "&copy; OpenStreetMap contributors"
-    });
-
     map = L.map("map", {
         center: [20.5937, 78.9629],
         zoom: 5,
-        layers: [satelliteLayer]
+        layers: [osmLayer]
     });
 
     markersLayer = L.layerGroup().addTo(map);
 
     baseLayers = {
+        "🗺️ OpenStreetMap (OSM Default)": osmLayer,
         "🛰️ Satellite Imagery (ESRI)": satelliteLayer,
-        "🌑 Dark Tactical GIS": darkLayer,
-        "🗺️ Standard Street Map": streetLayer
+        "🌑 Dark Tactical GIS": darkLayer
     };
 
     overlays = {
@@ -1458,13 +1512,17 @@ function renderMarkers() {
 
     filteredEvents.forEach(e => {
         const isInd = normalizeType(e.predicted_event_type) === "Industrial";
+        // ONLY present/live/active detections blink (real-time NASA detections or freshly predicted active events)
+        const isLiveOrPresent = Boolean(e.is_live_nasa || String(e.source_id).startsWith("PRED_"));
+        const shouldBlink = isInd && isLiveOrPresent;
+
         const marker = L.circleMarker([e.latitude, e.longitude], {
-            radius: isInd ? 10 : 8,
+            radius: shouldBlink ? 10 : (isInd ? 9 : 8),
             fillColor: getEventColor(normalizeType(e.predicted_event_type)),
-            color: isInd ? "#ffffff" : "#ffffff", 
-            weight: isInd ? 2.5 : 1.5, 
-            fillOpacity: 0.9,
-            className: isInd ? "blinking-industrial-hotspot" : ""
+            color: shouldBlink ? "#ffffff" : "#ffffff", 
+            weight: shouldBlink ? 2.5 : 1.5, 
+            fillOpacity: shouldBlink ? 0.95 : 0.82,
+            className: shouldBlink ? "blinking-industrial-hotspot" : ""
         });
         
         const pScore = Number(e.persistence_score) || 0;
@@ -1772,7 +1830,11 @@ function showEventDetails(sourceId) {
             attribution: 'NASA GIBS Active Fires'
         }).addTo(nasaMiniMap);
 
-        if (normalizeType(event.predicted_event_type) === "Industrial") {
+        const isInd = normalizeType(event.predicted_event_type) === "Industrial";
+        const isLiveOrPresent = Boolean(event.is_live_nasa || String(event.source_id).startsWith("PRED_"));
+        const shouldBlink = isInd && isLiveOrPresent;
+
+        if (shouldBlink) {
             const pulsingIcon = L.divIcon({
                 className: 'pulsing-industrial-beacon',
                 html: '<div class="beacon-ring"></div><div class="beacon-core"></div>',
@@ -1782,7 +1844,7 @@ function showEventDetails(sourceId) {
             const beaconMarker = L.marker([lat, lon], { icon: pulsingIcon }).addTo(nasaMiniMap);
             beaconMarker.bindPopup(`
                 <div style="color:#000;">
-                    <strong style="color:#ef4444;">🏭 ACTIVE INDUSTRIAL FIRE HOTSPOT</strong><br>
+                    <strong style="color:#e11d48;">🏭 ACTIVE INDUSTRIAL FIRE HOTSPOT (LIVE)</strong><br>
                     Lat: ${lat.toFixed(4)}°, Lon: ${lon.toFixed(4)}°<br>
                     Confidence: ${Number(event.confidence).toFixed(1)}%<br>
                     Persistence: ${event.persistence_score || 85}%
@@ -1801,6 +1863,7 @@ function showEventDetails(sourceId) {
                 <div style="color:#000;">
                     <strong>🔥 Thermal Hotspot Location</strong><br>
                     Lat: ${lat.toFixed(4)}°, Lon: ${lon.toFixed(4)}°<br>
+                    Type: ${normalizeType(event.predicted_event_type)}<br>
                     Confidence: ${Number(event.confidence).toFixed(1)}%
                 </div>
             `).openPopup();
@@ -1925,6 +1988,78 @@ function setupPredictionForm() {
 
             applyFilters();
 
+            // RENDER PREDICTION MINI-MAP WINDOW RIGHT ON SCREEN (LIKE SATELLITE GIBS WINDOW)
+            const resultPanel = document.getElementById("prediction-result-panel");
+            const summaryCard = document.getElementById("prediction-summary-card");
+            const badgeType = document.getElementById("pred-badge-type");
+
+            if (resultPanel && summaryCard) {
+                resultPanel.classList.remove("hidden");
+                if (badgeType) {
+                    badgeType.textContent = newEvent.predicted_event_type.toUpperCase();
+                    badgeType.style.background = getEventColor(newEvent.predicted_event_type) + "22";
+                    badgeType.style.color = getEventColor(newEvent.predicted_event_type);
+                }
+
+                summaryCard.innerHTML = `
+                    <div style="display:flex; flex-direction:column; gap:10px; font-size:13px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:8px;">
+                            <strong style="color:var(--text); font-size:14px;">🔥 ${escapeHTML(newEvent.source_id)}</strong>
+                            <span style="font-weight:700; color:${getEventColor(newEvent.predicted_event_type)};">${escapeHTML(newEvent.predicted_event_type)}</span>
+                        </div>
+                        <div><strong>Jurisdiction:</strong> ${escapeHTML(derivedState)}</div>
+                        <div><strong>Coordinates:</strong> ${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E</div>
+                        <div><strong>AI Confidence:</strong> <span style="color:var(--cyan); font-weight:700;">${newEvent.confidence.toFixed(1)}%</span></div>
+                        <div><strong>Temporal Persistence:</strong> <span style="color:#f59e0b; font-weight:700;">${newEvent.persistence_score}%</span></div>
+                        <div><strong>Mean FRP:</strong> ${frp.toFixed(1)} MW</div>
+                        <div style="margin-top:8px; display:flex; gap:8px;">
+                            <button class="btn-secondary" style="flex:1; padding:8px;" onclick="window.navigateToView('map-section')">
+                                <i class="fa-solid fa-earth-americas"></i> Full GIS Map
+                            </button>
+                            <button class="btn-authority" style="flex:1; padding:8px;" onclick="window.inspectAndDispatch('${escapeHTML(newEvent.source_id)}')">
+                                <i class="fa-solid fa-paper-plane"></i> Dispatch
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                setTimeout(() => {
+                    if (window.predMiniMapInstance) {
+                        window.predMiniMapInstance.remove();
+                        window.predMiniMapInstance = null;
+                    }
+                    const pMap = L.map("prediction-mini-map").setView([lat, lng], 11);
+                    window.predMiniMapInstance = pMap;
+
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        maxZoom: 19,
+                        attribution: '&copy; OpenStreetMap'
+                    }).addTo(pMap);
+
+                    const isInd = normalizeType(newEvent.predicted_event_type) === "Industrial";
+                    if (isInd) {
+                        const pulsingIcon = L.divIcon({
+                            className: 'pulsing-industrial-beacon',
+                            html: '<div class="beacon-ring"></div><div class="beacon-core"></div>',
+                            iconSize: [28, 28],
+                            iconAnchor: [14, 14]
+                        });
+                        const bMarker = L.marker([lat, lng], { icon: pulsingIcon }).addTo(pMap);
+                        bMarker.bindPopup(`<strong>🏭 Predicted Active Industrial Fire</strong><br>Lat: ${lat.toFixed(4)}, Lon: ${lng.toFixed(4)}<br>Conf: ${newEvent.confidence}%`).openPopup();
+                    } else {
+                        const cMarker = L.circleMarker([lat, lng], {
+                            radius: 10,
+                            fillColor: getEventColor(newEvent.predicted_event_type),
+                            color: "#ffffff",
+                            weight: 2,
+                            fillOpacity: 0.9
+                        }).addTo(pMap);
+                        cMarker.bindPopup(`<strong>🔥 ${newEvent.predicted_event_type} Hotspot</strong><br>Lat: ${lat.toFixed(4)}, Lon: ${lng.toFixed(4)}`).openPopup();
+                    }
+                    resultPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                }, 150);
+            }
+
             const isCrit = (newEvent.confidence >= 88 || newEvent.persistence_score >= 88);
 
             if (isCrit) {
@@ -1933,22 +2068,6 @@ function setupPredictionForm() {
                     "CRITICAL THERMAL ALERT GENERATED"
                 );
                 showToast(`Critical Alert ${newEvent.source_id} routed to Alerts Center!`, "warning");
-
-                if (window.navigateToView) {
-                    window.navigateToView("alerts-section");
-                } else {
-                    const dbSec = document.getElementById("database-section");
-                    if (dbSec && !dbSec.classList.contains("hidden")) {
-                        dbSec.classList.add("hidden");
-                        document.getElementById("dashboard-section")?.classList.remove("hidden");
-                    }
-                    const alertsSec = document.getElementById("alerts-section");
-                    if (alertsSec) {
-                        setTimeout(() => {
-                            alertsSec.scrollIntoView({ behavior: "smooth", block: "start" });
-                        }, 350);
-                    }
-                }
             } else {
                 showDramaticBannerAlert(
                     `AI Classification [${newEvent.predicted_event_type}]: ${newEvent.confidence.toFixed(1)}% Confidence | ${newEvent.persistence_score}% Persistence in ${derivedState}`,

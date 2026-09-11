@@ -268,6 +268,24 @@
                             <i class="fa-solid fa-wand-magic-sparkles"></i> <span id="lbl-predict-btn">PREDICT & SAVE EVENT</span>
                         </button>
                     </form>
+
+                    <!-- PREDICTION VERIFICATION & SATELLITE HOTSPOT MINI-MAP WINDOW -->
+                    <div id="prediction-result-panel" class="hidden" style="margin-top: 26px; border-top: 1px solid var(--border); padding-top: 22px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                            <h3 style="margin:0; font-size:16px; font-weight:800; color:var(--text); display:flex; align-items:center; gap:8px;">
+                                <i class="fa-solid fa-crosshairs" style="color:var(--cyan);"></i> AI Spatial Hotspot Verification Window
+                            </h3>
+                            <span id="pred-badge-type" class="badge">PROCESSED</span>
+                        </div>
+                        <div style="display:grid; grid-template-columns: 1.2fr 1fr; gap: 20px; align-items:start;">
+                            <div style="height: 320px; border-radius: 8px; overflow:hidden; border: 1px solid var(--border);">
+                                <div id="prediction-mini-map" style="width:100%; height:100%;"></div>
+                            </div>
+                            <div id="prediction-summary-card" style="background:var(--panel-light); border:1px solid var(--border); border-radius:8px; padding:18px;">
+                                <!-- Content dynamically populated by app.js -->
+                            </div>
+                        </div>
+                    </div>
                 </section>
             </div>
 
@@ -430,62 +448,23 @@
                 <!-- Right Column: Account Selector List -->
                 <div>
                     <div id="google-accounts-list" style="display: flex; flex-direction: column;">
-                        
-                        <!-- Account 1: University Account -->
-                        <div class="google-acc-row" data-email="sridevi.24bcd7246@vitapstudent.ac.in" data-name="Sridevi" style="display: flex; align-items: center; gap: 14px; padding: 12px 10px; cursor: pointer; border-radius: 8px; transition: background 0.15s ease; border-bottom: 1px solid #282a2c;">
-                            <div style="width: 36px; height: 36px; border-radius: 50%; background: #2e7d32; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 15px;">C</div>
-                            <div style="flex: 1; min-width: 0;">
-                                <div style="font-size: 13.5px; color: #e3e3e3; font-weight: 500;">sridevi.24bcd7246@vitapstudent.ac.in</div>
-                            </div>
-                        </div>
-
-                        <!-- Account 2: Athota Sanjana (Signed out) -->
-                        <div class="google-acc-row" data-email="sanjanaathota@gmail.com" data-name="Athota Sanjana" style="display: flex; align-items: center; gap: 14px; padding: 12px 10px; cursor: pointer; border-radius: 8px; transition: background 0.15s ease; border-bottom: 1px solid #282a2c;">
-                            <div style="width: 36px; height: 36px; border-radius: 50%; background: #0288d1; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; overflow: hidden;">
-                                <i class="fa-solid fa-cloud" style="font-size: 16px;"></i>
-                            </div>
-                            <div style="flex: 1; min-width: 0;">
-                                <div style="font-size: 14px; font-weight: 500; color: #e3e3e3;">Athota Sanjana</div>
-                                <div style="font-size: 12.5px; color: #9aa0a6;">sanjanaathota@gmail.com</div>
-                            </div>
-                            <span style="font-size: 12px; color: #9aa0a6;">Signed out</span>
-                        </div>
-
-                        <!-- Account 3: Sailaja Sridevi Chavala -->
-                        <div class="google-acc-row" data-email="sailajasridevich@gmail.com" data-name="Sailaja Sridevi Chavala" style="display: flex; align-items: center; gap: 14px; padding: 12px 10px; cursor: pointer; border-radius: 8px; transition: background 0.15s ease; border-bottom: 1px solid #282a2c;">
-                            <div style="width: 36px; height: 36px; border-radius: 50%; background: #43a047; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 15px;">S</div>
-                            <div style="flex: 1; min-width: 0;">
-                                <div style="font-size: 14px; font-weight: 500; color: #e3e3e3;">Sailaja Sridevi Chavala</div>
-                                <div style="font-size: 12.5px; color: #9aa0a6;">sailajasridevich@gmail.com</div>
-                            </div>
-                        </div>
-
-                        <!-- Account 4: Sailaja Sridevi Chavala (Secondary) -->
-                        <div class="google-acc-row" data-email="chavalasailajasridevi@gmail.com" data-name="Sailaja Sridevi Chavala" style="display: flex; align-items: center; gap: 14px; padding: 12px 10px; cursor: pointer; border-radius: 8px; transition: background 0.15s ease; border-bottom: 1px solid #282a2c;">
-                            <div style="width: 36px; height: 36px; border-radius: 50%; background: #5c6bc0; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 15px;">S</div>
-                            <div style="flex: 1; min-width: 0;">
-                                <div style="font-size: 14px; font-weight: 500; color: #e3e3e3;">Sailaja Sridevi Chavala</div>
-                                <div style="font-size: 12.5px; color: #9aa0a6;">chavalasailajasridevi@gmail.com</div>
-                            </div>
-                        </div>
-
-                        <!-- Use another account -->
-                        <div class="google-acc-row" id="use-another-account-row" style="display: flex; align-items: center; gap: 14px; padding: 12px 10px; cursor: pointer; border-radius: 8px; transition: background 0.15s ease;">
-                            <div style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; color: #c4c7c5; font-size: 18px;">
-                                <i class="fa-regular fa-circle-user"></i>
-                            </div>
-                            <div style="flex: 1; min-width: 0;">
-                                <div style="font-size: 14px; font-weight: 500; color: #e3e3e3;">Use another account</div>
-                            </div>
-                        </div>
+                        <!-- Dynamic local accounts on this specific computer / browser -->
+                        <div id="dynamic-device-accounts"></div>
                     </div>
 
-                    <!-- CUSTOM GOOGLE ACCOUNT INPUT FORM (EXPANDS ON CLICK) -->
-                    <div id="custom-google-login-form" class="hidden" style="margin-top: 10px; padding: 12px; background: #1f1f21; border-radius: 8px; border: 1px solid #3c4043;">
-                        <label style="display: block; font-size: 12px; color: #9aa0a6; margin-bottom: 6px;">Enter your device Google Email:</label>
-                        <div style="display: flex; gap: 8px;">
-                            <input type="email" id="custom-google-email-input" placeholder="you@gmail.com" style="flex: 1; padding: 8px 10px; border-radius: 6px; background: #131314; border: 1px solid #5f6368; color: #fff; font-size: 13px;">
-                            <button type="button" id="custom-google-email-submit" style="padding: 8px 14px; background: #0b57d0; color: #fff; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px;">Sign In</button>
+                    <!-- UNIVERSAL GOOGLE ACCOUNT SIGN IN FORM (ALWAYS ACTIVE FOR CURRENT SYSTEM) -->
+                    <div id="custom-google-login-form" style="margin-top: 14px; padding: 16px; background: #1f1f21; border-radius: 12px; border: 1px solid #3c4043;">
+                        <label style="display: block; font-size: 12px; color: #a8c7fa; font-weight: 600; margin-bottom: 8px;">
+                            <i class="fa-brands fa-google" style="margin-right: 6px;"></i> Sign in with this system's Google Account:
+                        </label>
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            <input type="email" id="custom-google-email-input" placeholder="Enter your Google Account email (e.g. yourname@gmail.com)" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: #131314; border: 1px solid #5f6368; color: #fff; font-size: 13px;">
+                            <div style="display: flex; gap: 8px;">
+                                <input type="text" id="custom-google-name-input" placeholder="Display Name (optional)" style="flex: 1; padding: 10px 12px; border-radius: 8px; background: #131314; border: 1px solid #5f6368; color: #fff; font-size: 13px;">
+                                <button type="button" id="custom-google-email-submit" style="padding: 10px 20px; background: #0b57d0; color: #fff; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 13px; display:flex; align-items:center; gap:6px;">
+                                    <span>Continue</span> <i class="fa-solid fa-arrow-right"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
 
