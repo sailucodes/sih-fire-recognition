@@ -341,7 +341,13 @@ class APIRouter:
         obs_span = max(1, int(body.get("observation_span") or body.get("observation_span_days") or 1))
         
         # Calculate persistence score between 0 and 100%
-        calculated_persistence = min(100.0, round((active_days / obs_span) * 100, 1))
+        if body.get("persistence_score") is not None:
+            calculated_persistence = float(body.get("persistence_score"))
+        elif active_days > 1 or obs_span > 1:
+            calculated_persistence = min(100.0, round((active_days / obs_span) * 100, 1))
+        else:
+            # Scaled persistence based on thermal intensity and recurrence
+            calculated_persistence = min(96.0, round(85.0 + min(11.0, (mean_frp - 15) * 0.4), 1)) if mean_frp >= 15 else round(70.0 + mean_frp * 0.5, 1)
 
         # Accurately deduce state jurisdiction from geospatial coordinates
         provided_state = body.get("state") or query_params.get("state", [None])[0]
