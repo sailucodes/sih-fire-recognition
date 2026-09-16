@@ -780,16 +780,24 @@ function processVoiceCommand(command) {
     applyFilters();
 }
 
-/* DARK / LIGHT THEME TOGGLE */
+/* DARK / LIGHT THEME TOGGLE (DEFAULT LIGHT MODE) */
 function initializeThemeToggle() {
     const themeBtn = document.getElementById("theme-toggle");
     const themeIcon = document.getElementById("theme-icon");
     const htmlEl = document.documentElement;
 
+    // Retrieve saved theme or default to "light"
+    const savedTheme = localStorage.getItem("sih_theme") || "light";
+    htmlEl.setAttribute("data-theme", savedTheme);
+    if (themeIcon) {
+        themeIcon.className = savedTheme === "dark" ? "fa-solid fa-moon" : "fa-solid fa-sun";
+    }
+
     themeBtn?.addEventListener("click", () => {
-        const currentTheme = htmlEl.getAttribute("data-theme");
+        const currentTheme = htmlEl.getAttribute("data-theme") || "light";
         const nextTheme = currentTheme === "dark" ? "light" : "dark";
         htmlEl.setAttribute("data-theme", nextTheme);
+        localStorage.setItem("sih_theme", nextTheme);
         
         if (themeIcon) {
             themeIcon.className = nextTheme === "dark" ? "fa-solid fa-moon" : "fa-solid fa-sun";
