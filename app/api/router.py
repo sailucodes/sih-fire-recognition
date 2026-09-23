@@ -156,7 +156,10 @@ class APIRouter:
                 return 404, headers, json.dumps({"error": "Endpoint not found", "path": path}).encode("utf-8")
 
         except Exception as e:
-            return 500, headers, json.dumps({"error": str(e)}).encode("utf-8")
+            import traceback
+            tb = traceback.format_exc()
+            print(f"[ROUTER ERROR] {tb}", flush=True)
+            return 500, headers, json.dumps({"error": str(e), "traceback": tb}).encode("utf-8")
 
     # ---------------- HANDLERS ---------------- #
 

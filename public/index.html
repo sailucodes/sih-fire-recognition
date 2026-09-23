@@ -28454,7 +28454,19 @@ window.manualSyncNasa = async function () {
     }
 };
 
+let currentSyncAbortController = null;
+
 async function syncBackendFirms(days = 1, isManual = false) {
+    // If a sync is already running, cancel it so requests don't collide
+    if (currentSyncAbortController) {
+        currentSyncAbortController.abort();
+    }
+    currentSyncAbortController = new AbortController();
+    const signal = currentSyncAbortController.signal;
+
+    const icon = document.getElementById("sync-icon");
+    if (icon) icon.classList.add("fa-spin");
+
     const now = new Date();
     const timeStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + ", " +
                     now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -28465,9 +28477,18 @@ async function syncBackendFirms(days = 1, isManual = false) {
     const url = `${apiBase}/api/v1/firms/sync?days=${days}`;
 
     try {
-        const res = await fetch(url);
+        const res = await fetch(url, { signal });
         if (!res.ok) {
-            throw new Error(`HTTP ${res.status} (${res.statusText || 'Backend Error'})`);
+            let errorDetail = "";
+            try {
+                const errData = await res.json();
+                errorDetail = errData.error || errData.message || "";
+            } catch (_) {
+                try {
+                    errorDetail = await res.text();
+                } catch (_) {}
+            }
+            throw new Error(`HTTP ${res.status}${errorDetail ? ': ' + errorDetail : ' (' + (res.statusText || 'Backend Error') + ')'}`);
         }
         const data = await res.json();
         const rawSources = data.clusters || data.sources || [];
@@ -28518,17 +28539,30 @@ async function syncBackendFirms(days = 1, isManual = false) {
         eventsCurrentPage = 1;
         updateDashboard();
 
+        const label = days === 1 ? "Live Satellite Pass (Today)" : `Past ${days} Days`;
+        showToast(`Loaded ${label}: ${allEvents.length} real thermal sources classified by AI!`, "success");
         return allEvents.length;
     } catch (err) {
+        if (err.name === "AbortError") {
+            console.log("[Live Sync] Request aborted for newer selection.");
+            return 0;
+        }
         console.error("[Live Sync] Backend sync error:", err);
         showToast(`Backend connection failed: ${err.message}`, "error");
 
-        // Only fall back to emergency cache if we literally have zero events loaded
+        // Never fake or load 563 ground truth on sync failure
         if (allEvents.length === 0) {
-            loadInitialFallbackData();
-            showToast("Offline fallback dataset loaded", "warning");
+            setText("stat-total-sources", "--");
+            const alertsList = document.getElementById("recent-alerts-dashboard-list");
+            if (alertsList) {
+                alertsList.innerHTML = `<div style="text-align: center; color: var(--danger-color); padding: 20px; font-size: 13px;"><i class="fa-solid fa-triangle-exclamation"></i> Telemetry sync failed (${escapeHTML(err.message)}). Ensure backend server is running on port 8000.</div>`;
+            }
         }
         throw err;
+    } finally {
+        if (icon) {
+            setTimeout(() => icon.classList.remove("fa-spin"), 600);
+        }
     }
 }
 

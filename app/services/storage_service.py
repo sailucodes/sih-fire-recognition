@@ -455,7 +455,10 @@ class ThermalStorageService:
                     "facility_context": f"{s.get('nearest_facility_type', 'industrial').title()} ({s.get('min_distance_to_industry_km', 0.0):.2f} km away), FRP: {s.get('max_frp', 0.0):.1f} MW"
                 })
 
-        db_manager.bulk_insert_sources(sources_list)
+        try:
+            db_manager.bulk_insert_sources(sources_list)
+        except Exception as e:
+            print(f"[STORAGE WARNING] Bulk insert to SQLite caught: {e}", flush=True)
         return saved_ids
 
     def delete_source(self, source_id: str) -> bool:

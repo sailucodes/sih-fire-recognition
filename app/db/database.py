@@ -25,7 +25,9 @@ class DatabaseManager:
 
     @contextmanager
     def get_connection(self):
-        conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
+        conn = sqlite3.connect(str(self.db_path), timeout=60.0, check_same_thread=False)
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA busy_timeout=60000;")
         conn.row_factory = sqlite3.Row
         try:
             yield conn
@@ -247,22 +249,14 @@ class DatabaseManager:
             conn.commit()
 
     def bulk_insert_sources(self, sources_list: List[Dict[str, Any]]):
+        if not sources_list:
+            return
         with self.get_connection() as conn:
             cursor = conn.cursor()
+            rows = []
             for s in sources_list:
                 created_at = s.get("created_at") or time.strftime("%Y-%m-%d %H:%M:%S")
-                cursor.execute("""
-                    INSERT OR IGNORE INTO thermal_sources (
-                        source_id, state, latitude, longitude, event_type, predicted_event_type,
-                        confidence, confidence_pct, persistence_score, sih_alert_severity,
-                        total_detections, active_days, observation_span_days, mean_frp, max_frp,
-                        mean_brightness, max_brightness, nearest_facility_name, nearest_facility_type,
-                        min_distance_to_industry_km, nearest_refinery_km, nearest_powerplant_km,
-                        nearest_mine_km, nearest_industrial_area_km, mean_industrial_facilities_1km,
-                        mean_industrial_facilities_5km, landcover_class, first_detection, last_detection,
-                        is_persistent, is_flare_anomaly, risk_level, risk_description, marker_color, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
+                rows.append((
                     s["source_id"], s.get("state", "Odisha"), float(s["latitude"]), float(s["longitude"]),
                     s.get("event_type", "Other"), s.get("predicted_event_type", s.get("event_type", "Other")),
                     float(s.get("confidence", s.get("confidence_pct", 80.0))),
@@ -283,6 +277,18 @@ class DatabaseManager:
                     s.get("risk_level", "Medium"), s.get("risk_description", ""),
                     s.get("marker_color", "#457b9d"), created_at
                 ))
+            cursor.executemany("""
+                INSERT OR IGNORE INTO thermal_sources (
+                    source_id, state, latitude, longitude, event_type, predicted_event_type,
+                    confidence, confidence_pct, persistence_score, sih_alert_severity,
+                    total_detections, active_days, observation_span_days, mean_frp, max_frp,
+                    mean_brightness, max_brightness, nearest_facility_name, nearest_facility_type,
+                    min_distance_to_industry_km, nearest_refinery_km, nearest_powerplant_km,
+                    nearest_mine_km, nearest_industrial_area_km, mean_industrial_facilities_1km,
+                    mean_industrial_facilities_5km, landcover_class, first_detection, last_detection,
+                    is_persistent, is_flare_anomaly, risk_level, risk_description, marker_color, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, rows)
             conn.commit()
 
     def delete_source(self, source_id: str) -> bool:
