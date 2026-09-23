@@ -60,5 +60,22 @@ class TestAPIRoutes(unittest.TestCase):
         alerts = json.loads(content_alt.decode("utf-8"))
         self.assertIsInstance(alerts["alerts"], list)
 
+    def test_firms_sync_pipeline(self):
+        status, _, content = router.handle_request("GET", "/api/v1/firms/sync", {"days": ["1"]}, b"")
+        self.assertEqual(status, 200)
+        res = json.loads(content.decode("utf-8"))
+        self.assertEqual(res["status"], "success")
+        self.assertIn("clusters_count", res)
+        self.assertIn("hotspots_count", res)
+        self.assertIn("clusters", res)
+        if len(res["clusters"]) > 0:
+            first = res["clusters"][0]
+            self.assertTrue(first["source_id"].startswith("LIVE_FIRMS_"))
+            self.assertIn("predicted_event_type", first)
+            self.assertIn("confidence_pct", first)
+            self.assertIn("risk_level", first)
+            self.assertIn("persistence_score", first)
+            self.assertIn("state", first)
+
 if __name__ == "__main__":
     unittest.main()

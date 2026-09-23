@@ -4,7 +4,7 @@ import io
 from typing import Dict, Any, List, Tuple
 from urllib.parse import parse_qs, urlparse
 
-from app.services.storage_service import storage_service
+from app.services.storage_service import storage_service, detect_state_for_coordinates
 from app.services.osm_service import osm_service
 from app.services.firms_service import firms_service
 from app.services.auth_service import auth_service
@@ -456,7 +456,7 @@ class APIRouter:
 
     def _handle_firms_sync(self, query_params: Dict[str, List[str]], headers: Dict[str, str]) -> Tuple[int, Dict[str, str], bytes]:
         country = query_params.get("country", ["IND"])[0]
-        days = int(query_params.get("days", [5])[0])
+        days = int(query_params.get("days", [1])[0])
         api_key = query_params.get("key", [None])[0] or query_params.get("map_key", [None])[0]
 
         try:
@@ -475,6 +475,7 @@ class APIRouter:
 
         for idx, c in enumerate(clustered_sources, start=1):
             c["source_id"] = f"LIVE_FIRMS_{idx:04d}"
+            c["state"] = detect_state_for_coordinates(c["latitude"], c["longitude"])
             features = extract_features_for_point(
                 lat=c["latitude"], lon=c["longitude"], frp=c["mean_frp"],
                 detection_count=c["total_detections"], active_days=c["active_days"],
@@ -535,7 +536,9 @@ class APIRouter:
             "sync_time": time.strftime("%H:%M:%S IST"),
             "hotspots_count": len(raw_hotspots),
             "clusters_count": len(synced_sources),
-            "sample_clusters": synced_sources
+            "sample_clusters": synced_sources,
+            "clusters": synced_sources,
+            "sources": synced_sources
         }, indent=2).encode("utf-8")
 
     def _handle_openapi(self, headers: Dict[str, str]) -> Tuple[int, Dict[str, str], bytes]:

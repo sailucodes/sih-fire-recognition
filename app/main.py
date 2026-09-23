@@ -4,7 +4,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, Response
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
-from app.services.storage_service import storage_service
+from app.services.storage_service import storage_service, detect_state_for_coordinates
 from app.services.osm_service import osm_service
 from app.services.firms_service import firms_service
 from app.services.auth_service import auth_service
@@ -127,6 +127,90 @@ async def dispatch_alert(payload: Dict[str, Any] = Body(...)):
 @app.get("/api/v1/alerts/dispatched")
 async def get_dispatches():
     return {"count": len(alert_dispatcher_service.dispatches), "dispatches": alert_dispatcher_service.list_dispatches()}
+
+# ----------------- NASA FIRMS SYNC ENDPOINT ----------------- #
+@app.get("/api/v1/firms/sync")
+@app.post("/api/v1/firms/sync")
+@app.get("/firms/sync")
+@app.post("/firms/sync")
+async def sync_firms(country: str = Query("IND"), days: int = Query(1), key: Optional[str] = Query(None)):
+    try:
+        raw_hotspots = firms_service.fetch_live_hotspots(country_code=country, days=days, api_key=key)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail={
+            "status": "error",
+            "error": str(e),
+            "message": "NASA FIRMS live synchronization could not proceed."
+        })
+
+    clustered_sources = cluster_firms_hotspots(raw_hotspots, eps_km=1.5)
+    facilities = osm_service.get_all_facilities()
+    synced_sources = []
+
+    for idx, c in enumerate(clustered_sources, start=1):
+        c["source_id"] = f"LIVE_FIRMS_{idx:04d}"
+        c["state"] = detect_state_for_coordinates(c["latitude"], c["longitude"])
+        features = extract_features_for_point(
+            lat=c["latitude"], lon=c["longitude"], frp=c["mean_frp"],
+            detection_count=c["total_detections"], active_days=c["active_days"],
+            facilities=facilities, observation_span_days=c["observation_span_days"]
+        )
+        pred_res = ml_engine.predict_single(features)
+        risk_level, is_flare_anomaly, risk_desc = evaluate_thermal_risk(
+            pred_res["predicted_event_type"], features["min_distance_to_industry_km"],
+            c["mean_frp"], c["max_frp"], c["active_days"], c["total_detections"]
+        )
+
+        if pred_res["predicted_event_type"] == "Industrial" or c.get("max_frp", 0) >= 40.0:
+            sih_alert = "CRITICAL"
+        elif risk_level == "High" or c.get("max_frp", 0) >= 20.0 or c.get("active_days", 0) >= 3:
+            sih_alert = "HIGH"
+        elif risk_level == "Medium":
+            sih_alert = "MEDIUM"
+        else:
+            sih_alert = "LOW"
+
+        c["event_type"] = pred_res["predicted_event_type"]
+        c["predicted_event_type"] = pred_res["predicted_event_type"]
+        c["confidence_pct"] = pred_res["confidence_pct"]
+        c["confidence"] = pred_res["confidence_pct"]
+        c["risk_level"] = risk_level
+        c["risk_description"] = risk_desc
+        c["sih_alert_severity"] = sih_alert
+        c["is_flare_anomaly"] = is_flare_anomaly
+        c["is_persistent"] = c["active_days"] >= 3 or c["total_detections"] >= 5
+        c["nearest_facility_type"] = features["nearest_facility_type"]
+        c["nearest_facility_name"] = features["nearest_facility_name"]
+        c["landcover_class"] = features["landcover_class"]
+
+        act_days = max(1, int(c.get("active_days", 1)))
+        obs_span = max(1, int(c.get("observation_span_days", days)))
+        tot_dets = max(1, int(c.get("total_detections", 1)))
+        is_ind = pred_res["predicted_event_type"] == "Industrial"
+
+        day_ratio = min(1.0, act_days / obs_span)
+        density_ratio = min(1.0, tot_dets / (act_days * 3.0))
+        ind_boost = 25.0 if is_ind else 0.0
+
+        calc_pers = round(min(98.5, max(14.0, (day_ratio * 50.0) + (density_ratio * 25.0) + ind_boost)), 1)
+        c["persistence_score"] = calc_pers
+        synced_sources.append(c)
+
+    storage_service.save_new_sources_batch(synced_sources)
+
+    import time
+    return {
+        "status": "success",
+        "message": f"Successfully ingested {len(raw_hotspots)} NASA FIRMS hotspots, clustered into {len(synced_sources)} persistent/dynamic thermal sources.",
+        "source": f"NASA FIRMS VIIRS NRT ({country})",
+        "observation_window_days": days,
+        "sync_time": time.strftime("%H:%M:%S IST"),
+        "hotspots_count": len(raw_hotspots),
+        "clusters_count": len(synced_sources),
+        "sample_clusters": synced_sources,
+        "clusters": synced_sources,
+        "sources": synced_sources
+    }
 
 # ----------------- PREDICTION ENDPOINT ----------------- #
 @app.get("/predict")
