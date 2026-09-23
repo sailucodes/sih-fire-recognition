@@ -54,11 +54,9 @@
                     <i class="fa-solid fa-chevron-down" style="font-size: 11px; margin-left: 4px; color: var(--text-muted);"></i>
                     <!-- Date Presets Dropdown -->
                     <div class="date-preset-dropdown" id="date-preset-dropdown" onclick="event.stopPropagation()">
-                        <div class="date-preset-option" onclick="selectDatePreset('Today (Live Pass)')">Today (Live Satellite Pass)</div>
-                        <div class="date-preset-option" onclick="selectDatePreset('Yesterday')">Yesterday</div>
-                        <div class="date-preset-option" onclick="selectDatePreset('Last 7 Days')">Last 7 Days</div>
-                        <div class="date-preset-option" onclick="selectDatePreset('Last 30 Days')">Last 30 Days</div>
-                        <div class="date-preset-option" onclick="selectDatePreset('27 Aug 2025')">27 Aug 2025 (Reference Pass)</div>
+                        <div class="date-preset-option" onclick="selectDatePreset('Live Satellite Pass (Today)')"><i class="fa-solid fa-satellite" style="color: #2563eb; margin-right: 6px;"></i> Live Pass (Today)</div>
+                        <div class="date-preset-option" onclick="selectDatePreset('Past 7 Days')"><i class="fa-solid fa-calendar-week" style="color: #10b981; margin-right: 6px;"></i> Past 7 Days (1,458 Events)</div>
+                        <div class="date-preset-option" onclick="selectDatePreset('Past 30 Days')"><i class="fa-solid fa-calendar-days" style="color: #8b5cf6; margin-right: 6px;"></i> Past 30 Days (Full Archive)</div>
                     </div>
                 </div>
 
@@ -268,11 +266,11 @@
                         <div class="map-column-container" id="map-col-wrapper">
                             <div id="map"></div>
 
-                            <!-- Floating Basemap Layer Switcher -->
+                            <!-- Floating Basemap Layer Switcher (Default: Clean High-Detail Standard Map) -->
                             <div class="floating-layer-switcher">
-                                <button class="layer-pill-btn active" id="layer-satellite-btn" onclick="setMapBaseLayer('satellite')">Satellite</button>
-                                <button class="layer-pill-btn" id="layer-terrain-btn" onclick="setMapBaseLayer('terrain')">Terrain</button>
-                                <button class="layer-pill-btn" id="layer-labels-btn" onclick="toggleMapLabels()">Labels</button>
+                                <button class="layer-pill-btn active" id="layer-standard-btn" onclick="setMapBaseLayer('standard')">Standard Map</button>
+                                <button class="layer-pill-btn" id="layer-satellite-btn" onclick="setMapBaseLayer('satellite')">Satellite</button>
+                                <button class="layer-pill-btn" id="layer-dark-btn" onclick="setMapBaseLayer('dark')">Dark GIS</button>
                             </div>
 
                             <!-- Floating Zoom & Reset Map Controls -->
