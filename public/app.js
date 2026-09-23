@@ -14,17 +14,58 @@
  * - Dedicated Login / Logout screen
  */
 
-// Base API URL resolver (handles local file, VS Code Live Server on :5500, or FastAPI on :8000)
+// Base API URL resolver: reads from dynamic runtime config, query param, or env config without hard-coded ports
 function getApiBase() {
-    if (typeof window === "undefined") return "http://127.0.0.1:8000";
-    if (window.location.protocol === "file:") return "http://127.0.0.1:8000";
-    if (window.location.port && window.location.port !== "8000" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")) {
-        return `${window.location.protocol}//${window.location.hostname}:8000`;
+    if (typeof window === "undefined") return "";
+
+    // 1. Explicit API base URL defined in window.__AEROTHERMAL_CONFIG__ (e.g. from /config.js)
+    if (window.__AEROTHERMAL_CONFIG__ && window.__AEROTHERMAL_CONFIG__.apiBaseUrl) {
+        return window.__AEROTHERMAL_CONFIG__.apiBaseUrl.replace(/\/+$/, "");
     }
-    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-        if (window.location.port === "8000") return "";
-        return "http://127.0.0.1:8000";
+
+    // 2. Query param overrides (?api_base=http://... or ?api_port=8001) for testing any backend port
+    try {
+        if (window.location && window.location.search) {
+            const params = new URLSearchParams(window.location.search);
+            const qBase = params.get("api_base");
+            if (qBase) return qBase.replace(/\/+$/, "");
+            const qPort = params.get("api_port");
+            if (qPort) {
+                return `${window.location.protocol}//${window.location.hostname || "127.0.0.1"}:${qPort}`;
+            }
+        }
+    } catch (_) {}
+
+    // 3. LocalStorage persistence override
+    try {
+        const savedBase = localStorage.getItem("thermal_api_base");
+        if (savedBase) return savedBase.replace(/\/+$/, "");
+        const savedPort = localStorage.getItem("thermal_backend_port");
+        if (savedPort && window.location && window.location.hostname) {
+            return `${window.location.protocol}//${window.location.hostname}:${savedPort}`;
+        }
+    } catch (_) {}
+
+    // 4. Configured port from runtime config (defaults to configured backendPort)
+    const configuredPort = (window.__AEROTHERMAL_CONFIG__ && window.__AEROTHERMAL_CONFIG__.backendPort) || 8000;
+
+    // 5. If accessed via HTTP/HTTPS on the same port as the backend, use clean relative path
+    if (window.location && window.location.protocol !== "file:") {
+        const currentPort = window.location.port || (window.location.protocol === "https:" ? "443" : "80");
+        if (String(currentPort) === String(configuredPort)) {
+            return "";
+        }
+        // If served from dev static server (e.g. 5500), target backend on configured port
+        if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+            return `${window.location.protocol}//${window.location.hostname}:${configuredPort}`;
+        }
     }
+
+    // 6. Direct file:/// access fallback to configured port
+    if (window.location && window.location.protocol === "file:") {
+        return `http://127.0.0.1:${configuredPort}`;
+    }
+
     return "";
 }
 

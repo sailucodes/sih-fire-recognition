@@ -1,5 +1,35 @@
-from pydantic_settings import BaseSettings
+import os
 from pathlib import Path
+
+try:
+    from pydantic_settings import BaseSettings
+except ImportError:
+    try:
+        from pydantic import BaseSettings
+    except ImportError:
+        class BaseSettings:
+            def __init__(self, **kwargs):
+                for k, v in self.__class__.__dict__.items():
+                    if not k.startswith("_") and k.isupper():
+                        env_val = os.getenv(k)
+                        if env_val is not None:
+                            try:
+                                if isinstance(v, int):
+                                    setattr(self, k, int(env_val))
+                                elif isinstance(v, float):
+                                    setattr(self, k, float(env_val))
+                                elif isinstance(v, bool):
+                                    setattr(self, k, env_val.lower() in ("true", "1", "yes"))
+                                elif isinstance(v, Path):
+                                    setattr(self, k, Path(env_val))
+                                else:
+                                    setattr(self, k, env_val)
+                            except Exception:
+                                setattr(self, k, env_val)
+                        else:
+                            setattr(self, k, v)
+                for k, v in kwargs.items():
+                    setattr(self, k, v)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -23,6 +53,11 @@ class Settings(BaseSettings):
     # Clustering Parameters (DBSCAN Spatial eps in km, temporal span in hours)
     SPATIAL_CLUSTER_RADIUS_KM: float = 1.5
     TEMPORAL_WINDOW_HOURS: int = 168 # 7 days
+    
+    # Server Network Configuration
+    HOST: str = "0.0.0.0"
+    PORT: int = 8000
+    BACKEND_PORT: int = 8000
     
     class Config:
         case_sensitive = True

@@ -6,6 +6,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 from urllib.parse import urlparse, parse_qs
 from app.api.router import router
+from app.config import settings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "app" / "static"
@@ -61,6 +62,23 @@ class AeroThermalHTTPHandler(BaseHTTPRequestHandler):
             self._send_cors_headers()
             self.end_headers()
             self.wfile.write(SWAGGER_HTML.encode("utf-8"))
+            return
+
+        # 3. Dynamic Runtime Config
+        elif path in ["/config.js", "/api/config.js"]:
+            self.send_response(200)
+            self.send_header("Content-Type", "application/javascript; charset=utf-8")
+            self._send_cors_headers()
+            self.end_headers()
+            port = self.server.server_port
+            host_header = self.headers.get("Host", f"127.0.0.1:{port}")
+            cfg_js = f"""// AeroThermal Dynamic Runtime Config
+window.__AEROTHERMAL_CONFIG__ = {{
+    backendPort: {port},
+    apiBaseUrl: "http://{host_header}"
+}};
+"""
+            self.wfile.write(cfg_js.encode("utf-8"))
             return
 
         # 3. Static Assets (CSS, JS, CSV, Images)
@@ -174,7 +192,14 @@ class AeroThermalHTTPHandler(BaseHTTPRequestHandler):
         # Custom clean logging
         print(f"[API] {self.command} {self.path} - {args[1] if len(args)>1 else ''}")
 
-def start_server(host: str = "0.0.0.0", port: int = 8000):
+def start_server(host: str = None, port: int = None):
+    if host is None:
+        env_host = os.getenv("HOST") or os.getenv("BACKEND_HOST")
+        host = env_host if env_host else settings.HOST
+    if port is None:
+        env_port = os.getenv("PORT") or os.getenv("BACKEND_PORT")
+        port = int(env_port) if env_port else settings.PORT
+
     server = ThreadedHTTPServer((host, port), AeroThermalHTTPHandler)
     print("=" * 70)
     print(f"[FIRE] AeroThermal AI Geospatial Backend Server is LIVE!")
@@ -189,5 +214,6 @@ def start_server(host: str = "0.0.0.0", port: int = 8000):
         server.server_close()
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))
+    env_port = os.getenv("PORT") or os.getenv("BACKEND_PORT")
+    port = int(env_port) if env_port else settings.PORT
     start_server(port=port)
