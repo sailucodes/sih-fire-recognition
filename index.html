@@ -28194,12 +28194,11 @@ function initSmoothLeafletMap() {
         easeLinearity: 0.25
     });
 
-    // 1. Clean High-Detail Standard Map (CartoDB Voyager / OpenStreetMap Clean - Default)
+    // 1. Clean High-Detail Standard Map (OpenStreetMap Standard - Keyless Default)
     // Never fails at high zoom, has full road networks, borders, and state boundaries
-    baseTileStandard = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    baseTileStandard = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
-        subdomains: 'abcd',
-        attribution: '© OpenStreetMap, © CARTO'
+        attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
     // 2. Satellite Tile Layer (Esri World Imagery)
@@ -28497,15 +28496,31 @@ window.manualSyncNasa = async function () {
     }
 };
 
+let activeSyncPromise = null;
+let activeSyncDays = null;
 let currentSyncAbortController = null;
 
-async function syncBackendFirms(days = 1, isManual = false) {
-    // If a sync is already running, cancel it so requests don't collide
-    if (currentSyncAbortController) {
-        currentSyncAbortController.abort();
+function syncBackendFirms(days = 1, isManual = false) {
+    const targetDays = parseInt(days || 1, 10);
+
+    // 1. Single-Flight Guard: If a sync for the exact same days value is already in-flight, return the existing promise
+    if (activeSyncPromise && activeSyncDays === targetDays) {
+        console.log(`[SingleFlight] In-flight sync for ${targetDays} days already running. Reusing existing request.`);
+        return activeSyncPromise;
     }
+
+    // 2. Abort obsolete requests only if the selected period actually changes
+    if (currentSyncAbortController && activeSyncDays !== targetDays) {
+        console.log(`[SingleFlight] Aborting previous sync (${activeSyncDays} days) for new period (${targetDays} days).`);
+        try {
+            currentSyncAbortController.abort();
+        } catch (_) {}
+        currentSyncAbortController = null;
+    }
+
     currentSyncAbortController = new AbortController();
     const signal = currentSyncAbortController.signal;
+    activeSyncDays = targetDays;
 
     const icon = document.getElementById("sync-icon");
     if (icon) icon.classList.add("fa-spin");
@@ -28514,99 +28529,108 @@ async function syncBackendFirms(days = 1, isManual = false) {
     const timeStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + ", " +
                     now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
 
-    setText("nasa-last-update", "Last synced: " + timeStr + (days > 1 ? ` (${days}d window)` : ""));
+    setText("nasa-last-update", "Last synced: " + timeStr + (targetDays > 1 ? ` (${targetDays}d window)` : ""));
 
     const apiBase = getApiBase();
-    const url = `${apiBase}/api/v1/firms/sync?days=${days}`;
+    const url = `${apiBase}/api/v1/firms/sync?days=${targetDays}`;
 
-    try {
-        const res = await fetch(url, { signal });
-        if (!res.ok) {
-            let errorDetail = "";
-            try {
-                const errData = await res.json();
-                errorDetail = errData.error || errData.message || "";
-            } catch (_) {
+    activeSyncPromise = (async () => {
+        try {
+            const res = await fetch(url, { signal });
+            if (!res.ok) {
+                let errorDetail = "";
                 try {
-                    errorDetail = await res.text();
-                } catch (_) {}
+                    const errData = await res.json();
+                    errorDetail = errData.error || errData.message || "";
+                } catch (_) {
+                    try {
+                        errorDetail = await res.text();
+                    } catch (_) {}
+                }
+                throw new Error(`HTTP ${res.status}${errorDetail ? ': ' + errorDetail : ' (' + (res.statusText || 'Backend Error') + ')'}`);
             }
-            throw new Error(`HTTP ${res.status}${errorDetail ? ': ' + errorDetail : ' (' + (res.statusText || 'Backend Error') + ')'}`);
-        }
-        const data = await res.json();
-        const rawSources = data.clusters || data.sources || [];
-        if (!Array.isArray(rawSources)) {
-            throw new Error("Invalid response: 'clusters' array not found");
-        }
+            const data = await res.json();
+            const rawSources = data.clusters || data.sources || [];
+            if (!Array.isArray(rawSources)) {
+                throw new Error("Invalid response: 'clusters' array not found");
+            }
 
-        // Replace allEvents strictly with the backend FIRMS response clusters
-        allEvents = rawSources.map((s, idx) => {
-            const lat = parseFloat(s.latitude);
-            const lng = parseFloat(s.longitude);
-            const type = normalizeType(s.predicted_event_type || s.event_type || "Other");
-            const conf = parseFloat(s.confidence || s.confidence_pct || 80.0);
-            const frp = parseFloat(s.mean_frp || s.frp || 15.0);
-            const maxFrp = parseFloat(s.max_frp || frp);
-            const persScore = parseFloat(s.persistence_score || (s.is_persistent ? 85.0 : 40.0));
-            const state = s.state || getNearestState(lat, lng);
-            const risk = s.risk_level || (type === "Industrial" && conf >= 85 ? "Critical" : (frp >= 25 ? "High" : "Medium"));
+            // Replace allEvents strictly with the backend FIRMS response clusters
+            allEvents = rawSources.map((s, idx) => {
+                const lat = parseFloat(s.latitude);
+                const lng = parseFloat(s.longitude);
+                const type = normalizeType(s.predicted_event_type || s.event_type || "Other");
+                const conf = parseFloat(s.confidence || s.confidence_pct || 80.0);
+                const frp = parseFloat(s.mean_frp || s.frp || 15.0);
+                const maxFrp = parseFloat(s.max_frp || frp);
+                const persScore = parseFloat(s.persistence_score || (s.is_persistent ? 85.0 : 40.0));
+                const state = s.state || getNearestState(lat, lng);
+                const risk = s.risk_level || (type === "Industrial" && conf >= 85 ? "Critical" : (frp >= 25 ? "High" : "Medium"));
 
-            return {
-                source_id: s.source_id || `FIRMS_${String(idx + 1).padStart(4, "0")}`,
-                state: state,
-                latitude: lat,
-                longitude: lng,
-                predicted_event_type: type,
-                confidence: conf,
-                confidence_pct: conf,
-                persistence_score: persScore,
-                landcover: s.landcover_class || s.landcover || "Built-up",
-                landcover_class: s.landcover_class || s.landcover || "Built-up",
-                mean_frp: frp,
-                max_frp: maxFrp,
-                risk_level: risk,
-                risk_description: s.risk_description || "",
-                sih_alert_severity: s.sih_alert_severity || (risk === "Critical" ? "CRITICAL" : "LOW"),
-                nearest_facility_name: s.nearest_facility_name || "",
-                nearest_facility_type: s.nearest_facility_type || "",
-                total_detections: parseInt(s.total_detections || 1, 10),
-                active_days: parseInt(s.active_days || 1, 10),
-                is_persistent: Boolean(s.is_persistent),
-                is_flare_anomaly: Boolean(s.is_flare_anomaly),
-                acq_time: s.acq_time || "09:30"
-            };
-        });
+                return {
+                    source_id: s.source_id || `FIRMS_${String(idx + 1).padStart(4, "0")}`,
+                    state: state,
+                    latitude: lat,
+                    longitude: lng,
+                    predicted_event_type: type,
+                    confidence: conf,
+                    confidence_pct: conf,
+                    persistence_score: persScore,
+                    landcover: s.landcover_class || s.landcover || "Built-up",
+                    landcover_class: s.landcover_class || s.landcover || "Built-up",
+                    mean_frp: frp,
+                    max_frp: maxFrp,
+                    risk_level: risk,
+                    risk_description: s.risk_description || "",
+                    sih_alert_severity: s.sih_alert_severity || (risk === "Critical" ? "CRITICAL" : "LOW"),
+                    nearest_facility_name: s.nearest_facility_name || "",
+                    nearest_facility_type: s.nearest_facility_type || "",
+                    total_detections: parseInt(s.total_detections || 1, 10),
+                    active_days: parseInt(s.active_days || 1, 10),
+                    is_persistent: Boolean(s.is_persistent),
+                    is_flare_anomaly: Boolean(s.is_flare_anomaly),
+                    acq_time: s.acq_time || "09:30"
+                };
+            });
 
-        // Set filteredEvents to active dataset & reset table pagination
-        filteredEvents = [...allEvents];
-        eventsCurrentPage = 1;
-        updateDashboard();
+            // Set filteredEvents to active dataset & reset table pagination
+            filteredEvents = [...allEvents];
+            eventsCurrentPage = 1;
+            updateDashboard();
 
-        const label = days === 1 ? "Live Satellite Pass (Today)" : `Past ${days} Days`;
-        showToast(`Loaded ${label}: ${allEvents.length} real thermal sources classified by AI!`, "success");
-        return allEvents.length;
-    } catch (err) {
-        if (err.name === "AbortError") {
-            console.log("[Live Sync] Request aborted for newer selection.");
-            return 0;
-        }
-        console.error("[Live Sync] Backend sync error:", err);
-        showToast(`Backend connection failed: ${err.message}`, "error");
+            const label = targetDays === 1 ? "Live Satellite Pass (Today)" : `Past ${targetDays} Days`;
+            showToast(`Loaded ${label}: ${allEvents.length} real thermal sources classified by AI!`, "success");
+            return allEvents.length;
+        } catch (err) {
+            if (err.name === "AbortError") {
+                console.log(`[SingleFlight] Sync for ${targetDays} days aborted.`);
+                return 0;
+            }
+            console.error("[Live Sync] Backend sync error:", err);
+            showToast(`Backend connection failed: ${err.message}`, "error");
 
-        // Never fake or load 563 ground truth on sync failure
-        if (allEvents.length === 0) {
-            setText("stat-total-sources", "--");
-            const alertsList = document.getElementById("recent-alerts-dashboard-list");
-            if (alertsList) {
-                alertsList.innerHTML = `<div style="text-align: center; color: var(--danger-color); padding: 20px; font-size: 13px;"><i class="fa-solid fa-triangle-exclamation"></i> Telemetry sync failed (${escapeHTML(err.message)}). Ensure backend server is running on port 8000.</div>`;
+            // Never fake or load 563 ground truth on sync failure
+            if (allEvents.length === 0) {
+                setText("stat-total-sources", "--");
+                const alertsList = document.getElementById("recent-alerts-dashboard-list");
+                if (alertsList) {
+                    alertsList.innerHTML = `<div style="text-align: center; color: var(--danger-color); padding: 20px; font-size: 13px;"><i class="fa-solid fa-triangle-exclamation"></i> Telemetry sync failed (${escapeHTML(err.message)}). Ensure backend server is running.</div>`;
+                }
+            }
+            throw err;
+        } finally {
+            if (activeSyncDays === targetDays) {
+                activeSyncPromise = null;
+                activeSyncDays = null;
+                currentSyncAbortController = null;
+            }
+            if (icon) {
+                setTimeout(() => icon.classList.remove("fa-spin"), 600);
             }
         }
-        throw err;
-    } finally {
-        if (icon) {
-            setTimeout(() => icon.classList.remove("fa-spin"), 600);
-        }
-    }
+    })();
+
+    return activeSyncPromise;
 }
 
 // Alias for backwards compatibility
