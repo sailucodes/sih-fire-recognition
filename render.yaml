@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: sih-fire-recognition-backend
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python run.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: HOST
+        value: 0.0.0.0
+      - key: NASA_FIRMS_MAP_KEY
+        sync: false
