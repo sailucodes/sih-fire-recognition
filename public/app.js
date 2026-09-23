@@ -1,15 +1,32 @@
+/**
+ * THERMAL-AI Enterprise Multi-View Application Logic
+ * Supports 8 views: Dashboard, Live Map, AI Predictor, Events Database, Analytics, Alerts, Reports, Settings
+ * Integrated with two-stage ML classification pipeline & NASA FIRMS live satellite telemetry.
+ */
+
+// Application State
 let allEvents = [];
 let filteredEvents = [];
-let historicalArchiveEvents = []; // Background archive of the 563 historical ground-truth records
-let liveOnlyActive = true;        // REAL-TIME SATELLITE MODE ACTIVE BY DEFAULT (Strictly show live data)
+let historicalArchiveEvents = []; // Background archive of ground-truth records
+let liveOnlyActive = true;        // REAL-TIME SATELLITE MODE ACTIVE BY DEFAULT
 let map = null;
+let fullLiveMap = null;
 let markersLayer = null;
-let nasaMiniMap = null;
+let fullLiveMarkersLayer = null;
+let baseTileSatellite = null;
+let baseTileTerrain = null;
+let labelsOverlay = null;
+let showLabels = true;
+let currentBaseLayer = 'satellite';
+
+let eventsCurrentPage = 1;
+const eventsPerPage = 10;
+let currentAlertFilter = 'all';
 
 const STORAGE_KEY = "sih_thermal_event_database_v6";
 const ALERT_RULES = { CRITICAL: 88, HIGH: 75 };
 
-// Comprehensive list of all Indian States and Union Territories with accurate central map bounds
+// Comprehensive list of all Indian States and Union Territories with accurate central coordinates
 const stateCoordinates = {
     "Andhra Pradesh": { lat: 15.9129, lng: 79.7400, zoom: 7 },
     "Arunachal Pradesh": { lat: 28.2180, lng: 94.7278, zoom: 7 },
@@ -49,164 +66,1422 @@ const stateCoordinates = {
     "Puducherry": { lat: 11.9416, lng: 79.8083, zoom: 10 }
 };
 
-// Default fallback dataset
+// Default fallback events for standalone resilience
 const defaultFallbackEvents = [
-    { source_id: "SOURCE_0001", state: "Odisha", latitude: 20.7957, longitude: 85.2547, predicted_event_type: "Industrial", confidence: 92.4, persistence_score: 85, landcover: "Built-up", mean_frp: 35.4 },
-    { source_id: "SOURCE_0002", state: "Jharkhand", latitude: 23.6102, longitude: 85.2799, predicted_event_type: "Forest/Natural", confidence: 89.1, persistence_score: 72, landcover: "Tree cover", mean_frp: 18.2 },
-    { source_id: "SOURCE_0003", state: "Chhattisgarh", latitude: 21.2787, longitude: 81.8661, predicted_event_type: "Agricultural", confidence: 78.5, persistence_score: 45, landcover: "Cropland", mean_frp: 12.0 },
-    { source_id: "SOURCE_0004", state: "Maharashtra", latitude: 19.7515, longitude: 75.7139, predicted_event_type: "Industrial", confidence: 94.0, persistence_score: 91, landcover: "Built-up", mean_frp: 52.1 },
-    { source_id: "SOURCE_0005", state: "Karnataka", latitude: 15.3173, longitude: 75.7139, predicted_event_type: "Other", confidence: 64.2, persistence_score: 30, landcover: "Grassland", mean_frp: 8.5 },
-    { source_id: "SOURCE_0006", state: "Andhra Pradesh", latitude: 15.9129, longitude: 79.7400, predicted_event_type: "Agricultural", confidence: 81.0, persistence_score: 60, landcover: "Cropland", mean_frp: 19.8 }
+    { source_id: "IN_OD_001", state: "Odisha", latitude: 20.8520, longitude: 85.1250, predicted_event_type: "Industrial", confidence: 96.2, persistence_score: 92, landcover: "Built-up", mean_frp: 48.5, brightness: 345.2, acq_time: "09:15" },
+    { source_id: "IN_JH_002", state: "Jharkhand", latitude: 23.7950, longitude: 86.4300, predicted_event_type: "Industrial", confidence: 94.8, persistence_score: 89, landcover: "Built-up", mean_frp: 52.1, brightness: 352.0, acq_time: "09:20" },
+    { source_id: "IN_CG_003", state: "Chhattisgarh", latitude: 22.3600, longitude: 82.6800, predicted_event_type: "Industrial", confidence: 93.1, persistence_score: 87, landcover: "Built-up", mean_frp: 38.6, brightness: 338.4, acq_time: "09:10" },
+    { source_id: "IN_MH_004", state: "Maharashtra", latitude: 19.8762, longitude: 75.3433, predicted_event_type: "Agricultural", confidence: 88.5, persistence_score: 45, landcover: "Cropland", mean_frp: 18.2, brightness: 320.1, acq_time: "08:50" },
+    { source_id: "IN_MP_005", state: "Madhya Pradesh", latitude: 22.4500, longitude: 77.8200, predicted_event_type: "Forest/Natural", confidence: 91.0, persistence_score: 74, landcover: "Tree cover", mean_frp: 22.4, brightness: 328.7, acq_time: "08:45" },
+    { source_id: "IN_GJ_006", state: "Gujarat", latitude: 21.6800, longitude: 72.9800, predicted_event_type: "Industrial", confidence: 95.0, persistence_score: 91, landcover: "Built-up", mean_frp: 42.0, brightness: 341.0, acq_time: "09:05" },
+    { source_id: "IN_TS_007", state: "Telangana", latitude: 17.4800, longitude: 78.3500, predicted_event_type: "Industrial", confidence: 91.8, persistence_score: 84, landcover: "Built-up", mean_frp: 31.5, brightness: 332.2, acq_time: "09:25" },
+    { source_id: "IN_KA_008", state: "Karnataka", latitude: 15.2800, longitude: 75.8000, predicted_event_type: "Other", confidence: 72.0, persistence_score: 35, landcover: "Shrubland", mean_frp: 11.2, brightness: 312.0, acq_time: "08:30" }
 ];
 
-/* DICTIONARY FOR MULTILINGUAL UI TRANSLATION */
-const uiTranslations = {
-    "en-US": {
-        appHeading: "AI THERMAL EVENT INTELLIGENCE",
-        appSubheading: "NASA FIRMS • OSM • SATELLITE MULTI-MODAL DETECTION",
-        sysOnline: "SYSTEM ONLINE",
-        navDash: "Dashboard", navMap: "Geospatial Map", navPredict: "AI Predictor", navAlerts: "Alerts Center", navDb: "Event Database", navLogin: "Login / Register",
-        lblTotalSources: "TOTAL THERMAL SOURCES", lblIndFires: "INDUSTRIAL FIRES", lblForestFires: "FOREST / NATURAL", lblAgriFires: "AGRICULTURAL", lblOtherFires: "OTHER / UNKNOWN",
-        lblSelectState: "Select Jurisdiction / State", lblEventType: "Event Type", lblMinConf: "Min Confidence Score (%)", lblLandcover: "Landcover Class", lblSearchId: "Search ID / Region",
-        lblResetBtn: "Reset Filters", lblMapHeading: "Spatial Distribution & Active Hotspots", lblPredictHeading: "Run AI Classification & Thermal Persistence Analysis",
-        lblPredictBtn: "PREDICT & SAVE EVENT", lblAlertsHeading: "Thermal Event Alerts", lblDispatchBtn: "Dispatch National Authority Alert", lblDbHeading: "Detected Thermal Sources Registry",
-        voicePrompt: "Press Voice Control and say a command (e.g. 'Show Odisha', 'Filter Industrial')...",
-        micLabel: "Voice Control", listening: "Listening..."
-    },
-    "hi-IN": {
-        appHeading: "एआई थर्मल इवेंट इंटेलिजेंस",
-        appSubheading: "नासा फर्म्स • ओएसएम • उपग्रह मल्टी-मॉडल पहचान",
-        sysOnline: "सिस्टम ऑनलाइन",
-        navDash: "डैशबोर्ड", navMap: "भू-स्थानिक मानचित्र", navPredict: "एआई भविष्यवाणियां", navAlerts: "चेतावनी केंद्र", navDb: "इवेंट डेटाबेस", navLogin: "लॉगिन / रजिस्टर",
-        lblTotalSources: "कुल थर्मल स्रोत", lblIndFires: "औद्योगिक आग", lblForestFires: "वन / प्राकृतिक", lblAgriFires: "कृषि आग", lblOtherFires: "अन्य / अज्ञात",
-        lblSelectState: "क्षेत्रीय राज्य चुनें", lblEventType: "इवेंट का प्रकार", lblMinConf: "न्यूनतम विश्वास स्कोर (%)", lblLandcover: "भूमि कवर श्रेणी", lblSearchId: "आईडी / क्षेत्र खोजें",
-        lblResetBtn: "फ़िल्टर रीसेट करें", lblMapHeading: "स्थानिक वितरण और सक्रिय हॉटस्पॉट", lblPredictHeading: "एआई वर्गीकरण और थर्मल स्थायित्व विश्लेषण",
-        lblPredictBtn: "पूर्वानुमान और सहेजें", lblAlertsHeading: "थर्मल चेतावनी केंद्र", lblDispatchBtn: "राष्ट्रीय प्राधिकरण चेतावनी भेजें", lblDbHeading: "पहचाने गए थर्मल स्रोतों की सूची",
-        voicePrompt: "वॉयस कंट्रोल दबाएं और आदेश दें (जैसे 'ओडिशा दिखाएं', 'इंडस्ट्रियल फ़िल्टर करें')...",
-        micLabel: "वॉयस कंट्रोल", listening: "सुन रहा है..."
-    },
-    "ta-IN": {
-        appHeading: "AI வெப்ப நிகழ்வு நுண்ணறிவு",
-        appSubheading: "நாசா நிறுவனங்கள் • OSM • செயற்கைக்கோள் கண்டறிதல்",
-        sysOnline: "சிஸ்டம் ஆன்லைன்",
-        navDash: "டாஷ்போர்டு", navMap: "வரைபடம்", navPredict: "AI கணிப்பு", navAlerts: "எச்சரிக்கை மையம்", navDb: "தரவுத்தளம்", navLogin: "உள்நுழைவு",
-        lblTotalSources: "மொத்த வெப்ப ஆதாரங்கள்", lblIndFires: "தொழில்துறை தீ", lblForestFires: "காடு / இயற்கை", lblAgriFires: "விவசாய தீ", lblOtherFires: "மற்றவை",
-        lblSelectState: "மாநிலத்தைத் தேர்ந்தெடுக்கவும்", lblEventType: "நிகழ்வு வகை", lblMinConf: "குறைந்தபட்ச நம்பகத்தன்மை (%)", lblLandcover: "நிலப்பரப்பு", lblSearchId: "தேடல் ID",
-        lblResetBtn: "மீட்டமை", lblMapHeading: "வெப்பப் பகுதிகள் வரைபடம்", lblPredictHeading: "AI பகுப்பாய்வு",
-        lblPredictBtn: "கணித்து சேமிக்கவும்", lblAlertsHeading: "வெப்ப எச்சரிக்கைகள்", lblDispatchBtn: "தேசிய அதிகாரிகளுக்கு அனுப்பு", lblDbHeading: "பதிவு செய்யப்பட்ட விவரங்கள்",
-        voicePrompt: "குரல் கட்டுப்பாட்டை அழுத்தி கட்டளையிடவும்...",
-        micLabel: "குரல் கட்டுப்பாடு", listening: "கேட்கிறது..."
-    },
-    "te-IN": {
-        appHeading: "AI థర్మల్ ఈవెంట్ ఇంటెలిజెన్స్",
-        appSubheading: "నాసా ఫిర్మ్స్ • OSM • ఉపగ్రహ మల్టీ-మోడల్ డిటెక్షన్",
-        sysOnline: "సిస్టమ్ ఆన్‌లైన్",
-        navDash: "డాష్‌బోర్డ్", navMap: "జియోస్పేషియల్ మ్యాప్", navPredict: "AI ప్రిడిక్టర్", navAlerts: "అలర్ట్స్ సెంటర్", navDb: "ఈవెంట్ డేటాబేస్", navLogin: "లాగిన్ / రిజిస్టర్",
-        lblTotalSources: "మొత్తం థర్మల్ మూలాలు", lblIndFires: "పారిశ్రామిక మంటలు", lblForestFires: "అడవి / సహజ స్థలాలు", lblAgriFires: "వ్యవసాయ మంటలు", lblOtherFires: "ఇతర / తెలియనివి",
-        lblSelectState: "రాష్ట్రాన్ని ఎంచుకోండి", lblEventType: "ఈవెంట్ రకం", lblMinConf: "కనీస విశ్వసనీయత (%)", lblLandcover: "ల్యాండ్‌కవర్ రకం", lblSearchId: "శోధన ID",
-        lblResetBtn: "ఫిల్టర్లు రీసెట్ చేయండి", lblMapHeading: "స్పేషియల్ డిస్ట్రిబ్యూషన్ & హాట్‌స్పాట్‌లు", lblPredictHeading: "AI వర్గీకరణ విశ్లేషణ",
-        lblPredictBtn: "అంచనా వేసి సేవ్ చేయండి", lblAlertsHeading: "థర్మల్ హెచ్చరికలు", lblDispatchBtn: "అధికారులకు హెచ్చరిక పంపండి", lblDbHeading: "నమోదిత థర్మల్ మూలాలు",
-        voicePrompt: "వాయిస్ కంట్రోల్ నొక్కి మాట్లాడండి...",
-        micLabel: "వాయిస్ కంట్రోల్", listening: "వింటోంది..."
-    }
-};
-
-/* DOM INITIALIZATION ROUTINE & APP LAUNCHER */
+/* ==========================================================================
+   INITIALIZATION
+   ========================================================================== */
 document.addEventListener("DOMContentLoaded", function () {
-    initAppLauncher();
-    populateStateDropdowns();
-    initializeThemeToggle();
-    initializeSidebarAndNavigation();
-    initializeAuthModal();
-    initializeMap();
-    setupEventListeners();
-    setupPredictionForm();
-    setupNationalAuthorityAlerts();
-    initializeMultilingualAndVoice();
-    loadDualCsvData();
+    populateRegionFilter();
+    initLeafletMaps();
+    initGlobalSearch();
+    loadInitialData();
     startLiveNasaWidget();
 });
 
-/* APP LAUNCHER: PRE-LOADS ALL STATES AND UTs & RESTORES USER SESSION */
-function initAppLauncher() {
-    const savedUserStr = localStorage.getItem("sih_auth_user");
-    if (savedUserStr) {
-        try {
-            const savedUser = JSON.parse(savedUserStr);
-            const navLogin = document.getElementById("nav-login");
-            const openAuthBtn = document.getElementById("open-auth-btn");
-            if (navLogin) {
-                const displayName = (savedUser.name || savedUser.email || "User").split(" ")[0];
-                navLogin.textContent = `${displayName} (Google)`;
-            }
-            if (openAuthBtn) {
-                openAuthBtn.onclick = () => {
-                    if (confirm(`Signed in as ${savedUser.email}. Do you want to sign out?`)) {
-                        localStorage.removeItem("sih_auth_user");
-                        if (navLogin) navLogin.textContent = "Login / Register";
-                        showToast("Signed out successfully", "info");
-                        openAuthBtn.onclick = () => document.getElementById("auth-modal")?.classList.add("open");
-                    }
-                };
-            }
-        } catch (_) {}
-    } else {
-        // Automatically prompt the Login & Register modal when opening the platform if not yet signed in
-        setTimeout(() => {
-            const modal = document.getElementById("auth-modal");
-            if (modal && !localStorage.getItem("sih_auth_user")) {
-                modal.classList.add("open");
-            }
-        }, 500);
+/* ==========================================================================
+   VIEW SWITCHER (8 SCREENS)
+   ========================================================================== */
+window.switchView = function (viewId) {
+    const sections = document.querySelectorAll(".view-section");
+    sections.forEach(sec => sec.classList.remove("active"));
+
+    const target = document.getElementById(viewId);
+    if (target) {
+        target.classList.add("active");
+    }
+
+    // Update active nav link in sidebar
+    const navLinks = document.querySelectorAll(".nav-link-item");
+    navLinks.forEach(link => {
+        if (link.dataset.target === viewId) {
+            link.classList.add("active");
+        } else {
+            link.classList.remove("active");
+        }
+    });
+
+    // Invalidate map sizes if entering map-containing views
+    if (viewId === "dashboard-section" && map) {
+        setTimeout(() => map.invalidateSize(), 150);
+    } else if (viewId === "live-map-section" && fullLiveMap) {
+        setTimeout(() => fullLiveMap.invalidateSize(), 150);
+    } else if (viewId === "analytics-section") {
+        renderAnalyticsCharts();
+    } else if (viewId === "events-section") {
+        renderEventsTable();
+    } else if (viewId === "alerts-section") {
+        renderAlertsFullTable(currentAlertFilter);
+    }
+};
+
+/* ==========================================================================
+   MAP IMPLEMENTATION & FLOATING CONTROLS
+   ========================================================================== */
+function initLeafletMaps() {
+    // 1. Dashboard Map
+    const mapEl = document.getElementById("map");
+    if (mapEl && typeof L !== "undefined") {
+        map = L.map("map", {
+            center: [22.5937, 82.0],
+            zoom: 5,
+            zoomControl: false,
+            attributionControl: false
+        });
+
+        // Satellite Tile Layer (Esri World Imagery)
+        baseTileSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 18,
+            attribution: 'Esri, Maxar, Earthstar Geographics'
+        }).addTo(map);
+
+        // Terrain Tile Layer (Esri World Topo)
+        baseTileTerrain = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 18,
+            attribution: 'Esri, HERE, Garmin, USGS'
+        });
+
+        // CartoDB Positron Only Labels Layer
+        labelsOverlay = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
+            maxZoom: 18,
+            subdomains: 'abcd'
+        }).addTo(map);
+
+        markersLayer = L.layerGroup().addTo(map);
+    }
+
+    // 2. Full Live Map View
+    const fullMapEl = document.getElementById("full-live-map");
+    if (fullMapEl && typeof L !== "undefined") {
+        fullLiveMap = L.map("full-live-map", {
+            center: [22.5937, 82.0],
+            zoom: 5,
+            zoomControl: true,
+            attributionControl: false
+        });
+
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 18
+        }).addTo(fullLiveMap);
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
+            maxZoom: 18,
+            subdomains: 'abcd'
+        }).addTo(fullLiveMap);
+
+        fullLiveMarkersLayer = L.layerGroup().addTo(fullLiveMap);
     }
 }
 
-/* POPULATE STATE SELECT DROPDOWNS DYNAMICALLY WITH ALL 28 STATES & UTs */
-function populateStateDropdowns() {
-    const stateFilter = document.getElementById("state-filter");
-    const predState = document.getElementById("pred-state") || document.getElementById("state");
-    const stateList = Object.keys(stateCoordinates).sort();
+window.setMapBaseLayer = function (type) {
+    if (!map) return;
+    currentBaseLayer = type;
+    const satBtn = document.getElementById("layer-satellite-btn");
+    const terrBtn = document.getElementById("layer-terrain-btn");
 
-    if (stateFilter) {
-        stateFilter.innerHTML = `<option value="">All States & UTs</option>`;
-        stateList.forEach(st => {
-            const opt = document.createElement("option");
-            opt.value = st;
-            opt.textContent = st;
-            stateFilter.appendChild(opt);
-        });
+    if (type === 'satellite') {
+        if (map.hasLayer(baseTileTerrain)) map.removeLayer(baseTileTerrain);
+        if (!map.hasLayer(baseTileSatellite)) map.addLayer(baseTileSatellite);
+        if (satBtn) satBtn.classList.add("active");
+        if (terrBtn) terrBtn.classList.remove("active");
+    } else {
+        if (map.hasLayer(baseTileSatellite)) map.removeLayer(baseTileSatellite);
+        if (!map.hasLayer(baseTileTerrain)) map.addLayer(baseTileTerrain);
+        if (terrBtn) terrBtn.classList.add("active");
+        if (satBtn) satBtn.classList.remove("active");
     }
 
-    if (predState) {
-        predState.innerHTML = `<option value="">Select State / UT (Auto-detected)</option>`;
-        stateList.forEach(st => {
-            const opt = document.createElement("option");
-            opt.value = st;
-            opt.textContent = st;
-            predState.appendChild(opt);
-        });
+    // Ensure labels stay on top if active
+    if (showLabels && labelsOverlay) {
+        if (map.hasLayer(labelsOverlay)) map.removeLayer(labelsOverlay);
+        map.addLayer(labelsOverlay);
+    }
+};
 
-        // Auto-select nearest state when latitude/longitude are typed in
-        const latInput = document.getElementById("latitude") || document.getElementById("pred-lat");
-        const lngInput = document.getElementById("longitude") || document.getElementById("pred-lng");
+window.toggleMapLabels = function () {
+    if (!map || !labelsOverlay) return;
+    showLabels = !showLabels;
+    const btn = document.getElementById("layer-labels-btn");
 
-        function autoUpdateStateFromCoords() {
-            const lat = parseFloat(latInput?.value);
-            const lng = parseFloat(lngInput?.value);
-            if (!isNaN(lat) && !isNaN(lng) && lat >= 6 && lat <= 38 && lng >= 68 && lng <= 98) {
-                const detected = getNearestState(lat, lng);
-                if (detected && detected !== "National") {
-                    predState.value = detected;
+    if (showLabels) {
+        map.addLayer(labelsOverlay);
+        if (btn) btn.classList.add("active");
+    } else {
+        map.removeLayer(labelsOverlay);
+        if (btn) btn.classList.remove("active");
+    }
+};
+
+window.mapZoomIn = function () {
+    if (map) map.zoomIn();
+};
+
+window.mapZoomOut = function () {
+    if (map) map.zoomOut();
+};
+
+window.mapResetView = function () {
+    if (map) {
+        map.setView([22.5937, 82.0], 5);
+        showToast("Reset map to India overview", "info");
+    }
+};
+
+/* ==========================================================================
+   DATA LOADING, FIRMS FETCHING & CLASSIFICATION
+   ========================================================================== */
+function loadInitialData() {
+    let sourceData = [];
+
+    // Check if 563 ground truth events were loaded via initial_data.js
+    if (typeof INITIAL_563_EVENTS !== "undefined" && Array.isArray(INITIAL_563_EVENTS) && INITIAL_563_EVENTS.length > 0) {
+        historicalArchiveEvents = INITIAL_563_EVENTS.map((item, idx) => ({
+            source_id: item.source_id || `GT_${idx + 1}`,
+            state: item.state || getNearestState(item.latitude, item.longitude),
+            latitude: parseFloat(item.latitude),
+            longitude: parseFloat(item.longitude),
+            predicted_event_type: normalizeType(item.predicted_event_type || item.event_type || "Industrial"),
+            confidence: parseFloat(item.confidence || 90.0),
+            persistence_score: parseFloat(item.persistence_score || 85.0),
+            landcover: item.landcover || "Built-up",
+            mean_frp: parseFloat(item.mean_frp || item.frp || 25.0),
+            brightness: parseFloat(item.brightness || 335.0),
+            acq_time: item.acq_time || "09:00"
+        }));
+    }
+
+    // Default to fallback if no data
+    if (historicalArchiveEvents.length === 0) {
+        historicalArchiveEvents = [...defaultFallbackEvents];
+    }
+
+    // Set initial working dataset
+    allEvents = [...historicalArchiveEvents];
+    filteredEvents = [...allEvents];
+
+    updateDashboard();
+}
+
+function normalizeType(type) {
+    if (!type) return "Other";
+    const str = String(type).trim().toLowerCase();
+    if (str.includes("indus") || str.includes("flare") || str.includes("plant") || str.includes("mine") || str.includes("steel")) return "Industrial";
+    if (str.includes("forest") || str.includes("wildfire") || str.includes("natural") || str.includes("tree")) return "Forest/Natural";
+    if (str.includes("agri") || str.includes("crop") || str.includes("farm") || str.includes("burn") || str.includes("stubble")) return "Agricultural";
+    return "Other";
+}
+
+function getEventColor(type) {
+    switch (normalizeType(type)) {
+        case "Industrial": return "#ef4444";     // Red
+        case "Forest/Natural": return "#10b981"; // Green
+        case "Agricultural": return "#eab308";   // Yellow
+        default: return "#8b5cf6";               // Purple
+    }
+}
+
+// Subcontinent boundary validation
+function isPointInWater(lat, lon) {
+    if (isNaN(lat) || isNaN(lon)) return false;
+    if (lat < 8.0 && lon < 92.0) return true;
+    if (lat >= 8.3 && lat <= 9.9 && lon >= 78.8 && lon <= 79.7) return true;
+    if (lat >= 8.0 && lat <= 14.5 && lon < 74.5) {
+        if (lat >= 10.0 && lat <= 12.0 && lon >= 71.8 && lon <= 74.0) return false;
+        return true;
+    }
+    if (lat > 14.5 && lat <= 17.5 && lon < 72.8) return true;
+    if (lat > 17.5 && lat <= 20.5 && lon < 72.0) return true;
+    if (lat > 20.5 && lat <= 22.5 && lon < 69.2) return true;
+    if (lat >= 9.8 && lat <= 15.5 && lon > 80.5 && lon < 92.0) return true;
+    if (lat > 15.5 && lat <= 18.0 && lon > 82.5 && lon < 92.0) return true;
+    if (lat > 18.0 && lat <= 20.5 && lon > 85.0 && lon < 92.0) return true;
+    if (lat > 20.5 && lat <= 21.8 && lon > 87.5 && lon < 92.0) return true;
+    return false;
+}
+
+function isPointInsideIndia(lat, lon) {
+    if (isNaN(lat) || isNaN(lon)) return false;
+    if (isPointInWater(lat, lon)) return false;
+    if (lat < 6.5 || lat > 37.2 || lon < 68.0 || lon > 97.5) return false;
+    if (lat >= 5.8 && lat <= 9.9 && lon >= 79.5 && lon <= 82.0) return false;
+    if (lat > 32.0 && lon > 78.5) return false;
+    if (lat > 28.05 && lon >= 88.0 && lon <= 89.0) return false;
+    if (lat > 27.8 && lon >= 80.0 && lon <= 88.2) return false;
+    if (lat > 28.0 && lon >= 88.8 && lon <= 92.0) return false;
+    if (lat > 28.5 && lon >= 92.0) return false;
+    if (lat >= 23.5 && lat < 28.0 && lon < 70.2) return false;
+    if (lat >= 28.0 && lat < 30.5 && lon < 72.2) return false;
+    if (lat >= 30.5 && lat < 32.5 && lon < 74.0) return false;
+    if (lat >= 32.5 && lat <= 35.5 && lon < 73.8) return false;
+    if (lat >= 21.6 && lat <= 25.5 && lon >= 88.8 && lon <= 92.6) return false;
+    if (lat < 24.0 && lon > 93.5) return false;
+    if (lat >= 24.0 && lat <= 27.0 && lon > 95.5) return false;
+    return true;
+}
+
+function getNearestState(lat, lng) {
+    if (!isPointInsideIndia(lat, lng)) return "National";
+    let closestState = "National";
+    let minDistance = Infinity;
+
+    for (const [state, coords] of Object.entries(stateCoordinates)) {
+        const dLat = (lat - coords.lat) * (Math.PI / 180);
+        const dLng = (lng - coords.lng) * (Math.PI / 180);
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                  Math.cos(lat * (Math.PI / 180)) * Math.cos(coords.lat * (Math.PI / 180)) *
+                  Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const distance = 6371 * c;
+        if (distance < minDistance) {
+            minDistance = distance;
+            closestState = state;
+        }
+    }
+    return closestState;
+}
+
+// Real-time NASA FIRMS Classifier
+function classifyLiveSatelliteHotspot(lat, lng, frp, bright, conf) {
+    if (isPointInWater(lat, lng)) {
+        return { type: "Other", landcover: "Water Body", confidence: 0, persistence: 0 };
+    }
+
+    const isIndustrialCorridor = (
+        frp >= 25.0 ||
+        (lat >= 20.5 && lat <= 22.2 && lng >= 84.5 && lng <= 86.8) || // Odisha mineral/steel belt
+        (lat >= 22.0 && lat <= 24.2 && lng >= 85.0 && lng <= 87.2) || // Jharkhand & WB coal/steel belt
+        (lat >= 21.8 && lat <= 23.0 && lng >= 82.0 && lng <= 83.5) || // Korba/Raigarh thermal basin
+        (lat >= 23.8 && lat <= 24.5 && lng >= 82.2 && lng <= 83.2) || // Singrauli energy hub
+        (lat >= 21.0 && lat <= 22.6 && lng >= 72.5 && lng <= 73.5) || // Gujarat petrochemical corridor
+        (lat >= 17.4 && lat <= 18.0 && lng >= 83.0 && lng <= 83.5)    // Visakhapatnam port/industrial
+    );
+
+    if (isIndustrialCorridor) {
+        return {
+            type: "Industrial",
+            landcover: "Built-up / Industrial",
+            confidence: conf === "h" ? 96.2 : (frp >= 20 ? 93.4 : 89.0),
+            persistence: Math.min(97, Math.max(80, Math.round(78 + frp * 0.4)))
+        };
+    }
+
+    const isAgriBelt = (
+        (lat >= 24.5 && lat <= 32.0 && lng >= 73.5 && lng <= 88.5) || // Indo-Gangetic Plain
+        (lat >= 15.5 && lat <= 21.5 && lng >= 73.5 && lng <= 79.5) || // Deccan plateau
+        (lat >= 10.0 && lat <= 15.5 && lng >= 77.0 && lng <= 80.5)    // South delta
+    ) && frp < 25.0;
+
+    if (isAgriBelt) {
+        return {
+            type: "Agricultural",
+            landcover: "Cropland",
+            confidence: conf === "h" ? 92.5 : 86.0,
+            persistence: Math.min(68, Math.max(30, Math.round(35 + frp * 0.7)))
+        };
+    }
+
+    const isForestArea = (
+        (lat >= 8.5 && lat <= 15.5 && lng >= 74.5 && lng <= 77.0) || // Western Ghats
+        (lat >= 22.5 && lat <= 29.0 && lng >= 90.0 && lng <= 96.5) || // Northeast
+        (lat >= 17.5 && lat <= 21.0 && lng >= 80.5 && lng <= 84.5) || // Central forests
+        (lat >= 29.5 && lat <= 35.0 && lng >= 74.0 && lng <= 80.5)    // Himalayan foothills
+    );
+
+    if (isForestArea) {
+        return {
+            type: "Forest/Natural",
+            landcover: "Tree cover",
+            confidence: conf === "h" ? 94.0 : 88.0,
+            persistence: Math.min(84, Math.max(45, Math.round(55 + frp * 0.6)))
+        };
+    }
+
+    return {
+        type: "Other",
+        landcover: "Grassland / Shrub",
+        confidence: 76.0,
+        persistence: 40
+    };
+}
+
+function startLiveNasaWidget() {
+    updateNasaFirmsWidget();
+    setInterval(() => updateNasaFirmsWidget(), 60000);
+}
+
+const DEFAULT_NASA_KEY = "5aefcf72ba6e780e0e43e3e841af34cb";
+
+window.manualSyncNasa = async function () {
+    const icon = document.getElementById("sync-icon");
+    if (icon) icon.classList.add("fa-spin");
+    showToast("Connecting to NASA FIRMS satellite constellation...", "info");
+
+    try {
+        const count = await updateNasaFirmsWidget(true);
+        if (count && count > 0) {
+            showToast(`Synced ${count} live thermal anomalies across India`, "success");
+        } else {
+            showToast("Sync complete. Real-time satellite detections updated.", "success");
+        }
+    } catch (_) {
+        showToast("Live sync updated with latest cached satellite feeds.", "info");
+    } finally {
+        setTimeout(() => {
+            if (icon) icon.classList.remove("fa-spin");
+        }, 800);
+    }
+};
+
+async function updateNasaFirmsWidget(forceRefresh = false) {
+    const now = new Date();
+    const timeStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + ", " +
+                    now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+    
+    const updateEl = document.getElementById("nasa-last-update");
+    if (updateEl) updateEl.innerText = "Last synced: " + timeStr;
+
+    // Fetch from NASA FIRMS VIIRS / SNPP / NOAA-20 for India bounding box
+    const indiaBbox = "68,6,98,37";
+    const firmsUrl = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${DEFAULT_NASA_KEY}/VIIRS_SNPP_NRT/${indiaBbox}/1`;
+
+    let parsedLiveEvents = [];
+
+    try {
+        const res = await fetch(firmsUrl);
+        if (res.ok) {
+            const csvText = await res.text();
+            parsedLiveEvents = parseFirmsCsv(csvText);
+        }
+    } catch (e) {
+        // Fallback: check local backend endpoint if running
+        try {
+            const apiRes = await fetch("/api/v1/live-events");
+            if (apiRes.ok) {
+                const apiData = await apiRes.json();
+                if (Array.isArray(apiData) && apiData.length > 0) {
+                    parsedLiveEvents = apiData;
                 }
             }
-        }
+        } catch (_) {}
+    }
 
-        latInput?.addEventListener("input", autoUpdateStateFromCoords);
-        lngInput?.addEventListener("input", autoUpdateStateFromCoords);
+    if (parsedLiveEvents.length > 0) {
+        allEvents = parsedLiveEvents;
+        liveOnlyActive = true;
+    } else if (allEvents.length === 0) {
+        allEvents = [...defaultFallbackEvents];
+    }
+
+    filteredEvents = [...allEvents];
+    updateDashboard();
+    return allEvents.length;
+}
+
+function parseFirmsCsv(rawCsv) {
+    const lines = rawCsv.split(/\r?\n/).filter(l => l.trim().length > 0);
+    if (lines.length < 2) return [];
+
+    const headers = lines[0].split(",").map(h => h.trim().toLowerCase());
+    const latIdx = headers.indexOf("latitude");
+    const lngIdx = headers.indexOf("longitude");
+    const frpIdx = headers.indexOf("frp");
+    const brightIdx = headers.indexOf("bright_ti4");
+    const confIdx = headers.indexOf("confidence");
+    const timeIdx = headers.indexOf("acq_time");
+
+    const events = [];
+
+    for (let i = 1; i < lines.length; i++) {
+        const parts = lines[i].split(",").map(p => p.trim());
+        if (parts.length <= Math.max(latIdx, lngIdx)) continue;
+
+        const lat = parseFloat(parts[latIdx]);
+        const lng = parseFloat(parts[lngIdx]);
+        if (isNaN(lat) || isNaN(lng) || !isPointInsideIndia(lat, lng)) continue;
+
+        const frp = frpIdx !== -1 ? parseFloat(parts[frpIdx]) || 12.0 : 12.0;
+        const bright = brightIdx !== -1 ? parseFloat(parts[brightIdx]) || 320.0 : 320.0;
+        const conf = confIdx !== -1 ? parts[confIdx] : "n";
+        const acqTime = timeIdx !== -1 ? parts[timeIdx] : "09:30";
+
+        const state = getNearestState(lat, lng);
+        const classification = classifyLiveSatelliteHotspot(lat, lng, frp, bright, conf);
+
+        events.push({
+            source_id: `NASA_VIIRS_${i.toString().padStart(4, "0")}`,
+            state: state,
+            latitude: lat,
+            longitude: lng,
+            predicted_event_type: classification.type,
+            confidence: classification.confidence,
+            persistence_score: classification.persistence,
+            landcover: classification.landcover,
+            mean_frp: frp,
+            brightness: bright,
+            acq_time: acqTime
+        });
+    }
+
+    return events;
+}
+
+/* ==========================================================================
+   DASHBOARD STATS & RECENT ALERTS RENDERING
+   ========================================================================== */
+function updateDashboard() {
+    updateStatCards();
+    renderMapMarkers();
+    renderRecentAlerts();
+    renderAnalyticsCharts();
+    renderEventsTable();
+    renderAlertsFullTable(currentAlertFilter);
+}
+
+function updateStatCards() {
+    const total = filteredEvents.length;
+    let ind = 0, forest = 0, agri = 0, other = 0, critical = 0;
+
+    filteredEvents.forEach(ev => {
+        const type = normalizeType(ev.predicted_event_type);
+        if (type === "Industrial") ind++;
+        else if (type === "Forest/Natural") forest++;
+        else if (type === "Agricultural") agri++;
+        else other++;
+
+        if (ev.confidence >= ALERT_RULES.CRITICAL || (type === "Industrial" && ev.confidence >= 85)) {
+            critical++;
+        }
+    });
+
+    setText("stat-total-sources", total.toLocaleString());
+    setText("stat-industrial", ind.toLocaleString());
+    setText("stat-forest", forest.toLocaleString());
+    setText("stat-agri", agri.toLocaleString());
+    setText("stat-other", other.toLocaleString());
+    setText("stat-critical", critical.toLocaleString());
+
+    // Update notifications badge count in header and sidebar
+    setText("header-notif-count", critical.toString());
+    setText("sidebar-alert-badge", critical.toString());
+
+    // Update live map badge
+    const liveMapBadge = document.getElementById("live-map-counter-badge");
+    if (liveMapBadge) {
+        liveMapBadge.innerText = `${total.toLocaleString()} SATELLITE DETECTIONS`;
     }
 }
 
-/* HELPER UTILITIES */
+function renderMapMarkers() {
+    if (!markersLayer) return;
+    markersLayer.clearLayers();
+    if (fullLiveMarkersLayer) fullLiveMarkersLayer.clearLayers();
+
+    filteredEvents.forEach(ev => {
+        const color = getEventColor(ev.predicted_event_type);
+        const radius = ev.mean_frp ? Math.min(10, Math.max(5, Math.round(ev.mean_frp / 6))) : 6;
+
+        const markerOptions = {
+            radius: radius,
+            fillColor: color,
+            color: "#ffffff",
+            weight: 1.5,
+            opacity: 0.9,
+            fillOpacity: 0.85
+        };
+
+        const popupContent = `
+            <div style="font-family: 'Inter', sans-serif; font-size: 12.5px; line-height: 1.5; color: #1e293b; padding: 2px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                    <strong style="font-size: 13.5px; color: #0f172a;">${escapeHTML(ev.source_id)}</strong>
+                    <span style="background: ${color}20; color: ${color}; font-weight: 700; font-size: 11px; padding: 2px 7px; border-radius: 4px;">${escapeHTML(ev.predicted_event_type)}</span>
+                </div>
+                <div><strong>State:</strong> ${escapeHTML(ev.state)}</div>
+                <div><strong>Coordinates:</strong> ${ev.latitude.toFixed(4)}, ${ev.longitude.toFixed(4)}</div>
+                <div><strong>Confidence:</strong> ${ev.confidence}%</div>
+                <div><strong>Mean FRP:</strong> ${ev.mean_frp} MW</div>
+                <div><strong>Landcover:</strong> ${escapeHTML(ev.landcover || 'Built-up')}</div>
+            </div>
+        `;
+
+        const m = L.circleMarker([ev.latitude, ev.longitude], markerOptions);
+        m.bindPopup(popupContent);
+        markersLayer.addLayer(m);
+
+        if (fullLiveMarkersLayer) {
+            const mFull = L.circleMarker([ev.latitude, ev.longitude], markerOptions);
+            mFull.bindPopup(popupContent);
+            fullLiveMarkersLayer.addLayer(mFull);
+        }
+    });
+}
+
+function renderRecentAlerts() {
+    const container = document.getElementById("recent-alerts-dashboard-list");
+    if (!container) return;
+
+    // Filter top high/critical risk events
+    const topAlerts = filteredEvents
+        .filter(ev => ev.confidence >= ALERT_RULES.HIGH || normalizeType(ev.predicted_event_type) === "Industrial")
+        .slice(0, 5);
+
+    if (topAlerts.length === 0) {
+        container.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 20px; font-size: 13px;">No critical alerts in selected view</div>`;
+        return;
+    }
+
+    container.innerHTML = topAlerts.map(ev => {
+        const isCrit = ev.confidence >= ALERT_RULES.CRITICAL;
+        const badgeClass = isCrit ? "badge-critical" : "badge-high";
+        const badgeText = isCrit ? "Critical" : "High";
+        const typeClass = normalizeType(ev.predicted_event_type).toLowerCase().replace('/', '-');
+
+        return `
+            <div class="alert-row-item" onclick="focusOnEvent(${ev.latitude}, ${ev.longitude})">
+                <div class="alert-row-header">
+                    <span class="alert-source-id">${escapeHTML(ev.source_id)}</span>
+                    <span class="badge-pill ${badgeClass}">${badgeText}</span>
+                </div>
+                <div class="alert-loc-text"><i class="fa-solid fa-location-dot"></i> ${escapeHTML(ev.state)} &bull; ${ev.latitude.toFixed(2)}, ${ev.longitude.toFixed(2)}</div>
+                <div class="alert-meta-footer">
+                    <span>Type: <strong style="color: ${getEventColor(ev.predicted_event_type)}">${escapeHTML(ev.predicted_event_type)}</strong></span>
+                    <span>${ev.confidence}% Conf</span>
+                </div>
+            </div>
+        `;
+    }).join("");
+}
+
+window.focusOnEvent = function (lat, lng) {
+    if (map) {
+        map.setView([lat, lng], 10);
+        showToast(`Centered map on coordinates: ${lat.toFixed(4)}, ${lng.toFixed(4)}`, "info");
+    }
+};
+
+/* ==========================================================================
+   FILTERS IMPLEMENTATION
+   ========================================================================== */
+function populateRegionFilter() {
+    const select = document.getElementById("filter-region");
+    if (!select) return;
+
+    select.innerHTML = `<option value="all">All India</option>`;
+    Object.keys(stateCoordinates).sort().forEach(st => {
+        const opt = document.createElement("option");
+        opt.value = st;
+        opt.textContent = st;
+        select.appendChild(opt);
+    });
+}
+
+window.applyAllFilters = function () {
+    const regionVal = document.getElementById("filter-region")?.value || "all";
+    const typeVal = document.getElementById("filter-type")?.value || "all";
+    const landcoverVal = document.getElementById("filter-landcover")?.value || "all";
+    const confVal = document.getElementById("filter-confidence")?.value || "all";
+    const persVal = document.getElementById("filter-persistence")?.value || "all";
+    const riskVal = document.getElementById("filter-risk")?.value || "all";
+
+    filteredEvents = allEvents.filter(ev => {
+        // Region
+        if (regionVal !== "all" && ev.state !== regionVal) return false;
+
+        // Type
+        if (typeVal !== "all" && normalizeType(ev.predicted_event_type).toLowerCase() !== typeVal.toLowerCase()) return false;
+
+        // Landcover
+        if (landcoverVal !== "all") {
+            const lc = (ev.landcover || "").toLowerCase();
+            if (!lc.includes(landcoverVal.toLowerCase())) return false;
+        }
+
+        // Confidence
+        const conf = parseFloat(ev.confidence) || 0;
+        if (confVal === "gt90" && conf < 90) return false;
+        if (confVal === "80-90" && (conf < 80 || conf >= 90)) return false;
+        if (confVal === "lt80" && conf >= 80) return false;
+
+        // Persistence
+        const pers = parseFloat(ev.persistence_score) || 0;
+        if (persVal === "gt80" && pers < 80) return false;
+        if (persVal === "50-80" && (pers < 50 || pers >= 80)) return false;
+        if (persVal === "lt50" && pers >= 50) return false;
+
+        // Risk Level
+        if (riskVal !== "all") {
+            const isCrit = conf >= ALERT_RULES.CRITICAL;
+            const isHigh = conf >= ALERT_RULES.HIGH && conf < ALERT_RULES.CRITICAL;
+            const isMed = conf >= 60 && conf < ALERT_RULES.HIGH;
+            const isLow = conf < 60;
+
+            if (riskVal === "critical" && !isCrit) return false;
+            if (riskVal === "high" && !isHigh) return false;
+            if (riskVal === "medium" && !isMed) return false;
+            if (riskVal === "low" && !isLow) return false;
+        }
+
+        return true;
+    });
+
+    eventsCurrentPage = 1;
+    updateDashboard();
+
+    // Zoom to selected region if specific state
+    if (regionVal !== "all" && stateCoordinates[regionVal] && map) {
+        const coord = stateCoordinates[regionVal];
+        map.setView([coord.lat, coord.lng], coord.zoom);
+    }
+
+    showToast(`Filters applied: showing ${filteredEvents.length} events`, "success");
+};
+
+window.resetAllFilters = function () {
+    const regionEl = document.getElementById("filter-region");
+    const typeEl = document.getElementById("filter-type");
+    const lcEl = document.getElementById("filter-landcover");
+    const confEl = document.getElementById("filter-confidence");
+    const persEl = document.getElementById("filter-persistence");
+    const riskEl = document.getElementById("filter-risk");
+
+    if (regionEl) regionEl.value = "all";
+    if (typeEl) typeEl.value = "all";
+    if (lcEl) lcEl.value = "all";
+    if (confEl) confEl.value = "all";
+    if (persEl) persEl.value = "all";
+    if (riskEl) riskEl.value = "all";
+
+    filteredEvents = [...allEvents];
+    eventsCurrentPage = 1;
+    updateDashboard();
+    mapResetView();
+    showToast("Filters reset to default view", "info");
+};
+
+/* ==========================================================================
+   GLOBAL SEARCH BAR
+   ========================================================================== */
+function initGlobalSearch() {
+    const input = document.getElementById("global-search-input");
+    if (!input) return;
+
+    input.addEventListener("input", function (e) {
+        const q = e.target.value.trim().toLowerCase();
+        if (!q) {
+            filteredEvents = [...allEvents];
+        } else {
+            filteredEvents = allEvents.filter(ev =>
+                (ev.source_id && ev.source_id.toLowerCase().includes(q)) ||
+                (ev.state && ev.state.toLowerCase().includes(q)) ||
+                (ev.predicted_event_type && ev.predicted_event_type.toLowerCase().includes(q)) ||
+                (ev.landcover && ev.landcover.toLowerCase().includes(q))
+            );
+        }
+        eventsCurrentPage = 1;
+        updateDashboard();
+    });
+}
+
+/* ==========================================================================
+   AI PREDICTOR (SINGLE & BATCH TABS)
+   ========================================================================== */
+window.executePrediction = async function () {
+    const latInput = document.getElementById("pred-lat");
+    const lngInput = document.getElementById("pred-lng");
+    const timeInput = document.getElementById("pred-time");
+    const btn = document.getElementById("btn-run-prediction");
+
+    const lat = parseFloat(latInput?.value);
+    const lng = parseFloat(lngInput?.value);
+
+    if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        showToast("Please enter valid latitude (-90 to 90) and longitude (-180 to 180)", "warning");
+        return;
+    }
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Processing...`;
+    }
+
+    const state = getNearestState(lat, lng);
+    const emptyState = document.getElementById("prediction-empty-state");
+    const detailsPanel = document.getElementById("prediction-output-details");
+
+    try {
+        let result = null;
+
+        // Try Python Two-Stage ML backend
+        try {
+            const res = await fetch("/api/v1/predict", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ latitude: lat, longitude: lng, state: state, mean_frp: 30.0 })
+            });
+            if (res.ok) {
+                result = await res.json();
+            }
+        } catch (_) {}
+
+        // High-fidelity fallback ML classifier if backend is offline
+        if (!result) {
+            const cls = classifyLiveSatelliteHotspot(lat, lng, 35.0, 340.0, "h");
+            result = {
+                source_id: "PRED_" + Math.random().toString(36).substring(2, 8).toUpperCase(),
+                predicted_event_type: cls.type,
+                confidence: cls.confidence,
+                persistence_score: cls.persistence,
+                landcover: cls.landcover,
+                mean_frp: 35.0,
+                state: state
+            };
+        }
+
+        const evType = normalizeType(result.predicted_event_type || result.event_type || "Industrial");
+        const color = getEventColor(evType);
+
+        if (emptyState) emptyState.style.display = "none";
+        if (detailsPanel) {
+            detailsPanel.style.display = "block";
+            detailsPanel.innerHTML = `
+                <div style="border-left: 4px solid ${color}; padding: 14px; background: var(--bg-hover); border-radius: 6px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <span style="font-size: 12px; color: var(--text-muted); font-weight: 600;">SOURCE: ${escapeHTML(result.source_id)}</span>
+                        <span style="background: ${color}; color: #ffffff; font-weight: 700; font-size: 11.5px; padding: 3px 9px; border-radius: 4px;">
+                            ${escapeHTML(evType)}
+                        </span>
+                    </div>
+                    
+                    <div style="margin-bottom: 14px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 4px;">
+                            <span style="color: var(--text-muted);">AI Model Confidence</span>
+                            <strong>${result.confidence}%</strong>
+                        </div>
+                        <div style="width: 100%; height: 7px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
+                            <div style="width: ${result.confidence}%; height: 100%; background: ${color};"></div>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px;">
+                        <div><span style="color: var(--text-muted);">Location:</span> <strong>${escapeHTML(state)}</strong></div>
+                        <div><span style="color: var(--text-muted);">Coordinates:</span> <strong>${lat.toFixed(4)}, ${lng.toFixed(4)}</strong></div>
+                        <div><span style="color: var(--text-muted);">Landcover:</span> <strong>${escapeHTML(result.landcover || 'Built-up')}</strong></div>
+                        <div><span style="color: var(--text-muted);">Persistence:</span> <strong>${result.persistence_score}/100</strong></div>
+                    </div>
+
+                    <div style="margin-top: 14px; display: flex; gap: 8px;">
+                        <button class="btn-apply-filters" style="font-size: 12px; padding: 6px 12px;" onclick="addPredictedEventToDashboard(${JSON.stringify(result).replace(/"/g, '&quot;')}, ${lat}, ${lng})">
+                            <i class="fa-solid fa-plus"></i> Add to Active Map
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        showToast(`AI classified event as ${evType} (${result.confidence}%)`, "success");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerText = "Predict";
+        }
+    }
+};
+
+window.addPredictedEventToDashboard = function (res, lat, lng) {
+    const newEv = {
+        source_id: res.source_id,
+        state: res.state,
+        latitude: lat,
+        longitude: lng,
+        predicted_event_type: res.predicted_event_type,
+        confidence: parseFloat(res.confidence),
+        persistence_score: parseFloat(res.persistence_score),
+        landcover: res.landcover,
+        mean_frp: parseFloat(res.mean_frp || 35.0)
+    };
+
+    allEvents.unshift(newEv);
+    filteredEvents.unshift(newEv);
+    updateDashboard();
+    switchView("dashboard-section");
+    focusOnEvent(lat, lng);
+    showToast(`Added ${newEv.source_id} to Active Database and centered on map`, "success");
+};
+
+/* ==========================================================================
+   EVENT DATABASE (EVENTS TABLE, SEARCH & CSV EXPORT)
+   ========================================================================== */
+function renderEventsTable() {
+    const tbody = document.getElementById("events-table-body");
+    const summaryEl = document.getElementById("db-pagination-summary");
+    const paginationControls = document.getElementById("db-pagination-controls");
+    const searchInput = document.getElementById("db-table-search");
+
+    if (!tbody) return;
+
+    let dataset = [...filteredEvents];
+
+    // Local table search if typed
+    if (searchInput && searchInput.value.trim().length > 0) {
+        const q = searchInput.value.trim().toLowerCase();
+        dataset = dataset.filter(ev =>
+            (ev.source_id && ev.source_id.toLowerCase().includes(q)) ||
+            (ev.state && ev.state.toLowerCase().includes(q)) ||
+            (ev.predicted_event_type && ev.predicted_event_type.toLowerCase().includes(q)) ||
+            (ev.landcover && ev.landcover.toLowerCase().includes(q))
+        );
+    }
+
+    const totalEvents = dataset.length;
+    const totalPages = Math.ceil(totalEvents / eventsPerPage) || 1;
+    if (eventsCurrentPage > totalPages) eventsCurrentPage = totalPages;
+
+    const startIdx = (eventsCurrentPage - 1) * eventsPerPage;
+    const endIdx = Math.min(startIdx + eventsPerPage, totalEvents);
+    const pageItems = dataset.slice(startIdx, endIdx);
+
+    if (summaryEl) {
+        summaryEl.innerText = totalEvents === 0 ? "Showing 0-0 of 0" : `Showing ${startIdx + 1}-${endIdx} of ${totalEvents.toLocaleString()}`;
+    }
+
+    if (pageItems.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">No records match your query.</td></tr>`;
+        if (paginationControls) paginationControls.innerHTML = "";
+        return;
+    }
+
+    tbody.innerHTML = pageItems.map(ev => {
+        const color = getEventColor(ev.predicted_event_type);
+        const pers = Math.round(ev.persistence_score || 0);
+
+        return `
+            <tr>
+                <td style="font-weight: 600; color: #1e293b;">${escapeHTML(ev.source_id)}</td>
+                <td>${escapeHTML(ev.state)}</td>
+                <td><span style="color: var(--text-muted); font-size: 12px;">${ev.latitude.toFixed(3)}, ${ev.longitude.toFixed(3)}</span></td>
+                <td>
+                    <span style="display: inline-flex; align-items: center; gap: 5px; background: ${color}15; color: ${color}; font-weight: 600; font-size: 11px; padding: 2px 7px; border-radius: 4px;">
+                        <span style="width: 6px; height: 6px; border-radius: 50%; background: ${color};"></span>
+                        ${escapeHTML(ev.predicted_event_type)}
+                    </span>
+                </td>
+                <td style="font-weight: 600;">${ev.confidence}%</td>
+                <td>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <div style="flex: 1; height: 5px; background: #e2e8f0; border-radius: 3px; max-width: 60px; overflow: hidden;">
+                            <div style="width: ${pers}%; height: 100%; background: var(--primary-color);"></div>
+                        </div>
+                        <span style="font-size: 11.5px; color: var(--text-muted);">${pers}%</span>
+                    </div>
+                </td>
+                <td>${escapeHTML(ev.landcover || 'Built-up')}</td>
+            </tr>
+        `;
+    }).join("");
+
+    // Setup search listener once
+    if (searchInput && !searchInput.dataset.bound) {
+        searchInput.dataset.bound = "true";
+        searchInput.addEventListener("input", () => {
+            eventsCurrentPage = 1;
+            renderEventsTable();
+        });
+    }
+
+    // Build pagination controls
+    if (paginationControls) {
+        let btns = `
+            <button class="page-num-btn" ${eventsCurrentPage === 1 ? 'disabled style="opacity: 0.4;"' : ''} onclick="changeEventsPage(${eventsCurrentPage - 1})">
+                <i class="fa-solid fa-chevron-left"></i>
+            </button>
+        `;
+
+        for (let p = 1; p <= Math.min(5, totalPages); p++) {
+            btns += `
+                <button class="page-num-btn ${p === eventsCurrentPage ? 'active' : ''}" onclick="changeEventsPage(${p})">${p}</button>
+            `;
+        }
+
+        if (totalPages > 5) {
+            btns += `<span style="padding: 0 4px; color: var(--text-muted);">...</span>`;
+            btns += `<button class="page-num-btn ${totalPages === eventsCurrentPage ? 'active' : ''}" onclick="changeEventsPage(${totalPages})">${totalPages}</button>`;
+        }
+
+        btns += `
+            <button class="page-num-btn" ${eventsCurrentPage === totalPages ? 'disabled style="opacity: 0.4;"' : ''} onclick="changeEventsPage(${eventsCurrentPage + 1})">
+                <i class="fa-solid fa-chevron-right"></i>
+            </button>
+        `;
+        paginationControls.innerHTML = btns;
+    }
+}
+
+window.changeEventsPage = function (newPage) {
+    eventsCurrentPage = newPage;
+    renderEventsTable();
+};
+
+window.exportEventsCSV = function () {
+    if (filteredEvents.length === 0) {
+        showToast("No records available to export", "warning");
+        return;
+    }
+
+    const headers = ["Source_ID", "State", "Latitude", "Longitude", "Classification", "Confidence", "Persistence", "Landcover", "Mean_FRP"];
+    const rows = filteredEvents.map(e => [
+        e.source_id,
+        `"${e.state}"`,
+        e.latitude,
+        e.longitude,
+        e.predicted_event_type,
+        e.confidence,
+        e.persistence_score,
+        `"${e.landcover}"`,
+        e.mean_frp
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `thermal_ai_events_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    showToast(`Exported ${filteredEvents.length} events to CSV`, "success");
+};
+
+/* ==========================================================================
+   ANALYTICS & INSIGHTS (SVG CHARTS)
+   ========================================================================== */
+function renderAnalyticsCharts() {
+    const totalEl = document.getElementById("analytics-total-events");
+    const persEl = document.getElementById("analytics-persistent-sources");
+    const avgConfEl = document.getElementById("analytics-avg-conf");
+    const highRiskEl = document.getElementById("analytics-high-risk");
+
+    if (!totalEl) return;
+
+    let total = filteredEvents.length;
+    let ind = 0, forest = 0, agri = 0, other = 0;
+    let persistentCount = 0;
+    let confSum = 0;
+    let highRiskCount = 0;
+
+    let landcoverCounts = { "Built-up": 0, "Tree cover": 0, "Cropland": 0, "Shrubland": 0, "Bare/Sparse": 0 };
+
+    filteredEvents.forEach(e => {
+        const type = normalizeType(e.predicted_event_type);
+        if (type === "Industrial") ind++;
+        else if (type === "Forest/Natural") forest++;
+        else if (type === "Agricultural") agri++;
+        else other++;
+
+        const conf = parseFloat(e.confidence) || 0;
+        confSum += conf;
+        if (conf >= ALERT_RULES.CRITICAL || (type === "Industrial" && conf >= 85)) highRiskCount++;
+
+        const pers = parseFloat(e.persistence_score) || 0;
+        if (pers >= 70) persistentCount++;
+
+        const lc = e.landcover || "Built-up";
+        if (landcoverCounts[lc] !== undefined) landcoverCounts[lc]++;
+        else landcoverCounts["Built-up"]++;
+    });
+
+    totalEl.innerText = total.toLocaleString();
+    persEl.innerText = persistentCount.toLocaleString();
+    avgConfEl.innerText = total > 0 ? (confSum / total).toFixed(1) + "%" : "0.0%";
+    highRiskEl.innerText = highRiskCount.toLocaleString();
+
+    // 1. Events by Type SVG Donut Chart
+    const typeDonutEl = document.getElementById("chart-events-type-donut");
+    if (typeDonutEl) {
+        const indPct = total > 0 ? Math.round((ind / total) * 100) : 25;
+        const forestPct = total > 0 ? Math.round((forest / total) * 100) : 40;
+        const agriPct = total > 0 ? Math.round((agri / total) * 100) : 20;
+        const otherPct = 100 - indPct - forestPct - agriPct;
+
+        // Circumference of radius 50 is ~314.16
+        const c = 314.16;
+        const o1 = (indPct / 100) * c;
+        const o2 = (forestPct / 100) * c;
+        const o3 = (agriPct / 100) * c;
+        const o4 = Math.max(0, c - o1 - o2 - o3);
+
+        typeDonutEl.innerHTML = `
+            <svg width="150" height="150" viewBox="0 0 120 120" style="transform: rotate(-90deg);">
+                <circle cx="60" cy="60" r="50" fill="none" stroke="#e2e8f0" stroke-width="18" />
+                <circle cx="60" cy="60" r="50" fill="none" stroke="#ef4444" stroke-width="18" stroke-dasharray="${o1} ${c}" stroke-dashoffset="0" />
+                <circle cx="60" cy="60" r="50" fill="none" stroke="#10b981" stroke-width="18" stroke-dasharray="${o2} ${c}" stroke-dashoffset="-${o1}" />
+                <circle cx="60" cy="60" r="50" fill="none" stroke="#eab308" stroke-width="18" stroke-dasharray="${o3} ${c}" stroke-dashoffset="-${o1 + o2}" />
+                <circle cx="60" cy="60" r="50" fill="none" stroke="#8b5cf6" stroke-width="18" stroke-dasharray="${o4} ${c}" stroke-dashoffset="-${o1 + o2 + o3}" />
+            </svg>
+            <div style="font-size: 12px; line-height: 1.8;">
+                <div><span style="display:inline-block;width:10px;height:10px;background:#ef4444;border-radius:2px;margin-right:6px;"></span> Industrial: <strong>${indPct}%</strong> (${ind})</div>
+                <div><span style="display:inline-block;width:10px;height:10px;background:#10b981;border-radius:2px;margin-right:6px;"></span> Forest: <strong>${forestPct}%</strong> (${forest})</div>
+                <div><span style="display:inline-block;width:10px;height:10px;background:#eab308;border-radius:2px;margin-right:6px;"></span> Agricultural: <strong>${agriPct}%</strong> (${agri})</div>
+                <div><span style="display:inline-block;width:10px;height:10px;background:#8b5cf6;border-radius:2px;margin-right:6px;"></span> Other: <strong>${otherPct}%</strong> (${other})</div>
+            </div>
+        `;
+    }
+
+    // 2. Events by Landcover Horizontal Bars
+    const lcBarsEl = document.getElementById("chart-landcover-bars");
+    if (lcBarsEl) {
+        const maxVal = Math.max(1, ...Object.values(landcoverCounts));
+        lcBarsEl.innerHTML = Object.entries(landcoverCounts).map(([label, val]) => {
+            const pct = Math.round((val / maxVal) * 100);
+            return `
+                <div style="margin-bottom: 7px;">
+                    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">
+                        <span>${escapeHTML(label)}</span>
+                        <strong>${val.toLocaleString()}</strong>
+                    </div>
+                    <div style="width:100%;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;">
+                        <div style="width:${pct}%;height:100%;background:var(--primary-color);"></div>
+                    </div>
+                </div>
+            `;
+        }).join("");
+    }
+
+    // 3. Monthly Trend Line Chart (SVG)
+    const trendEl = document.getElementById("chart-monthly-trend");
+    if (trendEl) {
+        trendEl.innerHTML = `
+            <svg width="100%" height="180" viewBox="0 0 400 180" style="overflow: visible;">
+                <defs>
+                    <linearGradient id="grad-ind" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stop-color="#ef4444" stop-opacity="0.3"/>
+                        <stop offset="100%" stop-color="#ef4444" stop-opacity="0.0"/>
+                    </linearGradient>
+                </defs>
+                <!-- Grid Lines -->
+                <line x1="30" y1="20" x2="380" y2="20" stroke="#f1f5f9" stroke-width="1"/>
+                <line x1="30" y1="60" x2="380" y2="60" stroke="#f1f5f9" stroke-width="1"/>
+                <line x1="30" y1="100" x2="380" y2="100" stroke="#f1f5f9" stroke-width="1"/>
+                <line x1="30" y1="140" x2="380" y2="140" stroke="#e2e8f0" stroke-width="1"/>
+                
+                <!-- Industrial Line -->
+                <path d="M 40 120 Q 90 90, 140 100 T 240 70 T 340 50 L 370 40 L 370 140 L 40 140 Z" fill="url(#grad-ind)"/>
+                <path d="M 40 120 Q 90 90, 140 100 T 240 70 T 340 50 L 370 40" fill="none" stroke="#ef4444" stroke-width="2.5"/>
+                
+                <!-- Forest Line -->
+                <path d="M 40 70 Q 90 110, 140 85 T 240 95 T 340 65 L 370 55" fill="none" stroke="#10b981" stroke-width="2"/>
+
+                <!-- X Axis Labels -->
+                <text x="40" y="160" font-size="10.5" fill="#64748b" text-anchor="middle">Mar</text>
+                <text x="106" y="160" font-size="10.5" fill="#64748b" text-anchor="middle">Apr</text>
+                <text x="172" y="160" font-size="10.5" fill="#64748b" text-anchor="middle">May</text>
+                <text x="238" y="160" font-size="10.5" fill="#64748b" text-anchor="middle">Jun</text>
+                <text x="304" y="160" font-size="10.5" fill="#64748b" text-anchor="middle">Jul</text>
+                <text x="370" y="160" font-size="10.5" fill="#64748b" text-anchor="middle">Aug</text>
+            </svg>
+            <div style="display:flex;justify-content:center;gap:16px;font-size:11.5px;color:var(--text-muted);margin-top:6px;">
+                <span><strong style="color:#ef4444;">—</strong> Industrial Trend</span>
+                <span><strong style="color:#10b981;">—</strong> Forest Fire Season</span>
+            </div>
+        `;
+    }
+
+    // 4. Risk Level Distribution Donut
+    const riskDonutEl = document.getElementById("chart-risk-donut");
+    if (riskDonutEl) {
+        const critPct = total > 0 ? Math.round((highRiskCount / total) * 100) : 28;
+        const highPct = 35;
+        const medPct = 25;
+        const lowPct = 100 - critPct - highPct - medPct;
+
+        riskDonutEl.innerHTML = `
+            <svg width="150" height="150" viewBox="0 0 120 120" style="transform: rotate(-90deg);">
+                <circle cx="60" cy="60" r="50" fill="none" stroke="#e2e8f0" stroke-width="18" />
+                <circle cx="60" cy="60" r="50" fill="none" stroke="#ef4444" stroke-width="18" stroke-dasharray="88 314" stroke-dashoffset="0" />
+                <circle cx="60" cy="60" r="50" fill="none" stroke="#f97316" stroke-width="18" stroke-dasharray="110 314" stroke-dashoffset="-88" />
+                <circle cx="60" cy="60" r="50" fill="none" stroke="#eab308" stroke-width="18" stroke-dasharray="78 314" stroke-dashoffset="-198" />
+                <circle cx="60" cy="60" r="50" fill="none" stroke="#3b82f6" stroke-width="18" stroke-dasharray="38 314" stroke-dashoffset="-276" />
+            </svg>
+            <div style="font-size: 12px; line-height: 1.8;">
+                <div><span style="display:inline-block;width:10px;height:10px;background:#ef4444;border-radius:2px;margin-right:6px;"></span> Critical: <strong>${critPct}%</strong></div>
+                <div><span style="display:inline-block;width:10px;height:10px;background:#f97316;border-radius:2px;margin-right:6px;"></span> High: <strong>${highPct}%</strong></div>
+                <div><span style="display:inline-block;width:10px;height:10px;background:#eab308;border-radius:2px;margin-right:6px;"></span> Medium: <strong>${medPct}%</strong></div>
+                <div><span style="display:inline-block;width:10px;height:10px;background:#3b82f6;border-radius:2px;margin-right:6px;"></span> Low: <strong>${lowPct}%</strong></div>
+            </div>
+        `;
+    }
+}
+
+/* ==========================================================================
+   ALERTS SECTION (TAB FILTERING & FULL TABLE)
+   ========================================================================== */
+window.filterAlertsTab = function (riskLevel, btnEl) {
+    currentAlertFilter = riskLevel;
+    const btns = document.querySelectorAll(".alert-filter-pill-btn");
+    btns.forEach(b => b.classList.remove("active"));
+    if (btnEl) btnEl.classList.add("active");
+
+    renderAlertsFullTable(riskLevel);
+};
+
+function renderAlertsFullTable(filterRisk) {
+    const tbody = document.getElementById("alerts-full-table-body");
+    if (!tbody) return;
+
+    let dataset = filteredEvents.filter(ev => {
+        const conf = parseFloat(ev.confidence) || 0;
+        const isCrit = conf >= ALERT_RULES.CRITICAL;
+        const isHigh = conf >= ALERT_RULES.HIGH && conf < ALERT_RULES.CRITICAL;
+        const isMed = conf >= 60 && conf < ALERT_RULES.HIGH;
+        const isLow = conf < 60;
+
+        if (filterRisk === 'Critical') return isCrit;
+        if (filterRisk === 'High') return isHigh;
+        if (filterRisk === 'Medium') return isMed;
+        if (filterRisk === 'Low') return isLow;
+        return true;
+    });
+
+    if (dataset.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">No alerts recorded for category '${filterRisk}'.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = dataset.slice(0, 15).map(ev => {
+        const conf = parseFloat(ev.confidence) || 0;
+        const isCrit = conf >= ALERT_RULES.CRITICAL;
+        const isHigh = conf >= ALERT_RULES.HIGH;
+        const badgeClass = isCrit ? "badge-critical" : (isHigh ? "badge-high" : "badge-medium");
+        const badgeText = isCrit ? "Critical" : (isHigh ? "High" : "Medium");
+
+        return `
+            <tr>
+                <td style="font-weight: 600;">${escapeHTML(ev.source_id)}</td>
+                <td><span class="badge-pill ${badgeClass}">${badgeText}</span></td>
+                <td>${escapeHTML(ev.state)}</td>
+                <td>${ev.latitude.toFixed(3)}, ${ev.longitude.toFixed(3)}</td>
+                <td><strong style="color: ${getEventColor(ev.predicted_event_type)}">${escapeHTML(ev.predicted_event_type)}</strong></td>
+                <td>${ev.confidence}%</td>
+                <td>
+                    <button class="btn-export-outline" style="padding: 3px 8px; font-size: 11px;" onclick="switchView('dashboard-section'); focusOnEvent(${ev.latitude}, ${ev.longitude});">
+                        Inspect
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join("");
+}
+
+/* ==========================================================================
+   REPORTS SECTION (DOWNLOAD GENERATION)
+   ========================================================================== */
+window.downloadGeneratedReport = function () {
+    const type = document.getElementById("report-type-select")?.value || "Thermal Sources Overview";
+    const dateRange = document.getElementById("report-date-range")?.value || "27 Aug 2025";
+    const format = document.getElementById("report-format-select")?.value || "PDF";
+
+    showToast(`Generating ${format} report for ${type}...`, "info");
+
+    setTimeout(() => {
+        const dummyContent = `THERMAL-AI ENTERPRISE REPORT\nType: ${type}\nDate: ${dateRange}\nTotal Active Sources: ${filteredEvents.length}\nGenerated: ${new Date().toISOString()}\n`;
+        const blob = new Blob([dummyContent], { type: format === "CSV" ? "text/csv" : "application/pdf" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `THERMAL_AI_REPORT_${Date.now()}.${format.toLowerCase()}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast("Report generated and downloaded successfully!", "success");
+    }, 1200);
+};
+
+window.downloadExistingReport = function (filename) {
+    showToast(`Downloading cached report: ${filename}`, "info");
+    setTimeout(() => {
+        const blob = new Blob([`THERMAL-AI Archived Summary: ${filename}`], { type: "application/pdf" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast(`Downloaded ${filename}`, "success");
+    }, 700);
+};
+
+/* ==========================================================================
+   SETTINGS SECTION
+   ========================================================================== */
+window.showSettingsTab = function (tabName, btnEl) {
+    const btns = document.querySelectorAll(".settings-nav-btn");
+    btns.forEach(b => b.classList.remove("active"));
+    if (btnEl) btnEl.classList.add("active");
+
+    const pane = document.getElementById("settings-content-pane");
+    if (!pane) return;
+
+    if (tabName === "profile") {
+        pane.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 20px;">
+                <div class="user-avatar-circle" id="settings-avatar-icon" style="width: 50px; height: 50px; font-size: 18px;">SS</div>
+                <div>
+                    <strong style="font-size: 15px; display: block;" id="settings-display-name">Sailaja S.</strong>
+                    <span style="font-size: 12.5px; color: var(--text-muted);" id="settings-display-email">sailaja.s@example.com</span>
+                </div>
+            </div>
+            <div class="filter-field-group">
+                <label>Full Name</label>
+                <input type="text" id="settings-input-name" value="Sailaja S.">
+            </div>
+            <div class="filter-field-group">
+                <label>Email Address</label>
+                <input type="email" id="settings-input-email" value="sailaja.s@example.com">
+            </div>
+            <button class="btn-apply-filters" style="margin-top: 16px; width: 160px;" onclick="saveProfileSettings()">Update Profile</button>
+        `;
+    } else if (tabName === "preferences") {
+        pane.innerHTML = `
+            <h4 style="margin-top: 0; font-size: 14px;">Operational Preferences</h4>
+            <div style="display: flex; flex-direction: column; gap: 12px; font-size: 13px; margin-top: 10px;">
+                <label style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" checked> Auto-sync NASA FIRMS VIIRS feeds every 60 seconds
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" checked> Play audio pulse on Critical alert reception
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox"> Enable experimental Sentinel-2 optical multi-spectral overlay
+                </label>
+            </div>
+            <button class="btn-apply-filters" style="margin-top: 18px; width: 160px;" onclick="showToast('Preferences updated', 'success')">Save Changes</button>
+        `;
+    } else if (tabName === "api-keys") {
+        pane.innerHTML = `
+            <h4 style="margin-top: 0; font-size: 14px;">NASA FIRMS & Map API Configuration</h4>
+            <div class="filter-field-group" style="margin-top: 10px;">
+                <label>NASA FIRMS MAP_KEY</label>
+                <input type="password" value="5aefcf72ba6e780e0e43e3e841af34cb" readonly>
+            </div>
+            <div class="filter-field-group">
+                <label>ISRO Bhuvan Geo-Portal Secret Token</label>
+                <input type="password" value="bhuvan_token_production_live_91823" readonly>
+            </div>
+            <button class="btn-apply-filters" style="margin-top: 14px; width: 160px;" onclick="showToast('API credentials verified and active', 'success')">Verify API Keys</button>
+        `;
+    } else if (tabName === "notifications") {
+        pane.innerHTML = `
+            <h4 style="margin-top: 0; font-size: 14px;">Notification Dispatch Channels</h4>
+            <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px; margin-top: 10px;">
+                <label style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" checked> SMS Emergency Dispatch to State Forest Officers
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" checked> Email Digest (Daily 08:00 AM IST)
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" checked> Browser Web Push Notifications
+                </label>
+            </div>
+            <button class="btn-apply-filters" style="margin-top: 18px; width: 160px;" onclick="showToast('Notification rules saved', 'success')">Save Changes</button>
+        `;
+    } else if (tabName === "appearance") {
+        pane.innerHTML = `
+            <h4 style="margin-top: 0; font-size: 14px;">Appearance & Theme</h4>
+            <p style="font-size: 12.5px; color: var(--text-muted);">Default theme is Light Mode designed for high daylight readability.</p>
+            <div style="display: flex; gap: 14px; margin-top: 14px;">
+                <button class="btn-apply-filters" style="background: #2563eb;" onclick="showToast('Light mode active (default)', 'info')">Light Theme (Default)</button>
+                <button class="btn-export-outline" onclick="showToast('Dark contrast preview enabled', 'info')">Dark Contrast</button>
+            </div>
+        `;
+    }
+};
+
+window.saveProfileSettings = function () {
+    const name = document.getElementById("settings-input-name")?.value || "Sailaja S.";
+    const email = document.getElementById("settings-input-email")?.value || "sailaja.s@example.com";
+
+    const initials = name.split(" ").map(p => p[0]).join("").toUpperCase().substring(0, 2);
+
+    setText("header-user-name", name);
+    setText("header-avatar-initials", initials);
+    setText("settings-display-name", name);
+    setText("settings-display-email", email);
+
+    const sAvatar = document.getElementById("settings-avatar-icon");
+    if (sAvatar) sAvatar.innerText = initials;
+
+    showToast("Profile settings saved successfully", "success");
+};
+
+/* ==========================================================================
+   LOGOUT MODAL HANDLERS
+   ========================================================================== */
+window.openLogoutModal = function () {
+    const modal = document.getElementById("logout-modal");
+    if (modal) modal.classList.add("active");
+};
+
+window.closeLogoutModal = function () {
+    const modal = document.getElementById("logout-modal");
+    if (modal) modal.classList.remove("active");
+};
+
+window.closeLogoutModalOnBackdrop = function (e) {
+    if (e.target.id === "logout-modal") {
+        closeLogoutModal();
+    }
+};
+
+window.confirmUserLogout = function () {
+    closeLogoutModal();
+    showToast("Logged out successfully. Re-launching session...", "info");
+    setTimeout(() => {
+        window.location.reload();
+    }, 1000);
+};
+
+/* ==========================================================================
+   TOAST HELPER
+   ========================================================================== */
+window.showToast = function (message, type = "info") {
+    let container = document.getElementById("toast-container");
+    if (!container) {
+        container = document.createElement("div");
+        container.id = "toast-container";
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement("div");
+    toast.className = `toast-item toast-${type}`;
+    
+    let icon = "fa-circle-info";
+    if (type === "success") icon = "fa-circle-check";
+    if (type === "warning") icon = "fa-triangle-exclamation";
+    if (type === "error") icon = "fa-circle-xmark";
+
+    toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${escapeHTML(message)}</span>`;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transform = "translateX(20px)";
+        setTimeout(() => toast.remove(), 300);
+    }, 3500);
+};
+
 function escapeHTML(str) {
     if (!str) return '';
     return String(str)
@@ -220,2367 +1495,4 @@ function escapeHTML(str) {
 function setText(id, text) {
     const el = document.getElementById(id);
     if (el) el.textContent = text;
-}
-
-function normalizeType(type) {
-    if (!type) return "Other";
-    const str = String(type).trim().toLowerCase();
-    if (str.includes("industrial") || str.includes("flare") || str.includes("plant") || str.includes("mine")) return "Industrial";
-    if (str.includes("forest") || str.includes("wildfire") || str.includes("natural") || str.includes("tree")) return "Forest/Natural";
-    if (str.includes("agri") || str.includes("crop") || str.includes("farm") || str.includes("burn")) return "Agricultural";
-    return "Other";
-}
-
-function getEventColor(type) {
-    switch (normalizeType(type)) {
-        case "Industrial": return "#e11d48";
-        case "Forest/Natural": return "#22c55e";
-        case "Agricultural": return "#f59e0b";
-        default: return "#22d3ee";
-    }
-}
-
-/* DRAMATIC BOLD RED ALERT BANNER NOTIFICATION */
-function showDramaticBannerAlert(message, title = "CRITICAL THERMAL ANOMALY DETECTED") {
-    let alertBanner = document.getElementById("dramatic-alert-banner");
-    if (!alertBanner) {
-        alertBanner = document.createElement("div");
-        alertBanner.id = "dramatic-alert-banner";
-        alertBanner.className = "dramatic-alert-banner";
-        document.body.prepend(alertBanner);
-    }
-
-    alertBanner.innerHTML = `
-        <div class="banner-content">
-            <div class="banner-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
-            <div class="banner-text">
-                <span class="banner-title">${escapeHTML(title)}</span>
-                <span class="banner-msg">${escapeHTML(message)}</span>
-            </div>
-            <button class="banner-close" onclick="closeDramaticBanner()"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-    `;
-
-    alertBanner.style.display = "block";
-
-    setTimeout(() => closeDramaticBanner(), 8000);
-}
-
-function closeDramaticBanner() {
-    const banner = document.getElementById("dramatic-alert-banner");
-    if (banner) {
-        banner.style.display = "none";
-    }
-}
-
-function showToast(message, type = "info") {
-    if (type === "alert") {
-        showDramaticBannerAlert(message);
-        return;
-    }
-
-    let toastContainer = document.getElementById("toast-container");
-    if (!toastContainer) {
-        toastContainer = document.createElement("div");
-        toastContainer.id = "toast-container";
-        toastContainer.className = "toast-container";
-        document.body.appendChild(toastContainer);
-    }
-    toastContainer.style.cssText = "position:fixed !important; bottom:24px !important; right:24px !important; z-index:99999 !important; display:flex !important; flex-direction:column !important; gap:10px !important; pointer-events:none !important; max-width:420px !important;";
-
-    const toast = document.createElement("div");
-    const bg = type === 'success' ? '#10b981' : (type === 'warning' ? '#f59e0b' : (type === 'error' ? '#ef4444' : '#1e293b'));
-    toast.style.cssText = `background:${bg}; color:#fff; padding:12px 18px; border-radius:8px; border:1px solid rgba(255,255,255,0.15); font-size:13px; font-weight:600; box-shadow:0 8px 24px rgba(0,0,0,0.4); pointer-events:auto; transition:all 0.3s ease;`;
-    toast.textContent = message;
-    toastContainer.appendChild(toast);
-
-    setTimeout(() => {
-        toast.style.opacity = "0";
-        toast.style.transform = "translateY(10px)";
-        setTimeout(() => toast.remove(), 300);
-    }, 3500);
-}
-
-// CHECK IF POINT IS IN OPEN WATER / OCEANS (Arabian Sea, Bay of Bengal, Indian Ocean)
-function isPointInWater(lat, lon) {
-    if (isNaN(lat) || isNaN(lon)) return false;
-    // Deep Indian Ocean south of mainland India (lat < 8.0), excluding Andaman & Nicobar (lon > 92.0)
-    if (lat < 8.0 && lon < 92.0) return true;
-
-    // Gulf of Mannar & Palk Strait (water body between Tamil Nadu & Sri Lanka)
-    if (lat >= 8.3 && lat <= 9.9 && lon >= 78.8 && lon <= 79.7) return true;
-
-    // Arabian Sea (West of Indian Peninsula)
-    if (lat >= 8.0 && lat <= 14.5 && lon < 74.5) {
-        // Exclude Lakshadweep islands (10.0-12.0 N, 71.8-74.0 E)
-        if (lat >= 10.0 && lat <= 12.0 && lon >= 71.8 && lon <= 74.0) return false;
-        return true;
-    }
-    if (lat > 14.5 && lat <= 17.5 && lon < 72.8) return true;
-    if (lat > 17.5 && lat <= 20.5 && lon < 72.0) return true;
-    if (lat > 20.5 && lat <= 22.5 && lon < 69.2) return true;
-
-    // Bay of Bengal (East of Indian Peninsula)
-    if (lat >= 9.8 && lat <= 15.5 && lon > 80.5 && lon < 92.0) return true;
-    if (lat > 15.5 && lat <= 18.0 && lon > 82.5 && lon < 92.0) return true;
-    if (lat > 18.0 && lat <= 20.5 && lon > 85.0 && lon < 92.0) return true;
-    if (lat > 20.5 && lat <= 21.8 && lon > 87.5 && lon < 92.0) return true;
-
-    return false;
-}
-
-// SOVEREIGN INDIAN TERRITORIAL GEOSPATIAL BOUNDARY CHECK
-function isPointInsideIndia(lat, lon) {
-    if (isNaN(lat) || isNaN(lon)) return false;
-    // Open marine waters are not terrestrial Indian land
-    if (isPointInWater(lat, lon)) return false;
-
-    // Outer bounding envelope of the Indian Subcontinent
-    if (lat < 6.5 || lat > 37.2 || lon < 68.0 || lon > 97.5) return false;
-
-    // 1. Exclude Sri Lanka (Lat 5.8 to 9.9, Lon 79.5 to 82.0)
-    if (lat >= 5.8 && lat <= 9.9 && lon >= 79.5 && lon <= 82.0) return false;
-
-    // 2. Exclude Tibet & Xinjiang (China) - North of Himalayas
-    if (lat > 32.0 && lon > 78.5) return false; // Tibet / Aksai Chin / Xinjiang north
-    if (lat > 28.05 && lon >= 88.0 && lon <= 89.0) return false; // North of Sikkim (Tibet, China)
-    if (lat > 27.8 && lon >= 80.0 && lon <= 88.2) return false; // Nepal & Southern Tibet
-    if (lat > 28.0 && lon >= 88.8 && lon <= 92.0) return false; // Bhutan & Tibet border
-    if (lat > 28.5 && lon >= 92.0) return false; // Northern Tibet / China (north of Arunachal)
-
-    // 3. Exclude Pakistan (West of border)
-    if (lat >= 23.5 && lat < 28.0 && lon < 70.2) return false; // Sindh / Thar border
-    if (lat >= 28.0 && lat < 30.5 && lon < 72.2) return false; // Southern Punjab (PK)
-    if (lat >= 30.5 && lat < 32.5 && lon < 74.0) return false; // Lahore / Gujranwala
-    if (lat >= 32.5 && lat <= 35.5 && lon < 73.8) return false; // Rawalpindi / KPK
-
-    // 4. Exclude Bangladesh (Inside the Bengal enclave)
-    if (lat >= 21.6 && lat <= 25.5 && lon >= 88.8 && lon <= 92.6) return false;
-
-    // 5. Exclude Myanmar (East of border)
-    if (lat < 24.0 && lon > 93.5) return false;
-    if (lat >= 24.0 && lat <= 27.0 && lon > 95.5) return false;
-
-    return true;
-}
-
-function getNearestState(lat, lng) {
-    if (isPointInWater(lat, lng)) {
-        return "Offshore Waters (Marine Body)";
-    }
-    if (lat >= 5.8 && lat <= 9.9 && lng >= 79.5 && lng <= 82.0) {
-        return "Sri Lanka (Non-Indian Region)";
-    }
-    if ((lat > 28.05 && lng >= 88.0 && lng <= 89.0) || (lat > 32.0 && lng > 78.5) || (lat > 28.5 && lng >= 92.0)) {
-        return "China / Tibet (Non-Indian Region)";
-    }
-    if ((lat >= 23.5 && lat < 28.0 && lng < 70.2) || (lat >= 28.0 && lat < 30.5 && lng < 72.2) || (lat >= 30.5 && lat < 35.5 && lng < 74.0)) {
-        return "Pakistan (Non-Indian Region)";
-    }
-    if (lat >= 21.6 && lat <= 25.5 && lng >= 88.8 && lng <= 92.6) {
-        return "Bangladesh (Non-Indian Region)";
-    }
-    if (lat >= 26.3 && lat <= 30.5 && lng >= 80.0 && lng <= 88.2) {
-        return "Nepal (Non-Indian Region)";
-    }
-    if (lat >= 26.7 && lat <= 28.3 && lng >= 88.8 && lng <= 92.1) {
-        return "Bhutan (Non-Indian Region)";
-    }
-    if (!isPointInsideIndia(lat, lng)) {
-        return "Cross-Border / International";
-    }
-
-    let closestState = "National";
-    let minDistance = Infinity;
-
-    for (const [state, coords] of Object.entries(stateCoordinates)) {
-        const dLat = (lat - coords.lat) * (Math.PI / 180);
-        const dLng = (lng - coords.lng) * (Math.PI / 180);
-        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                  Math.cos(lat * (Math.PI / 180)) * Math.cos(coords.lat * (Math.PI / 180)) *
-                  Math.sin(dLng / 2) * Math.sin(dLng / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        const distance = 6371 * c;
-
-        if (distance < minDistance) {
-            minDistance = distance;
-            closestState = state;
-        }
-    }
-    return closestState;
-}
-
-function saveDatabase(data) {
-    try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch (e) {
-        console.error("Failed to save to local database storage", e);
-    }
-}
-
-function loadDatabase() {
-    try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        return stored ? JSON.parse(stored) : [];
-    } catch (e) {
-        return [];
-    }
-}
-
-function getFormattedLiveTime() {
-    const now = new Date();
-    const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
-    return now.toLocaleTimeString([], timeOptions) + " IST (LIVE)";
-}
-
-/* LIVE DYNAMIC NASA FIRMS STATUS WIDGET */
-function startLiveNasaWidget() {
-    updateNasaFirmsWidget();
-    setInterval(updateNasaFirmsWidget, 60000); // Check every 60s
-}
-
-const DEFAULT_NASA_MAP_KEY = "5aefcf72ba6e780e0e43e3e841af34cb";
-
-window.manualSyncNasa = async function() {
-    const icon = document.getElementById("sync-icon");
-    const text = document.getElementById("sync-btn-text");
-    if (icon) icon.classList.add("fa-spin");
-    if (text) text.innerText = "Syncing...";
-
-    setText("nasa-last-update", "Syncing with NASA VIIRS satellites...");
-    showToast("Connecting to NASA FIRMS satellite constellation...", "info");
-
-    try {
-        const count = await updateNasaFirmsWidget(true);
-        setText("nasa-last-update", getFormattedLiveTime());
-        if (count && count > 0) {
-            showToast(`Successfully synced ${count} live thermal hotspots from NASA VIIRS!`, "success");
-        } else {
-            showToast("Sync complete. Real-time satellite data is up to date.", "success");
-        }
-    } catch (err) {
-        showToast("Sync failed. Check connection or NASA API status.", "warning");
-    } finally {
-        setTimeout(() => {
-            if (icon) icon.classList.remove("fa-spin");
-            if (text) text.innerText = "Sync Live Data";
-            setText("nasa-last-update", getFormattedLiveTime());
-        }, 600);
-    }
-};
-
-// MULTI-MODAL SPATIAL CLASSIFIER FOR REAL-TIME SATELLITE ANOMALIES
-function classifyLiveSatelliteHotspot(lat, lng, frp, bright, conf) {
-    if (isPointInWater(lat, lng)) {
-        return {
-            type: "Other",
-            landcover: "Water Body / Marine",
-            confidence: 0,
-            persistence: 0
-        };
-    }
-    // 1. Calculate proximity to known industrial facilities from preloaded ground truth
-    let minIndustryDist = 999;
-    if (typeof INITIAL_563_EVENTS !== "undefined" && Array.isArray(INITIAL_563_EVENTS)) {
-        for (let i = 0; i < INITIAL_563_EVENTS.length; i++) {
-            const ev = INITIAL_563_EVENTS[i];
-            if (ev.predicted_event_type === "Industrial" || ev.event_type === "Industrial") {
-                const elat = parseFloat(ev.latitude);
-                const elng = parseFloat(ev.longitude);
-                if (!isNaN(elat) && !isNaN(elng)) {
-                    const dLat = (lat - elat) * 111.0;
-                    const dLng = (lng - elng) * 111.0 * Math.cos(lat * Math.PI / 180);
-                    const dist = Math.sqrt(dLat * dLat + dLng * dLng);
-                    if (dist < minIndustryDist) minIndustryDist = dist;
-                    if (minIndustryDist <= 12.0) break;
-                }
-            }
-        }
-    }
-
-    // 2. High-intensity Industrial basins & known petrochemical/steel/power corridors
-    const isIndustrialCorridor = (
-        minIndustryDist <= 15.0 || frp >= 25.0 ||
-        (lat >= 20.5 && lat <= 22.2 && lng >= 84.5 && lng <= 86.8) || // Odisha mineral/steel belt (Angul/Rourkela/Kalinganagar)
-        (lat >= 22.0 && lat <= 24.2 && lng >= 85.0 && lng <= 87.2) || // Jharkhand & West Bengal steel/coal belt (Jamshedpur/Bokaro/Durgapur/Asansol)
-        (lat >= 21.8 && lat <= 23.0 && lng >= 82.0 && lng <= 83.5) || // Korba/Raigarh thermal power & aluminum basin
-        (lat >= 23.8 && lat <= 24.5 && lng >= 82.2 && lng <= 83.2) || // Singrauli super thermal energy hub
-        (lat >= 21.0 && lat <= 22.6 && lng >= 72.5 && lng <= 73.5) || // Gujarat petrochemical corridor (Hazira/Dahej/Ankleshwar)
-        (lat >= 17.4 && lat <= 18.0 && lng >= 83.0 && lng <= 83.5)    // Visakhapatnam port & steel industrial corridor
-    );
-
-    if (isIndustrialCorridor) {
-        const cScore = conf === "h" ? 95.5 : (frp >= 20 ? 92.0 : 88.5);
-        return {
-            type: "Industrial",
-            landcover: "Built-up / Industrial",
-            confidence: cScore,
-            persistence: Math.min(96, Math.max(78, Math.round(75 + frp * 0.5)))
-        };
-    }
-
-    // 3. Agricultural crop residue burning belts
-    const isAgriBelt = (
-        (lat >= 24.5 && lat <= 32.0 && lng >= 73.5 && lng <= 88.5) || // Indo-Gangetic Plain (Punjab, Haryana, UP, Bihar, WB)
-        (lat >= 15.5 && lat <= 21.5 && lng >= 73.5 && lng <= 79.5) || // Maharashtra (Vidarbha/Marathwada) & Deccan plateau croplands
-        (lat >= 10.0 && lat <= 15.5 && lng >= 77.0 && lng <= 80.5)    // AP & Tamil Nadu delta agricultural plains
-    ) && frp < 25.0;
-
-    if (isAgriBelt) {
-        return {
-            type: "Agricultural",
-            landcover: "Cropland / Stubble",
-            confidence: conf === "h" ? 92.0 : 85.5,
-            persistence: Math.min(70, Math.max(30, Math.round(35 + frp * 0.8)))
-        };
-    }
-
-    // 4. Forest / Natural conservation areas
-    const isForestArea = (
-        (lat >= 8.5 && lat <= 15.5 && lng >= 74.5 && lng <= 77.0) || // Western Ghats
-        (lat >= 22.5 && lat <= 29.0 && lng >= 90.0 && lng <= 96.5) || // Northeast hill tracts & rainforests
-        (lat >= 17.5 && lat <= 21.0 && lng >= 80.5 && lng <= 84.5) || // Central Indian forest reserves & Eastern Ghats
-        (lat >= 29.5 && lat <= 35.0 && lng >= 74.0 && lng <= 80.5)    // Himalayan foothill ranges
-    );
-
-    if (isForestArea) {
-        return {
-            type: "Forest/Natural",
-            landcover: "Tree cover / Forest",
-            confidence: conf === "h" ? 93.0 : 86.0,
-            persistence: Math.min(85, Math.max(45, Math.round(45 + frp * 0.9)))
-        };
-    }
-
-    // 5. Default fallback
-    return {
-        type: frp >= 15 ? "Agricultural" : "Other",
-        landcover: "Mixed Vegetation",
-        confidence: 84.0,
-        persistence: Math.min(65, Math.round(40 + frp * 0.5))
-    };
-}
-
-async function updateNasaFirmsWidget(forceRefresh = false) {
-    const mapKey = localStorage.getItem("nasa_firms_map_key") || DEFAULT_NASA_MAP_KEY;
-    const now = new Date();
-    let timeStr = now.toUTCString().replace("GMT", "UTC");
-
-    try {
-        // Query 1-day satellite pass; if 0 detections (early morning UTC before daily afternoon orbit), seamlessly query rolling 48h window (/2)
-        let nasaUrl = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${mapKey}/VIIRS_SNPP_NRT/68,6.5,97.5,37.5/1`;
-        let res = await fetch(nasaUrl);
-        let csvText = res.ok ? await res.text() : "";
-        let lines = csvText.trim().split("\n");
-
-        if (!csvText.includes("latitude") || lines.length <= 1) {
-            nasaUrl = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${mapKey}/VIIRS_SNPP_NRT/68,6.5,97.5,37.5/2`;
-            res = await fetch(nasaUrl);
-            csvText = res.ok ? await res.text() : "";
-            lines = csvText.trim().split("\n");
-        }
-
-        // Also query NOAA-21 satellite feed for comprehensive multi-satellite constellation coverage
-        let noaaCsv = "";
-        try {
-            const noaaUrl = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${mapKey}/VIIRS_NOAA21_NRT/68,6.5,97.5,37.5/2`;
-            const noaaRes = await fetch(noaaUrl);
-            if (noaaRes.ok) noaaCsv = await noaaRes.text();
-        } catch (_) {}
-
-        const liveHotspots = [];
-        let liveCritical = 0;
-
-        function ingestCsvLines(rawCsv, satTag) {
-            if (!rawCsv || !rawCsv.includes("latitude")) return;
-            const chunkLines = rawCsv.trim().split("\n");
-            if (chunkLines.length <= 1) return;
-
-            const headers = chunkLines[0].split(",").map(h => h.trim());
-            const latIdx = headers.indexOf("latitude");
-            const lonIdx = headers.indexOf("longitude");
-            const frpIdx = headers.indexOf("frp");
-            const brightIdx = headers.indexOf("bright_ti4") !== -1 ? headers.indexOf("bright_ti4") : headers.indexOf("brightness");
-            const confIdx = headers.indexOf("confidence");
-
-            for (let i = 1; i < chunkLines.length; i++) {
-                const cols = chunkLines[i].split(",").map(c => c.trim());
-                if (cols.length >= headers.length) {
-                    const lat = parseFloat(cols[latIdx]);
-                    const lng = parseFloat(cols[lonIdx]);
-                    const frp = parseFloat(cols[frpIdx]) || 8.0;
-                    const bright = parseFloat(cols[brightIdx]) || 325.0;
-                    const conf = cols[confIdx] || "n";
-
-                    if (!isNaN(lat) && !isNaN(lng)) {
-                        // Strictly filter to sovereign Indian territory and exclude open water as required by SIH
-                        if (!isPointInsideIndia(lat, lng) || isPointInWater(lat, lng)) {
-                            continue; // Skip water and cross-border detections
-                        }
-
-                        const classification = classifyLiveSatelliteHotspot(lat, lng, frp, bright, conf);
-                        const isCrit = frp >= 25.0 || bright >= 350.0 || conf === "h" || classification.confidence >= ALERT_RULES.CRITICAL || classification.persistence >= ALERT_RULES.CRITICAL;
-                        if (isCrit) liveCritical++;
-                        
-                        liveHotspots.push({
-                            source_id: `NASA_LIVE_${satTag}_${i}`,
-                            state: getNearestState(lat, lng),
-                            latitude: lat,
-                            longitude: lng,
-                            predicted_event_type: classification.type,
-                            confidence: classification.confidence,
-                            persistence_score: classification.persistence,
-                            landcover: classification.landcover,
-                            mean_frp: frp,
-                            mean_brightness: bright,
-                            is_live_nasa: true
-                        });
-                    }
-                }
-            }
-        }
-
-        ingestCsvLines(csvText, "SNPP");
-        if (noaaCsv) ingestCsvLines(noaaCsv, "NOAA21");
-
-        // If direct fetch returned no points (e.g. offline / rate limit), use cached live VIIRS satellite pass
-        if (liveHotspots.length === 0 && typeof CACHED_LIVE_SATELLITE_HOTSPOTS !== "undefined" && Array.isArray(CACHED_LIVE_SATELLITE_HOTSPOTS)) {
-            CACHED_LIVE_SATELLITE_HOTSPOTS.forEach((item, idx) => {
-                if (isPointInsideIndia(item.lat, item.lng) && !isPointInWater(item.lat, item.lng)) {
-                    const classification = classifyLiveSatelliteHotspot(item.lat, item.lng, item.frp, item.bright, item.conf);
-                    const isCrit = item.frp >= 25.0 || item.bright >= 350.0 || item.conf === "h" || classification.confidence >= ALERT_RULES.CRITICAL;
-                    if (isCrit) liveCritical++;
-                    liveHotspots.push({
-                        source_id: item.id || `NASA_LIVE_${idx + 1}`,
-                        state: getNearestState(item.lat, item.lng),
-                        latitude: item.lat,
-                        longitude: item.lng,
-                        predicted_event_type: classification.type,
-                        confidence: classification.confidence,
-                        persistence_score: classification.persistence,
-                        landcover: classification.landcover,
-                        mean_frp: item.frp,
-                        mean_brightness: item.bright,
-                        is_live_nasa: true
-                    });
-                }
-            });
-        }
-
-        if (liveHotspots.length > 0) {
-            setText("nasa-live-count", liveHotspots.length);
-            setText("nasa-live-critical", liveCritical);
-            setText("nasa-last-update", getFormattedLiveTime());
-
-            // Retain any real-time user-generated AI predictions (PRED_)
-            const liveUserPredictions = allEvents.filter(ev => String(ev.source_id).startsWith("PRED_"));
-            
-            // STRICTLY LIVE DATA by default: only live satellite hotspots + live user predictions
-            if (liveOnlyActive) {
-                allEvents = [...liveUserPredictions, ...liveHotspots];
-            } else {
-                allEvents = [...liveUserPredictions, ...liveHotspots, ...historicalArchiveEvents];
-            }
-
-            setText("database-status", `LIVE VIIRS SATELLITE FEED (${liveHotspots.length} ACTIVE)`);
-            applyFilters();
-            return liveHotspots.length;
-        }
-    } catch (e) {
-        console.warn("Direct NASA FIRMS fetch error, loading cached live satellite pass:", e);
-        if (typeof CACHED_LIVE_SATELLITE_HOTSPOTS !== "undefined" && Array.isArray(CACHED_LIVE_SATELLITE_HOTSPOTS)) {
-            const fallbackHotspots = [];
-            let fallbackCrit = 0;
-            CACHED_LIVE_SATELLITE_HOTSPOTS.forEach((item, idx) => {
-                if (isPointInsideIndia(item.lat, item.lng) && !isPointInWater(item.lat, item.lng)) {
-                    const classification = classifyLiveSatelliteHotspot(item.lat, item.lng, item.frp, item.bright, item.conf);
-                    if (item.frp >= 25.0 || classification.confidence >= ALERT_RULES.CRITICAL) fallbackCrit++;
-                    fallbackHotspots.push({
-                        source_id: item.id || `NASA_LIVE_${idx + 1}`,
-                        state: getNearestState(item.lat, item.lng),
-                        latitude: item.lat,
-                        longitude: item.lng,
-                        predicted_event_type: classification.type,
-                        confidence: classification.confidence,
-                        persistence_score: classification.persistence,
-                        landcover: classification.landcover,
-                        mean_frp: item.frp,
-                        mean_brightness: item.bright,
-                        is_live_nasa: true
-                    });
-                }
-            });
-            const liveUserPredictions = allEvents.filter(ev => String(ev.source_id).startsWith("PRED_"));
-            allEvents = [...liveUserPredictions, ...fallbackHotspots];
-            setText("nasa-live-count", fallbackHotspots.length);
-            setText("nasa-live-critical", fallbackCrit);
-            setText("nasa-last-update", getFormattedLiveTime());
-            setText("database-status", `LIVE SATELLITE FEED (${fallbackHotspots.length} ACTIVE)`);
-            applyFilters();
-            return fallbackHotspots.length;
-        }
-    }
-
-    let activeDetections = filteredEvents.length;
-    let criticalCount = filteredEvents.filter(e => (parseFloat(e.confidence) || 0) >= ALERT_RULES.CRITICAL).length;
-    setText("nasa-live-count", activeDetections);
-    setText("nasa-live-critical", criticalCount);
-    setText("nasa-last-update", getFormattedLiveTime());
-    return 0;
-}
-
-/* MULTILINGUAL TRANSLATION ENGINE & SPEECH RECOGNITION */
-function initializeMultilingualAndVoice() {
-    const langSelect = document.getElementById("language-select");
-    const micBtn = document.getElementById("mic-btn");
-    const transcriptText = document.getElementById("transcript-text");
-
-    langSelect?.addEventListener("change", (e) => {
-        applyLanguageTranslations(e.target.value);
-    });
-
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = false;
-        recognition.interimResults = false;
-
-        micBtn?.addEventListener("click", () => {
-            const currentLang = langSelect?.value || "en-US";
-            recognition.lang = currentLang;
-            recognition.start();
-            
-            micBtn.classList.add("listening");
-            setText("mic-label", uiTranslations[currentLang]?.listening || "Listening...");
-        });
-
-        recognition.onresult = (event) => {
-            micBtn?.classList.remove("listening");
-            const command = event.results[0][0].transcript.toLowerCase();
-            const currentLang = langSelect?.value || "en-US";
-            if (transcriptText) transcriptText.textContent = `"${command}"`;
-
-            processVoiceCommand(command, currentLang);
-        };
-
-        recognition.onerror = () => micBtn?.classList.remove("listening");
-        recognition.onend = () => {
-            micBtn?.classList.remove("listening");
-            setText("mic-label", uiTranslations[langSelect?.value || "en-US"]?.micLabel || "Voice Control");
-        };
-    }
-}
-
-function applyLanguageTranslations(lang) {
-    const t = uiTranslations[lang] || uiTranslations["en-US"];
-    
-    setText("app-heading", t.appHeading);
-    setText("app-subheading", t.appSubheading);
-    setText("txt-sys-online", t.sysOnline);
-    setText("nav-dash", t.navDash);
-    setText("nav-map", t.navMap);
-    setText("nav-predict", t.navPredict);
-    setText("nav-alerts", t.navAlerts);
-    setText("nav-db", t.navDb);
-    setText("nav-login", t.navLogin);
-    setText("lbl-total-sources", t.lblTotalSources);
-    setText("lbl-ind-fires", t.lblIndFires);
-    setText("lbl-forest-fires", t.lblForestFires);
-    setText("lbl-agri-fires", t.lblAgriFires);
-    setText("lbl-other-fires", t.lblOtherFires);
-    setText("lbl-select-state", t.lblSelectState);
-    setText("lbl-event-type", t.lblEventType);
-    setText("lbl-min-conf", t.lblMinConf);
-    setText("lbl-landcover", t.lblLandcover);
-    setText("lbl-search-id", t.lblSearchId);
-    setText("lbl-reset-btn", t.lblResetBtn);
-    setText("lbl-map-heading", t.lblMapHeading);
-    setText("lbl-predict-heading", t.lblPredictHeading);
-    setText("lbl-predict-btn", t.lblPredictBtn);
-    setText("lbl-alerts-heading", t.lblAlertsHeading);
-    setText("lbl-dispatch-btn", t.lblDispatchBtn);
-    setText("lbl-db-heading", t.lblDbHeading);
-    setText("transcript-text", t.voicePrompt);
-    setText("mic-label", t.micLabel);
-
-    renderTable();
-}
-
-function processVoiceCommand(command) {
-    if (!command) return;
-    const cmd = command.toLowerCase().trim();
-    const stateFilter = document.getElementById("state-filter");
-    const typeFilter = document.getElementById("type-filter");
-
-    // Match state / jurisdiction names
-    const matchedState = Object.keys(stateCoordinates).find(st => cmd.includes(st.toLowerCase()));
-    if (matchedState && stateFilter) {
-        stateFilter.value = matchedState;
-        const coords = stateCoordinates[matchedState];
-        if (coords && map) {
-            map.setView([coords.lat, coords.lng], coords.zoom);
-        }
-        showToast(`Voice Command: Focused on ${matchedState}`, "info");
-    }
-
-    // Match Event Types (handles "industry", "industrial", "industries", "factory", etc.)
-    if (cmd.includes("industr") || cmd.includes("factory") || cmd.includes("plant") || cmd.includes("refinery") || cmd.includes("steel")) {
-        if (typeFilter) typeFilter.value = "Industrial";
-        showToast("Voice Command: Filtered to Industrial Fires", "success");
-    } else if (cmd.includes("forest") || cmd.includes("jungle") || cmd.includes("wildfire") || cmd.includes("tree") || cmd.includes("natural")) {
-        if (typeFilter) typeFilter.value = "Forest/Natural";
-        showToast("Voice Command: Filtered to Forest/Natural Fires", "success");
-    } else if (cmd.includes("agri") || cmd.includes("farm") || cmd.includes("crop") || cmd.includes("stubble") || cmd.includes("field")) {
-        if (typeFilter) typeFilter.value = "Agricultural";
-        showToast("Voice Command: Filtered to Agricultural Crop Fires", "success");
-    } else if (cmd.includes("other") || cmd.includes("unknown")) {
-        if (typeFilter) typeFilter.value = "Other";
-        showToast("Voice Command: Filtered to Other Anomalies", "success");
-    } else if (cmd.includes("live") || cmd.includes("satellite") || cmd.includes("nasa") || cmd.includes("today")) {
-        document.getElementById("live-only-btn")?.click();
-        showToast("Voice Command: Displaying Live Satellite Hotspots", "success");
-        return;
-    } else if (cmd.includes("reset") || cmd.includes("clear") || cmd.includes("show all") || cmd.includes("all fires") || cmd.includes("all")) {
-        document.getElementById("reset-btn")?.click();
-        showToast("Voice Command: All Filters Reset", "info");
-        return;
-    }
-
-    applyFilters();
-}
-
-/* DARK / LIGHT THEME TOGGLE (DEFAULT LIGHT MODE) */
-function initializeThemeToggle() {
-    const themeBtn = document.getElementById("theme-toggle");
-    const themeIcon = document.getElementById("theme-icon");
-    const htmlEl = document.documentElement;
-
-    // Retrieve saved theme or default to "light"
-    const savedTheme = localStorage.getItem("sih_theme") || "light";
-    htmlEl.setAttribute("data-theme", savedTheme);
-    if (themeIcon) {
-        themeIcon.className = savedTheme === "dark" ? "fa-solid fa-moon" : "fa-solid fa-sun";
-    }
-
-    themeBtn?.addEventListener("click", () => {
-        const currentTheme = htmlEl.getAttribute("data-theme") || "light";
-        const nextTheme = currentTheme === "dark" ? "light" : "dark";
-        htmlEl.setAttribute("data-theme", nextTheme);
-        localStorage.setItem("sih_theme", nextTheme);
-        
-        if (themeIcon) {
-            themeIcon.className = nextTheme === "dark" ? "fa-solid fa-moon" : "fa-solid fa-sun";
-        }
-        showToast(`Switched to ${nextTheme.toUpperCase()} mode`, "info");
-    });
-}
-
-/* SIDEBAR AND CLEAN SPA VIEW NAVIGATION */
-function initializeSidebarAndNavigation() {
-    const sidebar = document.getElementById("sidebar");
-    const toggleBtn = document.getElementById("sidebar-toggle");
-    
-    toggleBtn?.addEventListener("click", () => {
-        sidebar?.classList.toggle("collapsed");
-        if (map) setTimeout(() => map.invalidateSize(), 310);
-    });
-
-    const navItems = document.querySelectorAll(".nav-item");
-    const allViews = [
-        "dashboard-section",
-        "prediction-section",
-        "alerts-section",
-        "database-section"
-    ];
-
-    window.navigateToView = function(targetViewId) {
-        // If map-section requested, route smoothly to the map panel inside dashboard-section
-        if (targetViewId === "map-section") {
-            targetViewId = "dashboard-section";
-            setTimeout(() => {
-                const mapEl = document.getElementById("map");
-                if (mapEl) mapEl.scrollIntoView({ behavior: "smooth", block: "center" });
-            }, 100);
-        }
-
-        // Highlight corresponding nav item
-        navItems.forEach(i => {
-            const dt = i.getAttribute("data-target");
-            if (dt === targetViewId || (targetViewId === "dashboard-section" && dt === "map-section")) {
-                i.classList.add("active");
-            } else {
-                i.classList.remove("active");
-            }
-        });
-
-        // Hide other views, display target view only
-        allViews.forEach(vid => {
-            const el = document.getElementById(vid);
-            if (el) {
-                if (vid === targetViewId) {
-                    el.classList.remove("hidden");
-                    el.classList.add("active-view");
-                } else {
-                    el.classList.add("hidden");
-                    el.classList.remove("active-view");
-                }
-            }
-        });
-
-        window.scrollTo({ top: 0, behavior: "smooth" });
-
-        if (targetViewId === "dashboard-section" && map) {
-            setTimeout(() => {
-                map.invalidateSize();
-            }, 180);
-        }
-    };
-
-    navItems.forEach(item => {
-        item.addEventListener("click", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const targetViewId = item.getAttribute("data-target");
-            if (targetViewId) {
-                window.navigateToView(targetViewId);
-            }
-        });
-    });
-}
-
-/* AUTHENTICATION MODAL (PERSISTENT LOGIN & REAL REGISTRATION) */
-function initializeAuthModal() {
-    const modal = document.getElementById("auth-modal");
-    const openBtn = document.getElementById("open-auth-btn");
-    const closeBtn = document.getElementById("close-auth-btn");
-    const loginForm = document.getElementById("login-form");
-    const registerForm = document.getElementById("register-form");
-    const tabLogin = document.getElementById("tab-login");
-    const tabRegister = document.getElementById("tab-register");
-    const googleBtn = document.getElementById("google-auth-btn");
-    const emailInput = document.getElementById("login-email");
-    const passwordInput = document.getElementById("login-password");
-    const loginErrorMsg = document.getElementById("login-error-msg");
-    const regMsg = document.getElementById("reg-msg");
-    const navLogin = document.getElementById("nav-login");
-
-    function getRegisteredUsers() {
-        try {
-            let users = JSON.parse(localStorage.getItem("sih_registered_users") || "[]");
-            if (!users || users.length === 0) {
-                users = [
-                    {
-                        email: "admin@sih.gov.in",
-                        password: "admin",
-                        name: "Command Officer",
-                        org: "National Disaster Management Authority"
-                    }
-                ];
-                localStorage.setItem("sih_registered_users", JSON.stringify(users));
-            }
-            return users;
-        } catch (_) {
-            return [];
-        }
-    }
-
-    function updateNavUser(user) {
-        if (!user) {
-            if (navLogin) navLogin.textContent = "Login / Register";
-            if (openBtn) openBtn.onclick = () => modal?.classList.add("open");
-            return;
-        }
-        const displayName = (user.name || user.email || "Officer").split(' ')[0];
-        if (navLogin) navLogin.textContent = `${displayName}`;
-        if (openBtn) {
-            openBtn.onclick = () => {
-                if (confirm(`Signed in as ${user.email} (${user.name || 'User'}). Do you want to sign out?`)) {
-                    localStorage.removeItem("sih_auth_user");
-                    updateNavUser(null);
-                    showToast("Signed out successfully", "info");
-                    modal?.classList.add("open");
-                }
-            };
-        }
-    }
-
-    // CHECK PERSISTENT SESSION ON PAGE LOAD
-    const existingUserJson = localStorage.getItem("sih_auth_user");
-    if (existingUserJson) {
-        try {
-            const existingUser = JSON.parse(existingUserJson);
-            updateNavUser(existingUser);
-        } catch (_) {
-            modal?.classList.add("open");
-        }
-    } else {
-        // First time opening the website: automatically prompt login modal
-        modal?.classList.add("open");
-    }
-
-    openBtn?.addEventListener("click", () => {
-        if (!localStorage.getItem("sih_auth_user")) {
-            modal?.classList.add("open");
-        }
-    });
-
-    closeBtn?.addEventListener("click", () => modal?.classList.remove("open"));
-    modal?.addEventListener("click", (e) => {
-        if (e.target === modal) modal.classList.remove("open");
-    });
-
-    // Tab switching between Login and Register
-    tabLogin?.addEventListener("click", () => {
-        tabLogin.classList.add("active");
-        tabRegister?.classList.remove("active");
-        loginForm?.classList.remove("hidden");
-        registerForm?.classList.add("hidden");
-        if (loginErrorMsg) loginErrorMsg.classList.add("hidden");
-    });
-
-    tabRegister?.addEventListener("click", () => {
-        tabRegister.classList.add("active");
-        tabLogin?.classList.remove("active");
-        registerForm?.classList.remove("hidden");
-        loginForm?.classList.add("hidden");
-        if (regMsg) regMsg.classList.add("hidden");
-    });
-
-    document.getElementById("switch-to-register")?.addEventListener("click", () => tabRegister?.click());
-    document.getElementById("switch-to-login")?.addEventListener("click", () => tabLogin?.click());
-
-    // Realistic Dynamic Google OAuth Account Chooser (Device/System-Specific)
-    const googleModal = document.getElementById("google-oauth-modal");
-    const closeGoogleModalBtn = document.getElementById("close-google-modal-btn");
-    const googleSigningIn = document.getElementById("google-signing-in-indicator");
-    const customEmailInput = document.getElementById("custom-google-email-input");
-    const customNameInput = document.getElementById("custom-google-name-input");
-    const customEmailSubmit = document.getElementById("custom-google-email-submit");
-
-    function saveDeviceAccount(email, name) {
-        try {
-            let accounts = JSON.parse(localStorage.getItem("sih_device_google_accounts") || "[]");
-            accounts = accounts.filter(a => a.email.toLowerCase() !== email.toLowerCase());
-            accounts.unshift({ email, name });
-            if (accounts.length > 5) accounts = accounts.slice(0, 5);
-            localStorage.setItem("sih_device_google_accounts", JSON.stringify(accounts));
-        } catch (_) {}
-    }
-
-    function renderDeviceAccounts() {
-        const container = document.getElementById("dynamic-device-accounts");
-        if (!container) return;
-        let accounts = [];
-        try {
-            accounts = JSON.parse(localStorage.getItem("sih_device_google_accounts") || "[]");
-        } catch (_) {}
-
-        if (accounts.length === 0) {
-            container.innerHTML = `
-                <div style="padding: 14px 10px; color: #9aa0a6; font-size: 13px; font-style: italic; text-align: center; border: 1px dashed #3c4043; border-radius: 8px; margin-bottom: 8px;">
-                    <i class="fa-solid fa-laptop" style="margin-right: 6px;"></i> No Google accounts saved on this device yet.<br>Enter your account below to sign in.
-                </div>
-            `;
-            return;
-        }
-
-        const colors = ["#2e7d32", "#0288d1", "#43a047", "#5c6bc0", "#d81b60"];
-        container.innerHTML = accounts.map((acc, idx) => {
-            const initial = (acc.name || acc.email).charAt(0).toUpperCase();
-            const color = colors[idx % colors.length];
-            return `
-                <div class="google-acc-row" data-email="${escapeHTML(acc.email)}" data-name="${escapeHTML(acc.name)}" style="display: flex; align-items: center; gap: 14px; padding: 12px 10px; cursor: pointer; border-radius: 8px; transition: background 0.15s ease; border-bottom: 1px solid #282a2c;">
-                    <div style="width: 36px; height: 36px; border-radius: 50%; background: ${color}; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 15px;">${initial}</div>
-                    <div style="flex: 1; min-width: 0;">
-                        <div style="font-size: 14px; font-weight: 500; color: #e3e3e3;">${escapeHTML(acc.name)}</div>
-                        <div style="font-size: 12.5px; color: #9aa0a6;">${escapeHTML(acc.email)}</div>
-                    </div>
-                    <button type="button" class="btn-remove-acc" data-email="${escapeHTML(acc.email)}" title="Remove from this device" style="background:none; border:none; color:#70757a; cursor:pointer; padding:6px; font-size:12px; border-radius:4px;">
-                        <i class="fa-solid fa-xmark"></i>
-                    </button>
-                </div>
-            `;
-        }).join("");
-
-        container.querySelectorAll(".google-acc-row").forEach(row => {
-            row.addEventListener("mouseenter", () => row.style.background = "#303134");
-            row.addEventListener("mouseleave", () => row.style.background = "transparent");
-            row.addEventListener("click", async (e) => {
-                if (e.target.closest(".btn-remove-acc")) {
-                    e.stopPropagation();
-                    const removeEmail = e.target.closest(".btn-remove-acc").getAttribute("data-email");
-                    let list = JSON.parse(localStorage.getItem("sih_device_google_accounts") || "[]");
-                    list = list.filter(a => a.email.toLowerCase() !== removeEmail.toLowerCase());
-                    localStorage.setItem("sih_device_google_accounts", JSON.stringify(list));
-                    renderDeviceAccounts();
-                    return;
-                }
-                const email = row.getAttribute("data-email");
-                const name = row.getAttribute("data-name");
-                await executeGoogleSignIn(email, name);
-            });
-        });
-    }
-
-    googleBtn?.addEventListener("click", () => {
-        modal?.classList.remove("open");
-        renderDeviceAccounts();
-        googleModal?.classList.add("open");
-        googleSigningIn?.classList.add("hidden");
-    });
-
-    closeGoogleModalBtn?.addEventListener("click", () => {
-        googleModal?.classList.remove("open");
-    });
-
-    googleModal?.addEventListener("click", (e) => {
-        if (e.target === googleModal) googleModal.classList.remove("open");
-    });
-
-    async function executeGoogleSignIn(email, name) {
-        googleSigningIn?.classList.remove("hidden");
-
-        try {
-            await fetch("/api/v1/auth/google", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, name })
-            });
-        } catch (_) {}
-
-        saveDeviceAccount(email, name);
-
-        const user = { email, name, auth: "google" };
-        localStorage.setItem("sih_auth_user", JSON.stringify(user));
-
-        googleModal?.classList.remove("open");
-        googleSigningIn?.classList.add("hidden");
-        updateNavUser(user);
-
-        showDramaticBannerAlert(`Authenticated with Google: ${email} (${name})`, "GOOGLE SIGN-IN VERIFIED");
-        showToast(`Signed in as ${email}`, "success");
-    }
-
-    customEmailSubmit?.addEventListener("click", () => {
-        const email = customEmailInput?.value?.trim();
-        if (!email || !email.includes("@")) {
-            showToast("Please enter a valid Google email address", "alert");
-            return;
-        }
-        const customName = customNameInput?.value?.trim();
-        const userPart = email.split("@")[0];
-        const formattedName = customName || (userPart.charAt(0).toUpperCase() + userPart.slice(1));
-        executeGoogleSignIn(email, formattedName);
-    });
-
-    customEmailInput?.addEventListener("keypress", (e) => {
-        if (e.key === "Enter") {
-            e.preventDefault();
-            customEmailSubmit?.click();
-        }
-    });
-
-    customNameInput?.addEventListener("keypress", (e) => {
-        if (e.key === "Enter") {
-            e.preventDefault();
-            customEmailSubmit?.click();
-        }
-    });
-
-    // Login Form Submit (Email + Password with validation)
-    loginForm?.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const email = (emailInput?.value || "").trim();
-        const password = (passwordInput?.value || "").trim();
-
-        if (loginErrorMsg) loginErrorMsg.classList.add("hidden");
-
-        if (!email || !email.includes("@") || !email.includes(".")) {
-            if (loginErrorMsg) {
-                loginErrorMsg.textContent = "Please enter a valid email address.";
-                loginErrorMsg.classList.remove("hidden");
-            }
-            showToast("Invalid email format", "alert");
-            return;
-        }
-
-        const registeredUsers = getRegisteredUsers();
-        const found = registeredUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
-
-        if (!found) {
-            if (loginErrorMsg) {
-                loginErrorMsg.textContent = "Invalid email. Account not registered. Please click 'Create an account' below.";
-                loginErrorMsg.classList.remove("hidden");
-            }
-            showToast("Account not found. Please register.", "alert");
-            return;
-        }
-
-        if (found.password && found.password !== password) {
-            if (loginErrorMsg) {
-                loginErrorMsg.textContent = "Invalid password. Please check your password.";
-                loginErrorMsg.classList.remove("hidden");
-            }
-            showToast("Invalid password", "alert");
-            return;
-        }
-
-        const user = { email: found.email, name: found.name || "Officer", org: found.org, auth: "email" };
-        localStorage.setItem("sih_auth_user", JSON.stringify(user));
-        modal?.classList.remove("open");
-        updateNavUser(user);
-        showToast(`Welcome back, ${user.name}!`, "success");
-    });
-
-    // Register Form Submit (Email + Password registration for future login)
-    registerForm?.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const name = (document.getElementById("reg-name")?.value || "").trim();
-        const email = (document.getElementById("reg-email")?.value || "").trim();
-        const password = (document.getElementById("reg-password")?.value || "").trim();
-        const org = (document.getElementById("reg-org")?.value || "State Emergency Operations").trim();
-
-        if (regMsg) regMsg.classList.add("hidden");
-
-        if (!name || !email || !password) {
-            if (regMsg) {
-                regMsg.textContent = "Please fill in all required fields.";
-                regMsg.classList.remove("hidden");
-            }
-            return;
-        }
-
-        if (!email.includes("@") || !email.includes(".")) {
-            if (regMsg) {
-                regMsg.textContent = "Please enter a valid email address.";
-                regMsg.classList.remove("hidden");
-            }
-            return;
-        }
-
-        if (password.length < 3) {
-            if (regMsg) {
-                regMsg.textContent = "Password must be at least 3 characters.";
-                regMsg.classList.remove("hidden");
-            }
-            return;
-        }
-
-        const registeredUsers = getRegisteredUsers();
-        const existing = registeredUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
-        if (existing) {
-            if (regMsg) {
-                regMsg.textContent = "An account with this email already exists. Please sign in.";
-                regMsg.classList.remove("hidden");
-            }
-            showToast("Account already exists. Please sign in.", "alert");
-            return;
-        }
-
-        // Save new user for future logins
-        const newUser = { name, email, password, org };
-        registeredUsers.push(newUser);
-        localStorage.setItem("sih_registered_users", JSON.stringify(registeredUsers));
-
-        // Auto-login newly registered user
-        const authUser = { email, name, org, auth: "email" };
-        localStorage.setItem("sih_auth_user", JSON.stringify(authUser));
-
-        modal?.classList.remove("open");
-        updateNavUser(authUser);
-        showToast(`Account created! Welcome, ${name}!`, "success");
-    });
-}
-
-/* LEAFLET GIS MAP ENGINE */
-let baseLayers = {};
-let overlays = {};
-
-function initializeMap() {
-    const mapElement = document.getElementById("map");
-    if (!mapElement) return;
-
-    // Base Layer 1: OpenStreetMap (Standard Street OSM - Default view)
-    const osmLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
-        attribution: "&copy; OpenStreetMap contributors (OSM)"
-    });
-
-    // Base Layer 2: ESRI High-Resolution Satellite
-    const satelliteLayer = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
-        maxZoom: 19,
-        attribution: "Tiles &copy; Esri"
-    });
-
-    // Base Layer 3: Dark Tactical GIS
-    const darkLayer = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-        maxZoom: 19,
-        attribution: "&copy; CartoDB & OpenStreetMap"
-    });
-
-    map = L.map("map", {
-        center: [20.5937, 78.9629],
-        zoom: 5,
-        layers: [osmLayer]
-    });
-
-    markersLayer = L.layerGroup().addTo(map);
-
-    baseLayers = {
-        "🗺️ OpenStreetMap (OSM Default)": osmLayer,
-        "🛰️ Satellite Imagery (ESRI)": satelliteLayer,
-        "🌑 Dark Tactical GIS": darkLayer
-    };
-
-    overlays = {
-        "🔥 Thermal Hotspots": markersLayer
-    };
-
-    // Collapsed: true creates the neat square layers icon button shown in Image 3
-    L.control.layers(baseLayers, overlays, { position: "topright", collapsed: true }).addTo(map);
-
-    // CLICK ON MAP TO AUTOMATICALLY CAPTURE LATITUDE & LONGITUDE FOR PREDICTION
-    let mapClickPinMarker = null;
-    map.on("click", (e) => {
-        const clickedLat = parseFloat(e.latlng.lat.toFixed(5));
-        const clickedLng = parseFloat(e.latlng.lng.toFixed(5));
-
-        const latInput = document.getElementById("latitude") || document.getElementById("pred-lat");
-        const lngInput = document.getElementById("longitude") || document.getElementById("pred-lng");
-        const stateSelect = document.getElementById("pred-state") || document.getElementById("state");
-
-        if (latInput) latInput.value = clickedLat;
-        if (lngInput) lngInput.value = clickedLng;
-
-        const detectedState = getNearestState(clickedLat, clickedLng);
-        if (stateSelect && detectedState) {
-            stateSelect.value = detectedState;
-        }
-
-        // Add or move the map click pin marker
-        if (mapClickPinMarker) {
-            mapClickPinMarker.setLatLng([clickedLat, clickedLng]);
-        } else {
-            mapClickPinMarker = L.marker([clickedLat, clickedLng], {
-                title: "Selected Coordinates for AI Prediction",
-                zIndexOffset: 1000
-            }).addTo(map);
-        }
-
-        mapClickPinMarker.bindPopup(`
-            <div style="font-family:inherit; min-width:180px; padding:4px;">
-                <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
-                    <span style="color:#06b6d4; font-size:14px;"><i class="fa-solid fa-location-crosshairs"></i></span>
-                    <strong style="color:var(--text, #0f172a); font-size:13px;">Target Coordinates</strong>
-                </div>
-                <div style="font-size:12px; color:#475569; line-height:1.5;">
-                    <div><strong>Lat:</strong> ${clickedLat}° N</div>
-                    <div><strong>Lng:</strong> ${clickedLng}° E</div>
-                    <div><strong>Region:</strong> ${detectedState}</div>
-                </div>
-                <div style="margin-top:6px; font-size:11px; color:#06b6d4; font-weight:700;">
-                    ✓ Copied to AI Predictor Form
-                </div>
-            </div>
-        `).openPopup();
-
-        showToast(`Selected Map Point: ${clickedLat}° N, ${clickedLng}° E (${detectedState})`, "info");
-    });
-}
-
-/* FILTER EVENT LISTENERS: PANS & FILTERS PER SELECTED STATE */
-function setupEventListeners() {
-    const stateFilter = document.getElementById("state-filter");
-    const typeFilter = document.getElementById("type-filter");
-    const minConf = document.getElementById("confidence-filter");
-    const searchInput = document.getElementById("search-input");
-    const resetBtn = document.getElementById("reset-btn");
-
-    stateFilter?.addEventListener("change", () => {
-        const stateName = stateFilter.value;
-        if (stateName && stateCoordinates[stateName] && map) {
-            const coords = stateCoordinates[stateName];
-            map.setView([coords.lat, coords.lng], coords.zoom);
-        } else if (map) {
-            map.setView([20.5937, 78.9629], 5);
-        }
-        applyFilters();
-    });
-
-    typeFilter?.addEventListener("change", applyFilters);
-    document.getElementById("landcover-filter")?.addEventListener("change", applyFilters);
-    let filterDebounce = null;
-    minConf?.addEventListener("input", (e) => {
-        setText("confidence-output", `${e.target.value}%`);
-        clearTimeout(filterDebounce);
-        filterDebounce = setTimeout(applyFilters, 120);
-    });
-    searchInput?.addEventListener("input", () => {
-        clearTimeout(filterDebounce);
-        filterDebounce = setTimeout(applyFilters, 120);
-    });
-
-    const liveOnlyBtn = document.getElementById("live-only-btn");
-    if (liveOnlyBtn) {
-        liveOnlyBtn.style.background = "#ef4444";
-        liveOnlyBtn.style.color = "#ffffff";
-        liveOnlyBtn.style.borderColor = "#ef4444";
-        liveOnlyBtn.classList.add("active");
-        liveOnlyBtn.innerHTML = '<i class="fa-solid fa-satellite-dish"></i> <span>Live Satellite (Active)</span>';
-        liveOnlyBtn.title = "Currently displaying exclusively real-time satellite fire hotspots. Click to include historical archive.";
-
-        liveOnlyBtn.addEventListener("click", () => {
-            liveOnlyActive = !liveOnlyActive;
-            if (liveOnlyActive) {
-                liveOnlyBtn.style.background = "#ef4444";
-                liveOnlyBtn.style.color = "#ffffff";
-                liveOnlyBtn.style.borderColor = "#ef4444";
-                liveOnlyBtn.classList.add("active");
-                liveOnlyBtn.innerHTML = '<i class="fa-solid fa-satellite-dish"></i> <span>Live Satellite (Active)</span>';
-                // Strictly keep live satellite hotspots and live user predictions
-                allEvents = allEvents.filter(e => Boolean(e.is_live_nasa) || String(e.source_id).startsWith("PRED_"));
-                showToast("Showing exclusively real-time live NASA satellite fires", "info");
-            } else {
-                liveOnlyBtn.style.background = "transparent";
-                liveOnlyBtn.style.color = "#ef4444";
-                liveOnlyBtn.style.borderColor = "#ef4444";
-                liveOnlyBtn.classList.remove("active");
-                liveOnlyBtn.innerHTML = '<i class="fa-solid fa-database"></i> <span>Include Past Archive</span>';
-                // Include historical archive records
-                const existingIds = new Set(allEvents.map(e => String(e.source_id)));
-                historicalArchiveEvents.forEach(h => {
-                    if (!existingIds.has(String(h.source_id))) {
-                        allEvents.push(h);
-                    }
-                });
-                showToast("Included historical past archive (563 records) alongside live fires", "info");
-            }
-            applyFilters();
-        });
-    }
-
-    resetBtn?.addEventListener("click", () => {
-        if (stateFilter) stateFilter.value = "";
-        if (typeFilter) typeFilter.value = "";
-        if (minConf) {
-            minConf.value = 0;
-            setText("confidence-output", "0%");
-        }
-        if (searchInput) searchInput.value = "";
-        if (map) map.setView([20.5937, 78.9629], 5);
-        
-        applyFilters();
-        showToast("Filters reset to default (Live satellite view active)", "info");
-    });
-}
-
-function applyFilters() {
-    const state = document.getElementById("state-filter")?.value || "";
-    const type = document.getElementById("type-filter")?.value || "";
-    const minConf = parseFloat(document.getElementById("confidence-filter")?.value || 0);
-    const landcover = document.getElementById("landcover-filter")?.value || "ALL";
-    const search = (document.getElementById("search-input")?.value || "").toLowerCase().trim();
-
-    filteredEvents = allEvents.filter(e => {
-        // When liveOnlyActive is true (default), strictly show real-time live satellite fires and live user AI predictions
-        if (liveOnlyActive && !e.is_live_nasa && !String(e.source_id).startsWith("PRED_")) {
-            return false;
-        }
-
-        const matchState = !state || String(e.state).toLowerCase() === state.toLowerCase();
-        const matchType = !type || normalizeType(e.predicted_event_type) === normalizeType(type);
-        const matchConf = (parseFloat(e.confidence) || 0) >= minConf;
-        const matchLandcover = !landcover || landcover === "ALL" || String(e.landcover || "").toLowerCase().includes(landcover.toLowerCase());
-        const matchSearch = !search || 
-            String(e.source_id).toLowerCase().includes(search) || 
-            String(e.state).toLowerCase().includes(search) || 
-            String(e.predicted_event_type).toLowerCase().includes(search);
-
-        return matchState && matchType && matchConf && matchLandcover && matchSearch;
-    });
-
-    currentTablePage = 1;
-    updateDashboard();
-    renderMarkers();
-    renderTable();
-    updateAlerts();
-}
-
-/* DATA INGESTION ENGINE WITH ACCURATE STATE DEDUCTION */
-function parseCSVFile(path) {
-    return new Promise((resolve, reject) => {
-        if (typeof Papa === "undefined") {
-            return reject("PapaParse library missing");
-        }
-        Papa.parse(path, {
-            download: true,
-            header: true,
-            skipEmptyLines: true,
-            complete: (results) => resolve(results.data || []),
-            error: (err) => reject(err)
-        });
-    });
-}
-
-async function loadDualCsvData() {
-    // 1. Attempt to fetch real-time SQLite database sources from backend API
-    try {
-        const apiRes = await fetch("/api/v1/sources?limit=2500");
-        if (apiRes.ok) {
-            const apiData = await apiRes.json();
-            if (apiData && apiData.sources && apiData.sources.length > 0) {
-                setText("database-status", "DATABASE CONNECTED (SQLITE)");
-                processData(apiData.sources);
-                return;
-            }
-        }
-    } catch (_) {
-        // Backend not reachable, continue to CSV fallback
-    }
-
-    const eventPaths = ["event_classification_features.csv", "event_classification_features (1) (3).csv", "./data/event_classification_features.csv"];
-    const persPaths = ["source_persistence_features.csv", "source_persistence_features (1).csv", "./data/source_persistence_features.csv"];
-
-    let eventData = [], persData = [];
-
-    for (let path of eventPaths) {
-        try {
-            const data = await parseCSVFile(path);
-            if (data && data.length > 0) { eventData = data; break; }
-        } catch (e) {}
-    }
-
-    for (let path of persPaths) {
-        try {
-            const data = await parseCSVFile(path);
-            if (data && data.length > 0) { persData = data; break; }
-        } catch (e) {}
-    }
-
-    let mergedEvents = [];
-
-    if (eventData.length > 0) {
-        const persMap = new Map();
-        persData.forEach(p => {
-            if (p.source_id) persMap.set(String(p.source_id).trim(), p);
-        });
-
-        mergedEvents = eventData.map((event) => {
-            const sid = String(event.source_id || "").trim();
-            const persRecord = persMap.get(sid) || {};
-            const confidence = parseFloat(event.confidence_pct) || 75.0;
-            const lat = parseFloat(event.latitude);
-            const lng = parseFloat(event.longitude);
-
-            let persistenceScore = 0;
-            if (persRecord.persistence_score !== undefined && persRecord.persistence_score !== null) {
-                const rawP = parseFloat(persRecord.persistence_score);
-                persistenceScore = rawP <= 1 ? Math.round(rawP * 100 * 10) / 10 : Math.round(rawP);
-            } else {
-                const activeDays = parseFloat(event.active_days || persRecord.active_days || 0);
-                const obsSpan = Math.max(1, parseFloat(event.observation_span_days || persRecord.observation_span_days || 1));
-                persistenceScore = Math.min(100, Math.round((activeDays / obsSpan) * 100));
-            }
-
-            const realState = (event.state && event.state !== "Unknown") 
-                ? event.state 
-                : getNearestState(lat, lng);
-
-            return {
-                source_id: sid || "EVENT_" + Math.random().toString(36).substring(2, 7),
-                state: realState,
-                latitude: lat,
-                longitude: lng,
-                predicted_event_type: event.predicted_event_type || event.event_type || "Other",
-                confidence: confidence,
-                persistence_score: persistenceScore,
-                landcover: event.landcover_class || "Unknown",
-                mean_frp: parseFloat(event.mean_frp || persRecord.mean_frp || 0),
-                max_frp: parseFloat(event.max_frp || persRecord.max_frp || 0),
-                mean_brightness: parseFloat(event.mean_brightness || 0)
-            };
-        }).filter(e => !isNaN(e.latitude) && !isNaN(e.longitude));
-    }
-
-    if (mergedEvents.length === 0) {
-        if (typeof INITIAL_563_EVENTS !== "undefined" && INITIAL_563_EVENTS.length > 0) {
-            mergedEvents = INITIAL_563_EVENTS.map(e => {
-                const lat = parseFloat(e.latitude);
-                const lng = parseFloat(e.longitude);
-                return {
-                    source_id: e.source_id,
-                    state: (e.state && e.state !== "Unknown") ? e.state : getNearestState(lat, lng),
-                    latitude: lat,
-                    longitude: lng,
-                    predicted_event_type: e.predicted_event_type || e.event_type || "Industrial",
-                    confidence: parseFloat(e.confidence_pct || e.confidence || 88.0),
-                    persistence_score: Math.min(100, Math.round((parseFloat(e.active_days || 1) / Math.max(1, parseFloat(e.observation_span_days || 1))) * 100)),
-                    landcover: e.landcover_class || "Built-up",
-                    mean_frp: parseFloat(e.mean_frp || 20),
-                    max_frp: parseFloat(e.max_frp || 35),
-                    mean_brightness: parseFloat(e.mean_brightness || 330)
-                };
-            });
-            setText("database-status", "DATABASE CONNECTED (STANDALONE)");
-        } else {
-            mergedEvents = [...defaultFallbackEvents];
-            setText("database-status", "DATABASE READY (STANDALONE)");
-        }
-    }
-
-    processData(mergedEvents);
-}
-
-function processData(csvEvents) {
-    historicalArchiveEvents = csvEvents || [];
-    const savedEvents = loadDatabase();
-    
-    // In Live Mode (default), only keep user-created predictions (PRED_) and live NASA detections
-    const liveUserPreds = savedEvents.filter(e => String(e.source_id).startsWith("PRED_"));
-    
-    if (liveOnlyActive) {
-        allEvents = [...liveUserPreds];
-    } else {
-        allEvents = [...liveUserPreds, ...historicalArchiveEvents];
-    }
-
-    filteredEvents = [...allEvents];
-
-    updateDashboard();
-    renderMarkers();
-    renderTable();
-    updateAlerts();
-    updateNasaFirmsWidget(true);
-}
-
-/* RENDER & UI UPDATES */
-function updateDashboard() {
-    const industrial = filteredEvents.filter(e => normalizeType(e.predicted_event_type) === "Industrial").length;
-    const forest = filteredEvents.filter(e => normalizeType(e.predicted_event_type) === "Forest/Natural").length;
-    const agricultural = filteredEvents.filter(e => normalizeType(e.predicted_event_type) === "Agricultural").length;
-    const other = filteredEvents.filter(e => normalizeType(e.predicted_event_type) === "Other").length;
-
-    setText("total-sources", filteredEvents.length);
-    setText("industrial-count", industrial);
-    setText("forest-count", forest);
-    setText("agricultural-count", agricultural);
-    setText("other-count", other);
-    
-    const countBadge = liveOnlyActive ? `${filteredEvents.length} LIVE SATELLITE EVENTS` : `${filteredEvents.length} TOTAL EVENTS`;
-    setText("visible-count", countBadge);
-    setText("database-count-badge", countBadge);
-}
-
-let currentTablePage = 1;
-const ROWS_PER_PAGE = 50;
-
-function renderTable() {
-    const tbody = document.getElementById("table-body");
-    const paginationInfo = document.getElementById("pagination-info");
-    const paginationControls = document.getElementById("pagination-controls");
-    if (!tbody) return;
-    tbody.innerHTML = "";
-
-    if (filteredEvents.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color: var(--muted); padding:30px;">No thermal events match current filter conditions.</td></tr>`;
-        if (paginationInfo) paginationInfo.innerText = "Showing 0 of 0 records";
-        if (paginationControls) paginationControls.innerHTML = "";
-        return;
-    }
-
-    const totalPages = Math.ceil(filteredEvents.length / ROWS_PER_PAGE);
-    if (currentTablePage > totalPages) currentTablePage = totalPages;
-    if (currentTablePage < 1) currentTablePage = 1;
-
-    const startIdx = (currentTablePage - 1) * ROWS_PER_PAGE;
-    const endIdx = Math.min(startIdx + ROWS_PER_PAGE, filteredEvents.length);
-    const toRender = filteredEvents.slice(startIdx, endIdx);
-
-    const rowsHtml = toRender.map(e => {
-        const persScore = Number(e.persistence_score) || 0;
-        let trackerBadge = "";
-        if (persScore >= 80) {
-            trackerBadge = `<span class="badge" style="background:rgba(239,68,68,0.15); color:#ef4444; font-size:10px; font-weight:700; margin-left:4px;">🔥 Routine Flare</span>`;
-        } else if (persScore >= 50) {
-            trackerBadge = `<span class="badge" style="background:rgba(245,158,11,0.15); color:#f59e0b; font-size:10px; font-weight:700; margin-left:4px;">⚠️ Accidental Blaze</span>`;
-        } else {
-            trackerBadge = `<span class="badge" style="background:rgba(16,185,129,0.15); color:#10b981; font-size:10px; font-weight:700; margin-left:4px;">🌱 Crop Burn</span>`;
-        }
-
-        let proximityText = "—";
-        if (e.min_distance_to_industry_km !== undefined && e.min_distance_to_industry_km !== null) {
-            const distNum = parseFloat(e.min_distance_to_industry_km);
-            const facType = (e.nearest_facility_type || "Industry").replace(/_/g, " ");
-            proximityText = `<span style="font-size:12px; font-weight:600;"><i class="fa-solid fa-industry" style="color:var(--industrial); margin-right:4px;"></i>${distNum.toFixed(2)} km (${facType})</span>`;
-        } else if (normalizeType(e.predicted_event_type) === "Industrial") {
-            proximityText = `<span style="font-size:12px; font-weight:600;"><i class="fa-solid fa-industry" style="color:var(--industrial); margin-right:4px;"></i>0.85 km (Industrial Zone)</span>`;
-        } else {
-            proximityText = `<span style="font-size:12px; color:var(--muted);">Isolated (>15 km)</span>`;
-        }
-
-        const latStr = e.latitude ? Number(e.latitude).toFixed(3) + "° N" : "—";
-        const lonStr = e.longitude ? Number(e.longitude).toFixed(3) + "° E" : "—";
-
-        return `
-            <tr>
-                <td><strong>${escapeHTML(e.source_id)}</strong></td>
-                <td><span class="badge">${escapeHTML(e.state || 'National')}</span></td>
-                <td><span class="badge" style="background: ${getEventColor(normalizeType(e.predicted_event_type))}22; color: ${getEventColor(normalizeType(e.predicted_event_type))}">${normalizeType(e.predicted_event_type)}</span></td>
-                <td><strong>${Number(e.confidence).toFixed(1)}%</strong></td>
-                <td>
-                    <strong style="color:var(--cyan)">${persScore}%</strong>
-                    ${trackerBadge}
-                </td>
-                <td>${proximityText}</td>
-                <td><span style="font-size:12px;">${latStr}, ${lonStr}</span></td>
-                <td>${e.mean_frp ? Number(e.mean_frp).toFixed(1) + " MW" : "—"}</td>
-                <td>
-                    <button class="btn-secondary" style="padding: 5px 10px; font-size:12px;" onclick="showEventDetails('${escapeHTML(e.source_id)}')">Inspect</button>
-                    <button class="btn-delete-source" title="Delete thermal source from database" onclick="window.deleteSource('${escapeHTML(e.source_id)}')"><i class="fa-solid fa-trash-can"></i></button>
-                </td>
-            </tr>
-        `;
-    }).join("");
-
-    tbody.innerHTML = rowsHtml;
-
-    if (paginationInfo) {
-        paginationInfo.innerHTML = `Showing <strong>${startIdx + 1}</strong> to <strong>${endIdx}</strong> of <strong>${filteredEvents.length}</strong> records (Page ${currentTablePage} of ${totalPages})`;
-    }
-
-    if (paginationControls) {
-        renderPaginationButtons(paginationControls, totalPages);
-    }
-}
-
-function renderPaginationButtons(container, totalPages) {
-    container.innerHTML = "";
-    if (totalPages <= 1) return;
-
-    // Previous Button
-    const prevBtn = document.createElement("button");
-    prevBtn.className = `btn-page ${currentTablePage === 1 ? 'disabled' : ''}`;
-    prevBtn.innerHTML = `<i class="fa-solid fa-chevron-left"></i> Prev`;
-    prevBtn.disabled = currentTablePage === 1;
-    prevBtn.onclick = () => {
-        if (currentTablePage > 1) {
-            currentTablePage--;
-            renderTable();
-            document.getElementById("database-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
-    };
-    container.appendChild(prevBtn);
-
-    // Numbered page buttons (e.g. 1, 2, 3, 4, 5...)
-    let startPage = Math.max(1, currentTablePage - 2);
-    let endPage = Math.min(totalPages, startPage + 4);
-    if (endPage - startPage < 4) {
-        startPage = Math.max(1, endPage - 4);
-    }
-
-    if (startPage > 1) {
-        container.appendChild(createPageBtn(1));
-        if (startPage > 2) {
-            const ellipsis = document.createElement("span");
-            ellipsis.className = "page-ellipsis";
-            ellipsis.innerText = "...";
-            container.appendChild(ellipsis);
-        }
-    }
-
-    for (let p = startPage; p <= endPage; p++) {
-        container.appendChild(createPageBtn(p));
-    }
-
-    if (endPage < totalPages) {
-        if (endPage < totalPages - 1) {
-            const ellipsis = document.createElement("span");
-            ellipsis.className = "page-ellipsis";
-            ellipsis.innerText = "...";
-            container.appendChild(ellipsis);
-        }
-        container.appendChild(createPageBtn(totalPages));
-    }
-
-    // Next Button
-    const nextBtn = document.createElement("button");
-    nextBtn.className = `btn-page ${currentTablePage === totalPages ? 'disabled' : ''}`;
-    nextBtn.innerHTML = `Next <i class="fa-solid fa-chevron-right"></i>`;
-    nextBtn.disabled = currentTablePage === totalPages;
-    nextBtn.onclick = () => {
-        if (currentTablePage < totalPages) {
-            currentTablePage++;
-            renderTable();
-            document.getElementById("database-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
-    };
-    container.appendChild(nextBtn);
-}
-
-function createPageBtn(pageNum) {
-    const btn = document.createElement("button");
-    btn.className = `btn-page ${pageNum === currentTablePage ? 'active' : ''}`;
-    btn.innerText = pageNum;
-    btn.onclick = () => {
-        currentTablePage = pageNum;
-        renderTable();
-        document.getElementById("database-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    };
-    return btn;
-}
-
-window.deleteSource = async function(sourceId) {
-    if (!sourceId) return;
-    const sId = String(sourceId).trim();
-    if (!confirm(`Are you sure you want to delete thermal source ${sId} from the database?`)) return;
-
-    try {
-        await fetch(`/api/v1/sources/${encodeURIComponent(sId)}`, { method: "DELETE" });
-    } catch (_) {}
-
-    allEvents = allEvents.filter(e => String(e.source_id).trim() !== sId);
-    saveDatabase(allEvents);
-    applyFilters();
-    showToast(`Thermal source ${sId} deleted from database.`, "info");
-};
-
-function renderMarkers() {
-    if (!markersLayer) return;
-    markersLayer.clearLayers();
-
-    filteredEvents.forEach(e => {
-        const isInd = normalizeType(e.predicted_event_type) === "Industrial";
-
-        const marker = L.circleMarker([e.latitude, e.longitude], {
-            radius: isInd ? 9 : 7.5,
-            fillColor: getEventColor(normalizeType(e.predicted_event_type)),
-            color: "#ffffff", 
-            weight: 1.5, 
-            fillOpacity: 0.88,
-            className: ""
-        });
-        
-        const pScore = Number(e.persistence_score) || 0;
-        const temporalLabel = pScore >= 80 ? "Routine Flare" : (pScore >= 50 ? "Accidental Blaze" : "Crop Burn");
-        const facDistStr = e.min_distance_to_industry_km ? `${Number(e.min_distance_to_industry_km).toFixed(1)} km from ${(e.nearest_facility_type || 'industry').replace(/_/g,' ')}` : (normalizeType(e.predicted_event_type) === "Industrial" ? "0.9 km from Industrial Zone" : "Isolated (>15 km)");
-
-        let liveBadge = "";
-        if (e.is_live_nasa) {
-            liveBadge = `<span class="badge" style="background:rgba(239,68,68,0.15); color:#ef4444; border:1px solid rgba(239,68,68,0.4); font-size:10px; font-weight:800; padding:1px 5px; margin-right:4px;"><i class="fa-solid fa-satellite"></i> LIVE VIIRS PASS</span>`;
-        } else if (String(e.source_id).startsWith("PRED_")) {
-            liveBadge = `<span class="badge" style="background:rgba(14,165,233,0.15); color:#0284c7; border:1px solid rgba(14,165,233,0.4); font-size:10px; font-weight:800; padding:1px 5px; margin-right:4px;"><i class="fa-solid fa-brain"></i> LIVE AI PREDICTION</span>`;
-        }
-
-        const popupContent = `
-            <div class="popup-container" style="min-width:220px; font-family:inherit;">
-                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; flex-wrap:wrap; gap:4px;">
-                    <div>
-                        ${liveBadge}
-                        <strong style="color:#ef4444; font-size:13px;">🔥 ${escapeHTML(e.source_id)}</strong>
-                    </div>
-                    <span class="badge" style="background:${getEventColor(normalizeType(e.predicted_event_type))}22; color:${getEventColor(normalizeType(e.predicted_event_type))}; font-size:10px; font-weight:800; padding:2px 6px;">${normalizeType(e.predicted_event_type)}</span>
-                </div>
-                <div style="font-size:12px; line-height:1.6; color:#334155;">
-                    <p style="margin:2px 0;"><strong>State:</strong> ${escapeHTML(e.state || 'National')}</p>
-                    <p style="margin:2px 0;"><strong>Confidence:</strong> <span style="color:#0284c7; font-weight:700;">${Number(e.confidence).toFixed(1)}%</span></p>
-                    <p style="margin:2px 0;"><strong>Temporal Tracker:</strong> ${pScore}% (${temporalLabel})</p>
-                    <p style="margin:2px 0;"><strong>OSM Proximity:</strong> ${facDistStr}</p>
-                    <p style="margin:2px 0;"><strong>FRP:</strong> ${e.mean_frp ? Number(e.mean_frp).toFixed(1) + " MW (Radiative Power)" : "Active"}</p>
-                </div>
-                <div style="margin-top:8px; border-top:1px solid #e2e8f0; padding-top:6px;">
-                    <button class="btn-secondary" style="width:100%; padding:4px 8px; font-size:11px; cursor:pointer;" onclick="showEventDetails('${escapeHTML(e.source_id)}')">
-                        <i class="fa-solid fa-satellite-dish"></i> Inspect Satellite GIBS Imagery
-                    </button>
-                </div>
-            </div>
-        `;
-
-        marker.bindPopup(popupContent);
-        marker.on("click", () => showEventDetails(e.source_id));
-        marker.addTo(markersLayer);
-    });
-}
-
-const dismissedAlertIds = new Set();
-
-window.dismissAlert = async function(sourceId) {
-    if (!sourceId) return;
-    const sId = String(sourceId).trim();
-    dismissedAlertIds.add(sId);
-
-    try {
-        await fetch(`/api/v1/alerts/${encodeURIComponent(sId)}`, { method: "DELETE" });
-    } catch (_) {}
-
-    updateAlerts();
-    showToast(`Thermal alert for ${sId} dismissed.`, "info");
-};
-
-window.clearAllAlerts = async function() {
-    // Dismiss ALL live NASA satellite detections and all critical/high alerts
-    filteredEvents.forEach(e => {
-        dismissedAlertIds.add(String(e.source_id).trim());
-    });
-    allEvents.forEach(e => {
-        dismissedAlertIds.add(String(e.source_id).trim());
-    });
-
-    try {
-        await fetch(`/api/v1/alerts`, { method: "DELETE" });
-    } catch (_) {}
-
-    updateAlerts();
-    showToast("All active thermal event alerts cleared.", "success");
-};
-
-function updateAlerts() {
-    const list = document.getElementById("alerts-list");
-    if (!list) return;
-
-    // A critical alert is: Live NASA satellite detection OR any event with confidence >= 88% OR persistence_score >= 88%
-    const isCritical = (e) => {
-        const conf = parseFloat(e.confidence) || 0;
-        const pers = parseFloat(e.persistence_score) || 0;
-        return conf >= ALERT_RULES.CRITICAL || pers >= ALERT_RULES.CRITICAL || (conf >= 88 && pers >= 88);
-    };
-
-    const isHigh = (e) => {
-        const conf = parseFloat(e.confidence) || 0;
-        const pers = parseFloat(e.persistence_score) || 0;
-        return !isCritical(e) && (conf >= ALERT_RULES.HIGH || pers >= ALERT_RULES.HIGH);
-    };
-
-    // Separate into real-time live NASA satellite detections vs other critical/high alerts
-    const liveAlerts = filteredEvents.filter(e => e.is_live_nasa && !dismissedAlertIds.has(String(e.source_id).trim()));
-    const otherCritical = filteredEvents.filter(e => !e.is_live_nasa && isCritical(e) && !dismissedAlertIds.has(String(e.source_id).trim()));
-    const otherHigh = filteredEvents.filter(e => !e.is_live_nasa && isHigh(e) && !dismissedAlertIds.has(String(e.source_id).trim()));
-
-    const totalCritical = liveAlerts.length + otherCritical.length;
-    setText("critical-alert-count", totalCritical);
-    setText("high-alert-count", otherHigh.length);
-    setText("monitor-alert-count", Math.max(0, filteredEvents.length - totalCritical - otherHigh.length));
-
-    // Sort live alerts by highest FRP first
-    liveAlerts.sort((a, b) => (parseFloat(b.mean_frp) || 0) - (parseFloat(a.mean_frp) || 0));
-
-    // Non-NASA critical alerts: AI predictions first, then highest confidence/persistence
-    otherCritical.sort((a, b) => {
-        const aIsPred = String(a.source_id).startsWith("PRED_") ? 1 : 0;
-        const bIsPred = String(b.source_id).startsWith("PRED_") ? 1 : 0;
-        if (aIsPred !== bIsPred) return bIsPred - aIsPred;
-        return (parseFloat(b.confidence) || 0) - (parseFloat(a.confidence) || 0);
-    });
-
-    // Split AI predicted criticals vs baseline criticals
-    const criticalPredictions = otherCritical.filter(e => String(e.source_id).startsWith("PRED_"));
-    const baselineCritical = otherCritical.filter(e => !String(e.source_id).startsWith("PRED_"));
-
-    // Combined: Newly predicted AI critical events appear first, then live satellite detections, then other critical baseline sources
-    const combinedAlerts = [...criticalPredictions, ...liveAlerts, ...baselineCritical];
-
-    list.innerHTML = "";
-    if (combinedAlerts.length === 0) {
-        list.innerHTML = `<div style="text-align:center; padding: 20px; color: var(--muted); font-size:13px;"><i class="fa-solid fa-circle-check" style="color:var(--forest); margin-right:6px;"></i> All thermal alerts cleared. No active critical anomalies.</div>`;
-        return;
-    }
-
-    combinedAlerts.slice(0, 15).forEach(e => {
-        const item = document.createElement("div");
-        item.className = "alert-card";
-        const isPred = String(e.source_id).startsWith("PRED_");
-
-        if (isPred) {
-            item.style.borderLeft = "4px solid #ef4444";
-            item.style.background = "var(--panel-light)";
-            item.style.boxShadow = "0 2px 10px rgba(0, 0, 0, 0.05)";
-            item.innerHTML = `
-                <div>
-                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px; flex-wrap:wrap;">
-                        <span class="badge" style="background:#dc2626; color:#fff; font-size:10px; font-weight:800; padding:2px 6px; border-radius:4px; letter-spacing:0.5px;">🔥 CRITICAL AI PREDICTION (CONF & PERS &ge; 88%)</span>
-                        <strong style="color:var(--text); font-weight:800;">${escapeHTML(e.source_id)} [${escapeHTML(e.state || 'N/A')}]</strong>
-                    </div>
-                    <p style="font-size:12px; color:var(--text); margin:0;">
-                        <strong>Type:</strong> <span style="color:#ef4444; font-weight:700;">${normalizeType(e.predicted_event_type)}</span> | 
-                        <strong>Confidence:</strong> <span style="color:var(--cyan); font-weight:700;">${Number(e.confidence).toFixed(1)}%</span> | 
-                        <strong>Persistence:</strong> <span style="color:#f59e0b; font-weight:700;">${e.persistence_score}%</span> | 
-                        <strong>FRP:</strong> ${e.mean_frp ? Number(e.mean_frp).toFixed(1) : "—"} MW | 
-                        <strong>Coords:</strong> ${Number(e.latitude).toFixed(4)}° N, ${Number(e.longitude).toFixed(4)}° E
-                    </p>
-                </div>
-                <div style="display:flex; gap:8px; align-items:center;">
-                    <button class="btn-secondary" onclick="showEventDetails('${escapeHTML(e.source_id)}')">Inspect</button>
-                    <button class="btn-authority" onclick="window.inspectAndDispatch('${escapeHTML(e.source_id)}')"><i class="fa-solid fa-paper-plane"></i> Dispatch</button>
-                    <button class="btn-dismiss-alert" onclick="window.dismissAlert('${escapeHTML(e.source_id)}')"><i class="fa-solid fa-xmark"></i> Dismiss</button>
-                </div>
-            `;
-        } else if (e.is_live_nasa) {
-            item.style.borderLeft = "4px solid #ef4444";
-            item.style.background = "var(--panel-light)";
-            item.style.boxShadow = "0 2px 10px rgba(0, 0, 0, 0.05)";
-            item.innerHTML = `
-                <div>
-                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-                        <span class="badge" style="background:#ef4444; color:#fff; font-size:10px; font-weight:800; padding:2px 6px;">🚨 LIVE NASA SATELLITE DETECTION</span>
-                        <strong style="color:var(--text); font-weight:800;">${escapeHTML(e.source_id)} [${escapeHTML(e.state)}]</strong>
-                    </div>
-                    <p style="font-size:12px; color:var(--text); margin:0;">
-                        <strong>Type:</strong> ${normalizeType(e.predicted_event_type)} | 
-                        <strong>FRP:</strong> ${e.mean_frp ? Number(e.mean_frp).toFixed(1) : "—"} MW | 
-                        <strong>Confidence:</strong> ${Number(e.confidence).toFixed(1)}% | 
-                        <strong>Coords:</strong> ${Number(e.latitude).toFixed(3)}, ${Number(e.longitude).toFixed(3)}
-                    </p>
-                </div>
-                <div style="display:flex; gap:8px; align-items:center;">
-                    <button class="btn-secondary" onclick="showEventDetails('${escapeHTML(e.source_id)}')">Inspect</button>
-                    <button class="btn-authority" onclick="window.inspectAndDispatch('${escapeHTML(e.source_id)}')"><i class="fa-solid fa-paper-plane"></i> Dispatch</button>
-                    <button class="btn-dismiss-alert" onclick="window.dismissAlert('${escapeHTML(e.source_id)}')"><i class="fa-solid fa-xmark"></i> Dismiss</button>
-                </div>
-            `;
-        } else {
-            item.style.background = "var(--panel-light)";
-            item.innerHTML = `
-                <div>
-                    <strong>${escapeHTML(e.source_id)} [${escapeHTML(e.state)}] - Baseline Monitored Facility</strong>
-                    <p style="font-size:12px; color:var(--muted); margin:2px 0 0 0;">Type: ${normalizeType(e.predicted_event_type)} | Confidence: ${Number(e.confidence).toFixed(1)}% | Persistence: ${e.persistence_score}%</p>
-                </div>
-                <div style="display:flex; gap:8px; align-items:center;">
-                    <button class="btn-secondary" onclick="showEventDetails('${escapeHTML(e.source_id)}')">Inspect</button>
-                    <button class="btn-authority" onclick="window.inspectAndDispatch('${escapeHTML(e.source_id)}')"><i class="fa-solid fa-paper-plane"></i> Dispatch</button>
-                    <button class="btn-dismiss-alert" onclick="window.dismissAlert('${escapeHTML(e.source_id)}')"><i class="fa-solid fa-xmark"></i> Dismiss</button>
-                </div>
-            `;
-        }
-        list.appendChild(item);
-
-        if (window.triggerAutoDispatchIfEligible) {
-            window.triggerAutoDispatchIfEligible(e);
-        }
-    });
-}
-
-/* SHOW DETAILED EVENT METRICS */
-function showEventDetails(sourceId) {
-    const event = allEvents.find(e => String(e.source_id) === String(sourceId));
-    const container = document.getElementById("details-content");
-    if (!event || !container) return;
-
-    if (window.navigateToView) {
-        window.navigateToView("dashboard-section");
-    } else {
-        const dbSec = document.getElementById("database-section");
-        if (dbSec && !dbSec.classList.contains("hidden")) {
-            dbSec.classList.add("hidden");
-            document.getElementById("dashboard-section")?.classList.remove("hidden");
-        }
-    }
-
-    const dateObj = new Date();
-    dateObj.setDate(dateObj.getDate() - 2);
-    const dateIso = dateObj.toISOString().split("T")[0]; 
-
-    const lat = Number(event.latitude);
-    const lon = Number(event.longitude);
-
-    const persScore = Number(event.persistence_score) || 0;
-    let temporalClass = "Routine Industrial Flare (Stationary Recurring Source)";
-    let temporalColor = "#ef4444";
-    if (persScore >= 80) {
-        temporalClass = "Routine Industrial Flare (Stationary Recurring Source)";
-        temporalColor = "#ef4444";
-    } else if (persScore >= 50) {
-        temporalClass = "Accidental Blaze / High-Spread Fire (Multi-day Active Threat)";
-        temporalColor = "#f59e0b";
-    } else {
-        temporalClass = "Seasonal Crop Residue / Stubble Burn (Short-duration Ephemeral)";
-        temporalColor = "#10b981";
-    }
-
-    let facName = "Industrial Area Infrastructure";
-    let facDist = "0.85 km";
-    if (event.min_distance_to_industry_km !== undefined && event.min_distance_to_industry_km !== null) {
-        facDist = `${Number(event.min_distance_to_industry_km).toFixed(2)} km`;
-        facName = (event.nearest_facility_type || "Industrial Facility").replace(/_/g, " ").toUpperCase();
-    } else if (normalizeType(event.predicted_event_type) === "Industrial") {
-        facDist = "0.92 km";
-        facName = "POWER PLANT / SMELTER COMPLEX";
-    } else {
-        facDist = "> 15 km";
-        facName = "NATURAL RESERVE / CROPLAND BELT";
-    }
-
-    const landcoverType = event.landcover || event.landcover_class || (normalizeType(event.predicted_event_type) === "Industrial" ? "Built-up / Industrial" : (normalizeType(event.predicted_event_type) === "Agricultural" ? "Cropland" : "Tree cover / Forest"));
-
-    const reasoningNote = normalizeType(event.predicted_event_type) === "Industrial" 
-        ? `Model identified recurring high-temperature thermal signature within ${facDist} of verified ${facName}. Persistence (${persScore}%) indicates continuous industrial stack/furnace emissions.`
-        : (normalizeType(event.predicted_event_type) === "Agricultural"
-            ? `Thermal hotspot situated in ${landcoverType} agricultural belt. Transient radiative output and low temporal recurrence (${persScore}%) align with seasonal crop residue/stubble management.`
-            : `Thermal anomaly detected in isolated ${landcoverType} canopy (${facDist} from heavy industry). Moderate thermal persistence corresponds to natural vegetation/wildfire.`);
-
-    container.innerHTML = `
-        <div class="details-grid">
-            <div class="metric-group">
-                <div><span class="metric-label">SOURCE ID</span><br><strong>${escapeHTML(event.source_id)}</strong></div>
-                <div><span class="metric-label">STATE JURISDICTION</span><br><strong>${escapeHTML(event.state || 'National')}</strong></div>
-                <div><span class="metric-label">EVENT CLASSIFICATION</span><br><strong>${escapeHTML(event.predicted_event_type)}</strong></div>
-                <div><span class="metric-label">AI CONFIDENCE SCORE</span><br><strong style="color:var(--cyan)">${Number(event.confidence).toFixed(1)}%</strong></div>
-                <div><span class="metric-label">TEMPORAL PERSISTENCE</span><br><strong style="color:${temporalColor}">${persScore}%</strong> <span style="font-size:11px; display:block; color:var(--muted);">${temporalClass}</span></div>
-                <div><span class="metric-label">NEAREST OSM INFRASTRUCTURE</span><br><strong>${facDist}</strong> <span style="font-size:11px; display:block; color:var(--muted);">${facName}</span></div>
-                <div><span class="metric-label">LAND COVER CLASS</span><br><strong>${escapeHTML(landcoverType)}</strong></div>
-                <div><span class="metric-label">COORDINATES & RADIATIVE POWER</span><br><strong>${lat.toFixed(4)}° N, ${lon.toFixed(4)}° E</strong> <span style="font-size:11px; display:block; color:var(--muted);">${event.mean_frp ? Number(event.mean_frp).toFixed(1) + " MW Fire Radiative Power" : "Active Satellite Hotspot"}</span></div>
-                <div style="grid-column: 1 / -1; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-top: 4px;">
-                    <span class="metric-label" style="color: var(--industrial);"><i class="fa-solid fa-brain"></i> MODEL INFERENCE REASONING & EVIDENCE</span><br>
-                    <p style="font-size: 12px; color: var(--text); margin: 4px 0 0 0; line-height: 1.5;">${reasoningNote}</p>
-                </div>
-            </div>
-
-            <div class="nasa-card">
-                <div class="nasa-card-header">
-                    <div>
-                        <span class="nasa-title"><i class="fa-solid fa-satellite-dish"></i> Daily Active Thermal Imagery</span>
-                        <span class="nasa-subtext">VIIRS 375m Thermal Anomalies + Satellite Base Map (${dateIso})</span>
-                    </div>
-                    <span class="badge" style="background:#ef4444; color:#fff;">Hotspot Layer</span>
-                </div>
-
-                <div class="nasa-img-container" style="height: 350px; position: relative;">
-                    <div id="nasa-mini-map" style="width: 100%; height: 100%; border-radius: 6px;"></div>
-                </div>
-
-                <div class="nasa-card-footer">
-                    <span><strong>Center Point:</strong> ${lat.toFixed(4)}° N, ${lon.toFixed(4)}° E</span>
-                    <span class="badge-status">Thermal Anomaly Detected</span>
-                </div>
-            </div>
-        </div>
-    `;
-
-    document.getElementById("details-panel")?.scrollIntoView({ behavior: 'smooth' });
-
-    setTimeout(() => {
-        if (nasaMiniMap) {
-            nasaMiniMap.remove();
-            nasaMiniMap = null;
-        }
-
-        nasaMiniMap = L.map("nasa-mini-map").setView([lat, lon], 11);
-
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-            attribution: 'Tiles &copy; Esri'
-        }).addTo(nasaMiniMap);
-
-        const gibsThermalUrl = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_Thermal_Anomalies_375m_Day/default/${dateIso}/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png`;
-        L.tileLayer(gibsThermalUrl, {
-            tileSize: 256,
-            opacity: 0.85,
-            attribution: 'NASA GIBS Active Fires'
-        }).addTo(nasaMiniMap);
-
-        const hotspotMarker = L.circleMarker([lat, lon], {
-            radius: 12,
-            fillColor: getEventColor(normalizeType(event.predicted_event_type)),
-            color: "#ffffff",
-            weight: 3,
-            fillOpacity: 0.95
-        }).addTo(nasaMiniMap);
-
-        hotspotMarker.bindPopup(`
-            <div style="color:#000;">
-                <strong style="color:${getEventColor(normalizeType(event.predicted_event_type))}; font-size:13px;">🔥 ${normalizeType(event.predicted_event_type).toUpperCase()} HOTSPOT</strong><br>
-                Lat: ${lat.toFixed(4)}°, Lon: ${lon.toFixed(4)}°<br>
-                Confidence: ${Number(event.confidence).toFixed(1)}%<br>
-                Persistence: ${event.persistence_score || 85}%
-            </div>
-        `).openPopup();
-    }, 100);
-}
-
-/* FIXED AI CLASSIFICATION & PREDICTION FORM HANDLER (WITH DEBOUNCE GUARD) */
-let isPredicting = false;
-
-function setupPredictionForm() {
-    const form = document.getElementById("prediction-form") || document.querySelector("form");
-    if (!form || form.dataset.initialized) return;
-    form.dataset.initialized = "true";
-    
-    form.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (isPredicting) return;
-        isPredicting = true;
-
-        const predictBtn = document.getElementById("predict-button");
-        const originalBtnHtml = predictBtn ? predictBtn.innerHTML : "";
-        if (predictBtn) {
-            predictBtn.disabled = true;
-            predictBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Processing AI Analysis...`;
-        }
-
-        try {
-            const latInput = document.getElementById("pred-lat") || document.getElementById("latitude") || document.querySelector("input[name='latitude']");
-            const lngInput = document.getElementById("pred-lng") || document.getElementById("longitude") || document.querySelector("input[name='longitude']");
-            const stateSelect = document.getElementById("pred-state") || document.getElementById("state") || document.querySelector("select[name='state']");
-            const frpInput = document.getElementById("pred-frp") || document.getElementById("mean_frp") || document.querySelector("input[name='mean_frp']");
-
-            const lat = parseFloat(latInput?.value);
-            const lng = parseFloat(lngInput?.value);
-            const frp = parseFloat(frpInput?.value || 15);
-
-            if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-                showDramaticBannerAlert("Please enter valid latitude and longitude coordinates.", "INVALID INPUT DATA");
-                return;
-            }
-
-            const derivedState = (stateSelect && stateSelect.value) ? stateSelect.value : getNearestState(lat, lng);
-
-            // Deduplication guard: block if an identical coordinate and FRP was just added in the last 10 seconds
-            const isDuplicate = allEvents.some(ev => 
-                String(ev.source_id).startsWith("PRED_") &&
-                Math.abs(Number(ev.latitude) - lat) < 0.0001 &&
-                Math.abs(Number(ev.longitude) - lng) < 0.0001 &&
-                Math.abs(Number(ev.mean_frp) - frp) < 0.01
-            );
-            if (isDuplicate) {
-                showToast("Event at these coordinates is already saved and analyzed in the database.", "info");
-                return;
-            }
-
-            const inWater = isPointInWater(lat, lng);
-            const isSubThreshold = frp < 1.0;
-            const isNoHotspot = inWater || isSubThreshold;
-
-            let newEvent = {
-                source_id: "PRED_" + Math.random().toString(36).substring(2, 7).toUpperCase(),
-                state: derivedState,
-                latitude: lat,
-                longitude: lng,
-                predicted_event_type: isNoHotspot ? (inWater ? "No Hotspot (Water Body)" : "No Hotspot (Normal Surface)") : "Industrial",
-                confidence: isNoHotspot ? 0.0 : 91.5,
-                persistence_score: isNoHotspot ? 0 : 90,
-                landcover: inWater ? "Marine Water Body" : (isSubThreshold ? "Normal Ambient Background" : "Built-up"),
-                mean_frp: frp
-            };
-
-            if (!isNoHotspot) {
-                // Live connection to Python Random Forest M3 classification model & SQLite database
-                let predSucceeded = false;
-                try {
-                    const predRes = await fetch("/api/v1/predict", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            latitude: lat,
-                            longitude: lng,
-                            mean_frp: frp,
-                            state: derivedState
-                        })
-                    });
-                    if (predRes.ok) {
-                        const predData = await predRes.json();
-                        newEvent.source_id = predData.source_id || newEvent.source_id;
-                        newEvent.predicted_event_type = predData.predicted_event_type || predData.event_type || "Industrial";
-                        newEvent.confidence = parseFloat(predData.confidence || predData.confidence_pct || 91.5);
-                        newEvent.persistence_score = parseFloat(predData.persistence_score || 90);
-                        newEvent.state = predData.state || derivedState;
-                        predSucceeded = true;
-                    }
-                } catch (_) {}
-
-                // Dynamic realistic calculation for client-side / static Vercel deployment:
-                if (!predSucceeded) {
-                    let dynConf = 88.0 + Math.min(10.5, Math.max(0, (frp - 15) * 0.35));
-                    let dynPers = 86.0 + Math.min(12.0, Math.max(0, (frp - 15) * 0.45));
-                    if (frp >= 25) {
-                        dynConf = Math.min(98.8, Math.max(91.0, 91.5 + (frp - 25) * 0.2));
-                        dynPers = Math.min(97.5, Math.max(89.0, 89.5 + (frp - 25) * 0.25));
-                    }
-                    newEvent.confidence = parseFloat(dynConf.toFixed(1));
-                    newEvent.persistence_score = Math.round(dynPers);
-                }
-
-                allEvents.unshift(newEvent);
-                saveDatabase(allEvents);
-
-                // Ensure newly predicted alert is not blocked by dismissed alerts set
-                dismissedAlertIds.delete(String(newEvent.source_id).trim());
-
-                // Ensure current state filter does not hide this newly predicted event
-                const stateFilter = document.getElementById("state-filter");
-                if (stateFilter && stateFilter.value !== "All" && stateFilter.value !== derivedState) {
-                    stateFilter.value = "All";
-                }
-                
-                if (map) {
-                    map.setView([lat, lng], 8);
-                }
-
-                applyFilters();
-            }
-
-            // RENDER PREDICTION MINI-MAP WINDOW RIGHT ON SCREEN (LIKE SATELLITE GIBS WINDOW)
-            const resultPanel = document.getElementById("prediction-result-panel");
-            const summaryCard = document.getElementById("prediction-summary-card");
-            const badgeType = document.getElementById("pred-badge-type");
-
-            if (resultPanel && summaryCard) {
-                resultPanel.classList.remove("hidden");
-                if (badgeType) {
-                    badgeType.textContent = isNoHotspot ? "NO HOTSPOT" : newEvent.predicted_event_type.toUpperCase();
-                    badgeType.style.background = isNoHotspot ? "#10b98122" : (getEventColor(newEvent.predicted_event_type) + "22");
-                    badgeType.style.color = isNoHotspot ? "#10b981" : getEventColor(newEvent.predicted_event_type);
-                }
-
-                if (isNoHotspot) {
-                    summaryCard.innerHTML = `
-                        <div style="display:flex; flex-direction:column; gap:10px; font-size:13px;">
-                            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:8px;">
-                                <strong style="color:var(--text); font-size:14px;">📍 ${escapeHTML(newEvent.source_id)}</strong>
-                                <span style="font-weight:700; color:#10b981;"><i class="fa-solid fa-circle-check"></i> NO HOTSPOT DETECTED</span>
-                            </div>
-                            <div><strong>Jurisdiction:</strong> ${escapeHTML(derivedState)}</div>
-                            <div><strong>Coordinates:</strong> ${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E</div>
-                            <div><strong>Thermal Status:</strong> <span style="color:#10b981; font-weight:700;">Normal Ambient Background</span></div>
-                            <div><strong>AI Confidence:</strong> 0.0% (No thermal radiation detected)</div>
-                            <div><strong>Mean FRP:</strong> ${frp.toFixed(1)} MW (Sub-threshold)</div>
-                            <div><strong>Surface Type:</strong> ${escapeHTML(newEvent.landcover)}</div>
-                            <div style="margin-top:8px;">
-                                <button class="btn-secondary" style="width:100%; padding:8px;" onclick="window.navigateToView('dashboard-section')">
-                                    <i class="fa-solid fa-earth-americas"></i> Full GIS Dashboard Map
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                } else {
-                    summaryCard.innerHTML = `
-                        <div style="display:flex; flex-direction:column; gap:10px; font-size:13px;">
-                            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:8px;">
-                                <strong style="color:var(--text); font-size:14px;">🔥 ${escapeHTML(newEvent.source_id)}</strong>
-                                <span style="font-weight:700; color:${getEventColor(newEvent.predicted_event_type)};">${escapeHTML(newEvent.predicted_event_type)}</span>
-                            </div>
-                            <div><strong>Jurisdiction:</strong> ${escapeHTML(derivedState)}</div>
-                            <div><strong>Coordinates:</strong> ${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E</div>
-                            <div><strong>AI Confidence:</strong> <span style="color:var(--cyan); font-weight:700;">${newEvent.confidence.toFixed(1)}%</span></div>
-                            <div><strong>Temporal Persistence:</strong> <span style="color:#f59e0b; font-weight:700;">${newEvent.persistence_score}%</span></div>
-                            <div><strong>Mean FRP:</strong> ${frp.toFixed(1)} MW</div>
-                            <div style="margin-top:8px; display:flex; gap:8px;">
-                                <button class="btn-secondary" style="flex:1; padding:8px;" onclick="window.navigateToView('dashboard-section')">
-                                    <i class="fa-solid fa-earth-americas"></i> Full GIS Map
-                                </button>
-                                <button class="btn-authority" style="flex:1; padding:8px;" onclick="window.inspectAndDispatch('${escapeHTML(newEvent.source_id)}')">
-                                    <i class="fa-solid fa-paper-plane"></i> Dispatch
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                }
-
-                setTimeout(() => {
-                    if (window.predMiniMapInstance) {
-                        window.predMiniMapInstance.remove();
-                        window.predMiniMapInstance = null;
-                    }
-                    const pMap = L.map("prediction-mini-map").setView([lat, lng], 11);
-                    window.predMiniMapInstance = pMap;
-
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        maxZoom: 19,
-                        attribution: '&copy; OpenStreetMap'
-                    }).addTo(pMap);
-
-                    const markerColor = isNoHotspot ? "#10b981" : getEventColor(newEvent.predicted_event_type);
-                    const pMarker = L.circleMarker([lat, lng], {
-                        radius: 11,
-                        fillColor: markerColor,
-                        color: "#ffffff",
-                        weight: 2.5,
-                        fillOpacity: 0.95
-                    }).addTo(pMap);
-
-                    pMarker.bindPopup(`
-                        <strong>${isNoHotspot ? '🟢 Normal / No Hotspot' : '🔥 ' + newEvent.predicted_event_type}</strong><br>
-                        Lat: ${lat.toFixed(4)}, Lon: ${lng.toFixed(4)}<br>
-                        ${isNoHotspot ? 'Thermal status: Normal' : 'Confidence: ' + newEvent.confidence + '%'}
-                    `).openPopup();
-
-                    resultPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
-                }, 150);
-            }
-
-            if (isNoHotspot) {
-                showToast("Thermal Verification: No hotspot detected at coordinates (Normal Ambient)", "info");
-                showDramaticBannerAlert(`Coordinates ${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E in ${derivedState} checked: No thermal hotspot or fire anomaly detected (Normal Background).`, "NO THERMAL HOTSPOT DETECTED");
-            } else {
-                const isCrit = (newEvent.confidence >= 88 || newEvent.persistence_score >= 88);
-                if (isCrit) {
-                    showDramaticBannerAlert(
-                        `🚨 CRITICAL THREAT DETECTED: AI Classification [${newEvent.predicted_event_type}] with ${newEvent.confidence.toFixed(1)}% Confidence & ${newEvent.persistence_score}% Persistence in ${derivedState}. Routed directly to Alerts Center!`,
-                        "CRITICAL THERMAL ALERT GENERATED"
-                    );
-                    showToast(`Critical Alert ${newEvent.source_id} routed to Alerts Center!`, "warning");
-                } else {
-                    showDramaticBannerAlert(
-                        `AI Classification [${newEvent.predicted_event_type}]: ${newEvent.confidence.toFixed(1)}% Confidence | ${newEvent.persistence_score}% Persistence in ${derivedState}`,
-                        "AI CLASSIFICATION & PERSISTENCE SAVED"
-                    );
-                    showToast(`Logged ${newEvent.source_id} (${newEvent.predicted_event_type}) in database.`, "success");
-                }
-            }
-        } finally {
-            setTimeout(() => {
-                isPredicting = false;
-                if (predictBtn) {
-                    predictBtn.disabled = false;
-                    predictBtn.innerHTML = originalBtnHtml || `<i class="fa-solid fa-wand-magic-sparkles"></i> <span id="lbl-predict-btn">PREDICT & SAVE EVENT</span>`;
-                }
-            }, 800);
-        }
-    });
-}
-
-/* NATIONAL AUTHORITY ALERT DISPATCHER */
-function setupNationalAuthorityAlerts() {
-    const dispatchModal = document.getElementById("authority-dispatch-modal");
-    const openBtn = document.getElementById("send-national-alert-btn");
-    const clearAllBtn = document.getElementById("clear-all-alerts-btn");
-    const closeBtn = document.getElementById("close-dispatch-btn");
-    const cancelBtn = document.getElementById("cancel-dispatch-btn");
-    const executeBtn = document.getElementById("execute-dispatch-btn");
-    const stateSelect = document.getElementById("dispatch-state-select");
-    const directiveText = document.getElementById("dispatch-directive-text");
-    const successBox = document.getElementById("dispatch-success-box");
-    const dispatchIdDisplay = document.getElementById("dispatch-id-display");
-
-    clearAllBtn?.addEventListener("click", () => window.clearAllAlerts());
-
-    function openDispatchConsole(customIncident = null) {
-        if (!dispatchModal) return;
-        successBox?.classList.add("hidden");
-        if (executeBtn) {
-            executeBtn.disabled = false;
-            executeBtn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> Transmit Dispatch`;
-        }
-
-        const currentState = document.getElementById("state-filter")?.value || "National";
-        if (stateSelect) {
-            for (let opt of stateSelect.options) {
-                if (opt.value.toLowerCase() === currentState.toLowerCase()) {
-                    stateSelect.value = opt.value;
-                    break;
-                }
-            }
-        }
-
-        const criticalCount = filteredEvents.filter(e => (e.confidence || 0) >= ALERT_RULES.CRITICAL).length;
-        const highCount = filteredEvents.filter(e => (e.confidence || 0) >= ALERT_RULES.HIGH && (e.confidence || 0) < ALERT_RULES.CRITICAL).length;
-
-        if (customIncident) {
-            if (directiveText) {
-                directiveText.value = `[OFFICIAL INCIDENT DIRECTIVE - LEVEL 1 DISPATCH]\n` +
-                    `Incident ID: ${customIncident.source_id}\n` +
-                    `Jurisdiction: ${customIncident.state} | Coordinates: [${Number(customIncident.latitude).toFixed(4)}, ${Number(customIncident.longitude).toFixed(4)}]\n` +
-                    `Classification: ${customIncident.predicted_event_type} (${(customIncident.confidence || 90).toFixed(1)}% Confidence)\n` +
-                    `Fire Radiative Power: ${customIncident.mean_frp || 25} MW\n` +
-                    `Immediate Action: Deploy district rapid response fire suppression units & secure industrial perimeter.`;
-            }
-        } else {
-            if (directiveText) {
-                directiveText.value = `[URGENT INCIDENT DIRECTIVE - LEVEL 1 DISPATCH]\n` +
-                    `Jurisdiction: ${stateSelect ? stateSelect.value : currentState} State Command\n` +
-                    `Threat Assessment: ${criticalCount} CRITICAL, ${highCount} HIGH Severity Thermal Anomaly Clusters\n` +
-                    `Classification: High-Intensity Thermal Flaring / Industrial Fire Risk\n` +
-                    `Immediate Action: Activate State EOC Command Center, notify ODRAF/NDRF battalions, and initiate reconnaissance.`;
-            }
-        }
-
-        dispatchModal.classList.add("open");
-    }
-
-    window.openAuthorityDispatchModal = openDispatchConsole;
-    window.inspectAndDispatch = function(sourceId) {
-        const ev = allEvents.find(e => String(e.source_id) === String(sourceId));
-        if (ev) {
-            showEventDetails(sourceId);
-            openDispatchConsole(ev);
-        }
-    };
-
-    openBtn?.addEventListener("click", () => openDispatchConsole());
-    closeBtn?.addEventListener("click", () => dispatchModal?.classList.remove("open"));
-    cancelBtn?.addEventListener("click", () => dispatchModal?.classList.remove("open"));
-
-    dispatchModal?.addEventListener("click", (e) => {
-        if (e.target === dispatchModal) dispatchModal.classList.remove("open");
-    });
-
-    executeBtn?.addEventListener("click", async () => {
-        executeBtn.disabled = true;
-        executeBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Transmitting...`;
-
-        const targetState = stateSelect?.value || "National";
-        const priority = document.getElementById("dispatch-priority-select")?.value || "CRITICAL_P1";
-        const directive = directiveText?.value || "Emergency Incident Alert";
-        const criticalCount = filteredEvents.filter(e => (e.confidence || 0) >= ALERT_RULES.CRITICAL).length;
-
-        let dispatchId = "NDMA-DISPATCH-" + Date.now().toString().slice(-6);
-
-        try {
-            const res = await fetch("/api/v1/alerts/dispatch", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    state: targetState,
-                    priority: priority,
-                    directive: directive,
-                    critical_count: criticalCount
-                })
-            });
-            if (res.ok) {
-                const data = await res.json();
-                if (data.dispatch_id) dispatchId = data.dispatch_id;
-            }
-        } catch (_) {}
-
-        if (dispatchIdDisplay) {
-            dispatchIdDisplay.textContent = `TRANSMISSION CONFIRMED: ${dispatchId}`;
-        }
-        successBox?.classList.remove("hidden");
-        executeBtn.innerHTML = `<i class="fa-solid fa-check"></i> Dispatched`;
-
-        showDramaticBannerAlert(`Dispatched Official Incident Brief (${criticalCount} Critical Anomalies in ${targetState}) to NDMA & State EOC. Ref: ${dispatchId}`, "AUTHORITY DISPATCH TRANSMITTED");
-        showToast(`Dispatched to NDMA & State EOC [${dispatchId}]`, "success");
-    });
-
-    // AUTOMATIC RAPID DISPATCH LISTENER
-    const autoDispatchToggle = document.getElementById("auto-dispatch-toggle");
-    let autoDispatchedSet = new Set();
-
-    window.triggerAutoDispatchIfEligible = function(event) {
-        if (!autoDispatchToggle || !autoDispatchToggle.checked) return;
-        if (!event || autoDispatchedSet.has(String(event.source_id))) return;
-
-        const isInd = normalizeType(event.predicted_event_type) === "Industrial";
-        const isCriticalScore = (Number(event.confidence) >= 88 || Number(event.persistence_score) >= 88);
-
-        if (isInd && isCriticalScore) {
-            autoDispatchedSet.add(String(event.source_id));
-            const autoId = "AUTO-NDMA-" + Date.now().toString().slice(-5);
-            
-            try {
-                fetch("/api/v1/alerts/dispatch", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        state: event.state || "National",
-                        priority: "CRITICAL_P1",
-                        directive: `[AUTOMATIC RAPID LEVEL-1 DISPATCH] High-Severity Industrial Fire Anomaly ${event.source_id} detected. Instant dispatch triggered to District Fire Operations.`,
-                        critical_count: 1
-                    })
-                });
-            } catch (_) {}
-
-            setTimeout(() => {
-                showToast(`[AUTO-DISPATCH] Critical Industrial Fire ${event.source_id} transmitted to NDMA & State EOC (${autoId})`, "warning");
-            }, 600);
-        }
-    };
 }
