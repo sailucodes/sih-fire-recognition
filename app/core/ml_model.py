@@ -184,6 +184,141 @@ class EventClassifierEngine:
             "model_architecture": "Two-Stage Decoupled Pipeline (source_type_model + persistence_model)"
         }
 
+    def predict_batch(self, features_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        High-performance batch two-stage prediction:
+        1. Predict source type using source_type_model.pkl (Scikit-Learn Pipeline).
+        2. Predict temporal persistence using model.pkl.
+        """
+        if not features_list:
+            return []
+
+        n = len(features_list)
+        preds = [None] * n
+        confidences = [0.0] * n
+        prob_dicts = [{}] * n
+        pers_scores = [None] * n
+        is_persistents = [None] * n
+
+        # Stage 1: Source Type Prediction via source_type_model.pkl in batch
+        if self.source_model is not None:
+            try:
+                stage1_rows = []
+                for f in features_list:
+                    min_d = float(f.get("min_distance_to_industry_km") or f.get("min_distance_industry") or 5.0)
+                    mean_d = float(f.get("mean_distance_to_industry_km") or f.get("mean_distance_industry") or min_d)
+                    ind_1k = float(f.get("mean_industrial_facilities_1km") or 0.0)
+                    ind_5k = float(f.get("mean_industrial_facilities_5km") or 0.0)
+                    fac_type = str(f.get("nearest_facility_type") or "industrial_area")
+                    ref_km = float(f.get("nearest_refinery_km") or min_d)
+                    power_km = float(f.get("nearest_powerplant_km") or min_d)
+                    mine_km = float(f.get("nearest_mine_km") or min_d)
+                    ind_area_km = float(f.get("nearest_industrial_area_km") or min_d)
+                    lc = str(f.get("landcover_class") or "Built-up")
+                    stage1_rows.append({
+                        "mean_distance_to_industry_km": mean_d,
+                        "min_distance_to_industry_km": min_d,
+                        "mean_industrial_facilities_1km": ind_1k,
+                        "mean_industrial_facilities_5km": ind_5k,
+                        "nearest_facility_type": fac_type,
+                        "nearest_refinery_km": ref_km,
+                        "nearest_powerplant_km": power_km,
+                        "nearest_mine_km": mine_km,
+                        "nearest_industrial_area_km": ind_area_km,
+                        "landcover_class": lc
+                    })
+                source_df = pd.DataFrame(stage1_rows)
+                preds = list(self.source_model.predict(source_df))
+                probs_matrix = self.source_model.predict_proba(source_df)
+                for i in range(n):
+                    probs = probs_matrix[i]
+                    prob_dicts[i] = {str(c): round(float(p) * 100, 2) for c, p in zip(self.classes_, probs)}
+                    confidences[i] = round(float(np.max(probs)) * 100, 2)
+            except Exception as e:
+                print(f"Batch Stage-1 inference exception: {e}")
+
+        # Fallbacks if any failed
+        for i in range(n):
+            if preds[i] is None:
+                p, c, pd_ = self._rule_based_fallback(features_list[i])
+                preds[i] = p
+                confidences[i] = c
+                prob_dicts[i] = pd_
+
+        # Stage 2: Persistence Prediction via model.pkl in batch
+        if self.persistence_model is not None:
+            try:
+                stage2_rows = []
+                for f in features_list:
+                    m_frp = float(f.get("mean_frp") or 15.0)
+                    mx_frp = float(f.get("max_frp") or m_frp)
+                    m_brt = float(f.get("mean_brightness") or 325.0)
+                    mx_brt = float(f.get("max_brightness") or m_brt)
+                    min_ind = float(f.get("min_distance_industry") or f.get("min_distance_to_industry_km") or 5.0)
+                    mean_ind = float(f.get("mean_distance_industry") or f.get("mean_distance_to_industry_km") or min_ind)
+                    fac_1k = float(f.get("mean_industrial_facilities_1km") or 0.0)
+                    fac_5k = float(f.get("mean_industrial_facilities_5km") or 0.0)
+                    ind_ratio = float(f.get("industrial_land_ratio") or (0.8 if min_ind < 1.5 else 0.0))
+                    stage2_rows.append({
+                        "mean_frp": m_frp,
+                        "max_frp": mx_frp,
+                        "mean_brightness": m_brt,
+                        "max_brightness": mx_brt,
+                        "mean_distance_industry": mean_ind,
+                        "min_distance_industry": min_ind,
+                        "mean_industrial_facilities_1km": fac_1k,
+                        "mean_industrial_facilities_5km": fac_5k,
+                        "industrial_land_ratio": ind_ratio
+                    })
+                pers_df = pd.DataFrame(stage2_rows)
+                pers_preds = self.persistence_model.predict(pers_df)
+                pers_probs_matrix = self.persistence_model.predict_proba(pers_df)
+                for i in range(n):
+                    is_persistents[i] = bool(int(pers_preds[i]) == 1)
+                    pers_scores[i] = round(float(pers_probs_matrix[i][1]) * 100, 1)
+            except Exception as pe:
+                print(f"Batch Stage-2 persistence inference exception: {pe}")
+
+        results = []
+        for i in range(n):
+            f = features_list[i]
+            pred = preds[i]
+            conf = confidences[i]
+            final_persistence = pers_scores[i] if pers_scores[i] is not None else float(f.get("persistence_score") or 85.0)
+            is_pers = is_persistents[i]
+
+            min_dist = f.get("min_distance_to_industry_km", 50.0)
+            lc_class = f.get("landcover_class", "Unknown")
+            fac_type = f.get("nearest_facility_type", "industrial area")
+
+            reasons = []
+            if pred == "Industrial":
+                reasons.append(f"Classified by Stage-1 Spatial Pipeline within {min_dist:.2f} km of {fac_type}")
+                if is_pers:
+                    reasons.append(f"Stage-2 Energy Classifier flagged high persistence ({final_persistence:.1f}%)")
+                else:
+                    reasons.append(f"Thermal recurrence observed near manufacturing zone")
+            elif pred == "Forest/Natural":
+                reasons.append(f"Dominant canopy land cover: {lc_class}")
+                reasons.append(f"Isolated from industrial infrastructure ({min_dist:.2f} km away)")
+            elif pred == "Agricultural":
+                reasons.append(f"Occurring in cropland / agricultural belt ({lc_class})")
+                reasons.append("Short duration / ephemeral seasonal burn signature")
+            else:
+                reasons.append(f"Surface land cover: {lc_class}")
+
+            results.append({
+                "predicted_event_type": pred,
+                "confidence_pct": conf,
+                "persistence_score": final_persistence,
+                "is_persistent": is_pers,
+                "probabilities": prob_dicts[i],
+                "explanation": reasons,
+                "model_architecture": "Two-Stage Decoupled Pipeline (source_type_model + persistence_model)"
+            })
+
+        return results
+
     def _rule_based_fallback(self, feat: Dict[str, Any]) -> Tuple[str, float, Dict[str, float]]:
         min_dist = feat.get("min_distance_to_industry_km", 50.0)
         lc = str(feat.get("landcover_class", "")).lower()

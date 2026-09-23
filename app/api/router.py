@@ -459,6 +459,8 @@ class APIRouter:
         days = int(query_params.get("days", [1])[0])
         api_key = query_params.get("key", [None])[0] or query_params.get("map_key", [None])[0]
 
+        import time
+        t0 = time.time()
         try:
             raw_hotspots = firms_service.fetch_live_hotspots(country_code=country, days=days, api_key=api_key)
         except Exception as e:
@@ -468,11 +470,17 @@ class APIRouter:
                 "message": "NASA FIRMS live synchronization could not proceed.",
                 "hint": "Set NASA_FIRMS_MAP_KEY environment variable or provide a valid MAP_KEY from https://firms.modaps.eosdis.nasa.gov/api/map_key/"
             }, indent=2).encode("utf-8")
+        t_fetch = time.time() - t0
 
+        t1 = time.time()
         clustered_sources = cluster_firms_hotspots(raw_hotspots, eps_km=1.5)
+        t_cluster = time.time() - t1
+
         facilities = osm_service.get_all_facilities()
         synced_sources = []
 
+        t2 = time.time()
+        features_list = []
         for idx, c in enumerate(clustered_sources, start=1):
             c["source_id"] = f"LIVE_FIRMS_{idx:04d}"
             c["state"] = detect_state_for_coordinates(c["latitude"], c["longitude"])
@@ -481,7 +489,13 @@ class APIRouter:
                 detection_count=c["total_detections"], active_days=c["active_days"],
                 facilities=facilities, observation_span_days=c["observation_span_days"]
             )
-            pred_res = ml_engine.predict_single(features)
+            features_list.append(features)
+
+        predictions = ml_engine.predict_batch(features_list)
+
+        for idx, c in enumerate(clustered_sources):
+            features = features_list[idx]
+            pred_res = predictions[idx]
             risk_level, is_flare_anomaly, risk_desc = evaluate_thermal_risk(
                 pred_res["predicted_event_type"], features["min_distance_to_industry_km"],
                 c["mean_frp"], c["max_frp"], c["active_days"], c["total_detections"]
@@ -524,18 +538,69 @@ class APIRouter:
             c["persistence_score"] = calc_pers
 
             synced_sources.append(c)
+        t_ml = time.time() - t2
 
+        sqlite_before = db_manager.count_sources()
         storage_service.save_new_sources_batch(synced_sources)
+        sqlite_after = db_manager.count_sources()
 
-        import time
+        class_counts = {"Agricultural": 0, "Forest/Natural": 0, "Industrial": 0, "Other": 0}
+        conf_scores = []
+        pers_scores = []
+        persistent_count = 0
+
+        for s in synced_sources:
+            etype = s.get("predicted_event_type", "Other")
+            if etype in class_counts:
+                class_counts[etype] += 1
+            else:
+                class_counts["Other"] += 1
+            conf_scores.append(s.get("confidence_pct", 80.0))
+            pers_scores.append(s.get("persistence_score", 50.0))
+            if s.get("is_persistent"):
+                persistent_count += 1
+
+        acq_dates = [h.get("acq_date") for h in raw_hotspots if h.get("acq_date")]
+        start_date = min(acq_dates) if acq_dates else time.strftime("%Y-%m-%d")
+        end_date = max(acq_dates) if acq_dates else time.strftime("%Y-%m-%d")
+        calendar_days = len(set(acq_dates)) if acq_dates else 1
+        t_total = time.time() - t0
+
         return 200, headers, json.dumps({
             "status": "success",
             "message": f"Successfully ingested {len(raw_hotspots)} NASA FIRMS hotspots, clustered into {len(synced_sources)} persistent/dynamic thermal sources.",
             "source": f"NASA FIRMS VIIRS NRT ({country})",
             "observation_window_days": days,
+            "observation_window": {
+                "start_date": start_date,
+                "end_date": end_date,
+                "calendar_days_covered": calendar_days
+            },
+            "processing_time_sec": {
+                "firms_fetch": round(t_fetch, 2),
+                "clustering": round(t_cluster, 2),
+                "ml_prediction": round(t_ml, 2),
+                "total": round(t_total, 2)
+            },
+            "sqlite_storage": {
+                "count_before": sqlite_before,
+                "count_after": sqlite_after
+            },
             "sync_time": time.strftime("%H:%M:%S IST"),
             "hotspots_count": len(raw_hotspots),
             "clusters_count": len(synced_sources),
+            "classified_count": len(synced_sources),
+            "classification_counts": class_counts,
+            "confidence_stats": {
+                "mean": round(sum(conf_scores) / max(len(conf_scores), 1), 2),
+                "min": round(min(conf_scores), 2) if conf_scores else 0.0,
+                "max": round(max(conf_scores), 2) if conf_scores else 0.0
+            },
+            "persistence_stats": {
+                "persistent_count": persistent_count,
+                "mean_score": round(sum(pers_scores) / max(len(pers_scores), 1), 2)
+            },
+            "storage_total_count": len(storage_service.sources),
             "sample_clusters": synced_sources,
             "clusters": synced_sources,
             "sources": synced_sources

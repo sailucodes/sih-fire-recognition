@@ -1397,8 +1397,8 @@ body.dark-mode .floating-map-legend {
                     <!-- Date Presets Dropdown -->
                     <div class="date-preset-dropdown" id="date-preset-dropdown" onclick="event.stopPropagation()">
                         <div class="date-preset-option" onclick="selectDatePreset('Live Satellite Pass (Today)')"><i class="fa-solid fa-satellite" style="color: #2563eb; margin-right: 6px;"></i> Live Pass (Today)</div>
-                        <div class="date-preset-option" onclick="selectDatePreset('Past 7 Days')"><i class="fa-solid fa-calendar-week" style="color: #10b981; margin-right: 6px;"></i> Past 7 Days (1,458 Events)</div>
-                        <div class="date-preset-option" onclick="selectDatePreset('Past 30 Days')"><i class="fa-solid fa-calendar-days" style="color: #8b5cf6; margin-right: 6px;"></i> Past 30 Days (Full Archive)</div>
+                        <div class="date-preset-option" onclick="selectDatePreset('Past 7 Days')"><i class="fa-solid fa-calendar-week" style="color: #10b981; margin-right: 6px;"></i> Past 7 Days (Telemetry)</div>
+                        <div class="date-preset-option" onclick="selectDatePreset('Past 30 Days')"><i class="fa-solid fa-calendar-days" style="color: #8b5cf6; margin-right: 6px;"></i> Past 30 Days (Full Telemetry)</div>
                     </div>
                 </div>
 
@@ -28321,33 +28321,32 @@ document.addEventListener("click", function (e) {
     }
 });
 
-window.selectDatePreset = function (presetName) {
+window.selectDatePreset = async function (presetName) {
     const dateText = document.getElementById("header-date-text");
     if (dateText) dateText.innerText = presetName;
 
     const drop = document.getElementById("date-preset-dropdown");
     if (drop) drop.classList.remove("active");
 
-    showToast(`Loading satellite data for: ${presetName}...`, "info");
-
-    if (presetName.includes("Today") || presetName.includes("Live")) {
-        // Today's single real-time satellite pass
-        filteredEvents = allEvents.slice(0, Math.max(45, Math.min(120, allEvents.length)));
-        showToast(`Showing Today's live satellite pass (${filteredEvents.length} events)`, "success");
-    } else if (presetName.includes("7 Days")) {
-        // Full 7-Day Cumulative Multi-Pass Satellite Telemetry: exactly 1,458 events
-        filteredEvents = generateSevenDayCumulativeDataset(allEvents, 1458);
-        showToast(`Loaded Past 7 Days multi-pass satellite record: 1,458 active events`, "success");
+    let days = 1;
+    if (presetName.includes("7 Days")) {
+        days = 7;
     } else if (presetName.includes("30 Days")) {
-        // Full 30-Day Monthly Satellite Archive: 1,850 events
-        filteredEvents = generateSevenDayCumulativeDataset(allEvents, 1850);
-        showToast(`Loaded Past 30 Days national satellite archive: 1,850 active events`, "success");
+        days = 30;
     } else {
-        filteredEvents = [...allEvents];
+        days = 1;
     }
 
-    eventsCurrentPage = 1;
-    updateDashboard();
+    showToast(`Loading satellite data for: ${presetName} (fetching NASA FIRMS ${days}-day telemetry via AI pipeline)...`, "info");
+
+    try {
+        const count = await updateNasaFirmsWidget(true, days);
+        const liveCount = count > 0 ? count : filteredEvents.length;
+        showToast(`Loaded ${presetName}: ${liveCount} real thermal sources classified by AI!`, "success");
+    } catch (err) {
+        console.error("Error loading date preset:", err);
+        showToast(`Loaded ${presetName} cached telemetry`, "success");
+    }
 };
 
 /* ==========================================================================
@@ -28389,8 +28388,13 @@ window.manualSyncNasa = async function () {
     if (icon) icon.classList.add("fa-spin");
     showToast("Connecting to backend AI FIRMS sync pipeline...", "info");
 
+    const dateText = document.getElementById("header-date-text")?.innerText || "";
+    let days = 1;
+    if (dateText.includes("7 Days")) days = 7;
+    else if (dateText.includes("30 Days")) days = 30;
+
     try {
-        const count = await updateNasaFirmsWidget(true);
+        const count = await updateNasaFirmsWidget(true, days);
         const liveCount = count > 0 ? count : filteredEvents.length;
         showToast(`Successfully synced ${liveCount} clustered thermal sources verified by backend AI!`, "success");
     } catch (_) {
@@ -28402,19 +28406,19 @@ window.manualSyncNasa = async function () {
     }
 };
 
-async function updateNasaFirmsWidget(forceRefresh = false) {
+async function updateNasaFirmsWidget(forceRefresh = false, days = 1) {
     const now = new Date();
     const timeStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + ", " +
                     now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
 
-    setText("nasa-last-update", "Last synced: " + timeStr);
+    setText("nasa-last-update", "Last synced: " + timeStr + (days > 1 ? ` (${days}d window)` : ""));
 
     let parsedLiveEvents = [];
 
     try {
         // Authoritative Pipeline: Call backend /api/v1/firms/sync
         // Backend executes: NASA FIRMS -> cluster_firms_hotspots() -> thermal sources -> feature extraction -> ML prediction -> risk assessment -> storage
-        const res = await fetch("/api/v1/firms/sync?days=1");
+        const res = await fetch(`/api/v1/firms/sync?days=${days}`);
         if (res.ok) {
             const data = await res.json();
             const rawSources = data.clusters || data.sources || data.sample_clusters || [];
