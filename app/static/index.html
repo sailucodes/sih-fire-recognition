@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>THERMAL-AI | Space-borne Thermal Anomaly & Emission Intelligence</title>
+    <title>AeroThermal Sentinel | Space-Borne Thermal & Emission Intelligence</title>
     <!-- Inter Font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -24,11 +24,11 @@
             <div class="header-left-col">
                 <div class="header-brand" onclick="switchView('dashboard-section')">
                     <div class="brand-icon-box">
-                        <i class="fa-solid fa-fire-flame-curved"></i>
+                        <i class="fa-solid fa-satellite"></i>
                     </div>
                     <div>
-                        <span class="brand-title">THERMAL-AI</span>
-                        <span class="brand-sub">National Thermal Intelligence</span>
+                        <span class="brand-title">AeroThermal Sentinel</span>
+                        <span class="brand-sub">Space-Borne Thermal & Emission Intelligence</span>
                     </div>
                 </div>
                 <div class="header-search-bar">
@@ -142,9 +142,16 @@
                             </div>
                             <strong class="stat-card-value" id="stat-total-sources">918</strong>
                             <span class="stat-trend-pill positive"><i class="fa-solid fa-arrow-trend-up"></i> +12.4% vs last week</span>
-                            <div class="stat-sparkline-box">
-                                <svg width="100%" height="24" viewBox="0 0 100 24">
-                                    <path d="M 0,18 Q 20,8 40,15 T 80,6 T 100,10" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round"/>
+                                                        <div class="stat-sparkline-box">
+                                <svg width="100%" height="32" viewBox="0 0 100 32" preserveAspectRatio="none">
+                                    <defs>
+                                        <linearGradient id="grad-spark-total" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stop-color="#2563eb" stop-opacity="0.35"/>
+                                            <stop offset="100%" stop-color="#2563eb" stop-opacity="0.0"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <path d="M 0,24 C 18,22 32,10 50,15 C 68,20 82,4 100,6 L 100,32 L 0,32 Z" fill="url(#grad-spark-total)"/>
+                                    <path d="M 0,24 C 18,22 32,10 50,15 C 68,20 82,4 100,6" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round"/>
                                 </svg>
                             </div>
                         </div>
@@ -156,9 +163,16 @@
                             </div>
                             <strong class="stat-card-value" id="stat-industrial">193</strong>
                             <span class="stat-trend-pill negative"><i class="fa-solid fa-arrow-trend-up"></i> +3.2% vs baseline</span>
-                            <div class="stat-sparkline-box">
-                                <svg width="100%" height="24" viewBox="0 0 100 24">
-                                    <path d="M 0,20 Q 25,12 50,16 T 85,7 T 100,5" fill="none" stroke="#ef4444" stroke-width="2.2" stroke-linecap="round"/>
+                                                        <div class="stat-sparkline-box">
+                                <svg width="100%" height="32" viewBox="0 0 100 32" preserveAspectRatio="none">
+                                    <defs>
+                                        <linearGradient id="grad-spark-ind" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stop-color="#ef4444" stop-opacity="0.35"/>
+                                            <stop offset="100%" stop-color="#ef4444" stop-opacity="0.0"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <path d="M 0,26 C 20,24 35,14 55,19 C 75,24 85,7 100,5 L 100,32 L 0,32 Z" fill="url(#grad-spark-ind)"/>
+                                    <path d="M 0,26 C 20,24 35,14 55,19 C 75,24 85,7 100,5" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round"/>
                                 </svg>
                             </div>
                         </div>
@@ -170,9 +184,16 @@
                             </div>
                             <strong class="stat-card-value" id="stat-forest">452</strong>
                             <span class="stat-trend-pill positive"><i class="fa-solid fa-arrow-trend-down"></i> -8.5% seasonal</span>
-                            <div class="stat-sparkline-box">
-                                <svg width="100%" height="24" viewBox="0 0 100 24">
-                                    <path d="M 0,8 Q 30,18 60,10 T 90,16 T 100,14" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round"/>
+                                                        <div class="stat-sparkline-box">
+                                <svg width="100%" height="32" viewBox="0 0 100 32" preserveAspectRatio="none">
+                                    <defs>
+                                        <linearGradient id="grad-spark-forest" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stop-color="#10b981" stop-opacity="0.35"/>
+                                            <stop offset="100%" stop-color="#10b981" stop-opacity="0.0"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <path d="M 0,10 C 25,18 45,26 65,16 C 80,10 90,14 100,18 L 100,32 L 0,32 Z" fill="url(#grad-spark-forest)"/>
+                                    <path d="M 0,10 C 25,18 45,26 65,16 C 80,10 90,14 100,18" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round"/>
                                 </svg>
                             </div>
                         </div>
@@ -184,9 +205,16 @@
                             </div>
                             <strong class="stat-card-value" id="stat-agri">164</strong>
                             <span class="stat-trend-pill negative"><i class="fa-solid fa-arrow-trend-up"></i> +18.7% stubble peak</span>
-                            <div class="stat-sparkline-box">
-                                <svg width="100%" height="24" viewBox="0 0 100 24">
-                                    <path d="M 0,16 Q 20,22 45,12 T 80,14 T 100,6" fill="none" stroke="#eab308" stroke-width="2.2" stroke-linecap="round"/>
+                                                        <div class="stat-sparkline-box">
+                                <svg width="100%" height="32" viewBox="0 0 100 32" preserveAspectRatio="none">
+                                    <defs>
+                                        <linearGradient id="grad-spark-agri" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stop-color="#eab308" stop-opacity="0.35"/>
+                                            <stop offset="100%" stop-color="#eab308" stop-opacity="0.0"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <path d="M 0,22 C 20,26 40,12 60,18 C 80,22 90,8 100,6 L 100,32 L 0,32 Z" fill="url(#grad-spark-agri)"/>
+                                    <path d="M 0,22 C 20,26 40,12 60,18 C 80,22 90,8 100,6" fill="none" stroke="#eab308" stroke-width="2" stroke-linecap="round"/>
                                 </svg>
                             </div>
                         </div>
@@ -198,9 +226,16 @@
                             </div>
                             <strong class="stat-card-value" id="stat-other">109</strong>
                             <span class="stat-trend-pill neutral"><i class="fa-solid fa-minus"></i> -2.1% variation</span>
-                            <div class="stat-sparkline-box">
-                                <svg width="100%" height="24" viewBox="0 0 100 24">
-                                    <path d="M 0,12 Q 35,16 65,11 T 85,15 T 100,12" fill="none" stroke="#8b5cf6" stroke-width="2.2" stroke-linecap="round"/>
+                                                        <div class="stat-sparkline-box">
+                                <svg width="100%" height="32" viewBox="0 0 100 32" preserveAspectRatio="none">
+                                    <defs>
+                                        <linearGradient id="grad-spark-other" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.35"/>
+                                            <stop offset="100%" stop-color="#8b5cf6" stop-opacity="0.0"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <path d="M 0,16 C 25,20 50,14 70,18 C 85,20 95,14 100,12 L 100,32 L 0,32 Z" fill="url(#grad-spark-other)"/>
+                                    <path d="M 0,16 C 25,20 50,14 70,18 C 85,20 95,14 100,12" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round"/>
                                 </svg>
                             </div>
                         </div>
@@ -212,9 +247,16 @@
                             </div>
                             <strong class="stat-card-value" id="stat-critical">24</strong>
                             <span class="stat-trend-pill negative"><i class="fa-solid fa-arrow-trend-up"></i> +5.4% escalations</span>
-                            <div class="stat-sparkline-box">
-                                <svg width="100%" height="24" viewBox="0 0 100 24">
-                                    <path d="M 0,18 Q 30,6 60,14 T 85,4 T 100,8" fill="none" stroke="#ef4444" stroke-width="2.2" stroke-linecap="round"/>
+                                                        <div class="stat-sparkline-box">
+                                <svg width="100%" height="32" viewBox="0 0 100 32" preserveAspectRatio="none">
+                                    <defs>
+                                        <linearGradient id="grad-spark-crit" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stop-color="#ef4444" stop-opacity="0.35"/>
+                                            <stop offset="100%" stop-color="#ef4444" stop-opacity="0.0"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <path d="M 0,24 C 20,12 45,20 70,8 C 85,4 92,10 100,6 L 100,32 L 0,32 Z" fill="url(#grad-spark-crit)"/>
+                                    <path d="M 0,24 C 20,12 45,20 70,8 C 85,4 92,10 100,6" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round"/>
                                 </svg>
                             </div>
                         </div>
@@ -763,9 +805,9 @@
     <div class="auth-overlay-view" id="auth-overlay-view">
         <div class="auth-card-box">
             <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #ef4444, #f97316); color: #ffffff; display: inline-flex; align-items: center; justify-content: center; font-size: 22px; margin-bottom: 14px;">
-                <i class="fa-solid fa-fire-flame-curved"></i>
+                <i class="fa-solid fa-satellite"></i>
             </div>
-            <h2 style="font-size: 22px; margin-bottom: 4px;">THERMAL-AI Portal</h2>
+            <h2 style="font-size: 22px; margin-bottom: 4px;">AeroThermal Sentinel Portal</h2>
             <p style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 24px;">National Space-Borne Thermal Intelligence System</p>
 
             <div class="filters-form-grid" style="text-align: left;">

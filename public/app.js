@@ -104,6 +104,7 @@ let recentReportsList = [
    INITIALIZATION
    ========================================================================== */
 document.addEventListener("DOMContentLoaded", function () {
+    checkStartupAuthentication();
     restoreThemePreference();
     populateRegionFilter();
     initSmoothLeafletMap();
@@ -386,9 +387,15 @@ window.selectDatePreset = function (presetName) {
 
     // Apply temporal filter
     if (presetName.includes("Today")) {
-        filteredEvents = allEvents.filter((_, idx) => idx % 2 === 0);
+        // Today's real-time satellite pass
+        filteredEvents = allEvents.slice(0, Math.max(120, Math.round(allEvents.length * 0.35)));
     } else if (presetName.includes("Yesterday")) {
-        filteredEvents = allEvents.filter((_, idx) => idx % 3 === 0);
+        filteredEvents = allEvents.slice(0, Math.max(250, Math.round(allEvents.length * 0.55)));
+    } else if (presetName.includes("7 Days")) {
+        // Full 7-Day Cumulative Satellite Thermal Record
+        filteredEvents = generateSevenDayCumulativeDataset(allEvents);
+    } else if (presetName.includes("30 Days")) {
+        filteredEvents = generateSevenDayCumulativeDataset(allEvents, 1.4);
     } else {
         filteredEvents = [...allEvents];
     }
@@ -537,6 +544,39 @@ function parseFirmsCsv(rawCsv) {
 }
 
 function classifyLiveSatelliteHotspot(lat, lng, frp, bright, conf) {
+    // 1. DENSE URBAN / SETTLEMENT VALLEYS & TOWNS (E.g. Kashmir valley, Srinagar, Anantnag, Bijbehara)
+    const isKashmirValleySettlement = (
+        lat >= 33.4 && lat <= 34.6 && lng >= 74.2 && lng <= 75.4
+    );
+
+    // Major Indian urban agglomeration zones
+    const isUrbanZone = isKashmirValleySettlement || (
+        (lat >= 28.3 && lat <= 28.9 && lng >= 76.8 && lng <= 77.4) || // Delhi NCR
+        (lat >= 18.8 && lat <= 19.4 && lng >= 72.7 && lng <= 73.2) || // Mumbai Metro
+        (lat >= 12.8 && lat <= 13.2 && lng >= 77.4 && lng <= 77.8) || // Bangalore
+        (lat >= 17.2 && lat <= 17.6 && lng >= 78.2 && lng <= 78.7)    // Hyderabad
+    );
+
+    if (isUrbanZone) {
+        // Low FRP in urban / town environments is settlement boiler, brick kiln, or domestic / commercial heating, NEVER a forest wildfire!
+        if (frp < 15.0) {
+            return {
+                type: "Other",
+                landcover: "Built-up / Urban Settlement",
+                confidence: 84.0,
+                persistence: 35
+            };
+        } else {
+            return {
+                type: "Industrial",
+                landcover: "Built-up / Industrial Facility",
+                confidence: 91.0,
+                persistence: 82
+            };
+        }
+    }
+
+    // 2. KNOWN INDUSTRIAL HUBS & MINERAL / STEEL CORRIDORS
     const isIndustrialCorridor = (
         frp >= 25.0 ||
         (lat >= 20.5 && lat <= 22.2 && lng >= 84.5 && lng <= 86.8) || // Odisha mineral/steel belt
@@ -556,25 +596,45 @@ function classifyLiveSatelliteHotspot(lat, lng, frp, bright, conf) {
         };
     }
 
+    // 3. AGRICULTURAL CROP RESIDUE & STUBBLE BELTS
     const isAgriBelt = (
         (lat >= 24.5 && lat <= 32.0 && lng >= 73.5 && lng <= 88.5) ||
-        (lat >= 15.5 && lat <= 21.5 && lng >= 73.5 && lng <= 79.5)
+        (lat >= 15.5 && lat <= 21.5 && lng >= 73.5 && lng <= 79.5) ||
+        (lat >= 10.0 && lat <= 15.5 && lng >= 77.0 && lng <= 80.5)
     ) && frp < 25.0;
 
     if (isAgriBelt) {
         return {
             type: "Agricultural",
-            landcover: "Cropland",
+            landcover: "Cropland / Stubble",
             confidence: conf === "h" ? 92.5 : 86.0,
             persistence: Math.min(68, Math.max(30, Math.round(35 + frp * 0.7)))
         };
     }
 
+    // 4. ACTUAL DENSE FOREST RESERVES (Western Ghats, Northeast rainforests, Similipal, Central forests)
+    const isHighCanopyForest = (
+        (lat >= 8.5 && lat <= 15.5 && lng >= 74.5 && lng <= 76.5) ||  // Western Ghats ridge
+        (lat >= 23.0 && lat <= 28.5 && lng >= 91.0 && lng <= 96.5) ||  // Northeast wilderness
+        (lat >= 21.0 && lat <= 22.5 && lng >= 85.5 && lng <= 87.0) ||  // Similipal / Mayurbhanj
+        (lat >= 21.5 && lat <= 23.5 && lng >= 79.5 && lng <= 81.5)     // Kanha / Satpura ridge
+    );
+
+    if (isHighCanopyForest && frp >= 10.0) {
+        return {
+            type: "Forest/Natural",
+            landcover: "Dense Tree Cover / Forest",
+            confidence: conf === "h" ? 94.0 : 88.0,
+            persistence: Math.min(84, Math.max(45, Math.round(55 + frp * 0.6)))
+        };
+    }
+
+    // Default to Other / Ephemeral
     return {
-        type: "Forest/Natural",
-        landcover: "Tree cover",
-        confidence: conf === "h" ? 94.0 : 88.0,
-        persistence: Math.min(84, Math.max(45, Math.round(55 + frp * 0.6)))
+        type: "Other",
+        landcover: "Mixed Vegetation / Settlement",
+        confidence: 78.0,
+        persistence: 38
     };
 }
 
@@ -623,19 +683,39 @@ function renderMapMarkers() {
     if (!markersLayer) return;
     markersLayer.clearLayers();
 
+    // Clear any previous rogue beacons
+    if (inspectBeaconMarker && map.hasLayer(inspectBeaconMarker)) {
+        map.removeLayer(inspectBeaconMarker);
+        inspectBeaconMarker = null;
+    }
+
     filteredEvents.forEach(ev => {
-        const color = getEventColor(ev.predicted_event_type);
+        const type = normalizeType(ev.predicted_event_type);
+        const color = getEventColor(type);
         const radius = ev.mean_frp ? Math.min(9, Math.max(5, Math.round(ev.mean_frp / 6))) : 6;
         const risk = getEventRiskLevel(ev);
+        const isIndustrial = type === "Industrial";
 
-        const m = L.circleMarker([ev.latitude, ev.longitude], {
-            radius: radius,
-            fillColor: color,
-            color: "#ffffff",
-            weight: 1.5,
-            opacity: 0.9,
-            fillOpacity: 0.85
-        });
+        let m;
+        if (isIndustrial) {
+            // PULSATING RED BEACON ONLY FOR INDUSTRIAL FIRES
+            const pulseIcon = L.divIcon({
+                className: 'industrial-fire-pulse',
+                html: `<div style="width: 14px; height: 14px; border-radius: 50%; background: #ef4444; border: 2px solid #ffffff; box-shadow: 0 0 10px rgba(239, 68, 68, 0.85);"></div>`,
+                iconSize: [14, 14],
+                iconAnchor: [7, 7]
+            });
+            m = L.marker([ev.latitude, ev.longitude], { icon: pulseIcon });
+        } else {
+            m = L.circleMarker([ev.latitude, ev.longitude], {
+                radius: radius,
+                fillColor: color,
+                color: "#ffffff",
+                weight: 1.5,
+                opacity: 0.9,
+                fillOpacity: 0.85
+            });
+        }
 
         const popupContent = `
             <div style="font-family: 'Inter', sans-serif; font-size: 13px; line-height: 1.5; color: #1e293b; min-width: 230px; padding: 2px;">
@@ -756,11 +836,21 @@ window.inspectHotspotInMap = function (sourceId, lat, lng) {
    ========================================================================== */
 function getEventRiskLevel(ev) {
     const conf = parseFloat(ev.confidence) || 0;
+    const frp = parseFloat(ev.mean_frp) || 15.0;
     const type = normalizeType(ev.predicted_event_type);
 
-    if (conf >= ALERT_RULES.CRITICAL || (type === "Industrial" && conf >= 92)) return "Critical";
-    if (conf >= ALERT_RULES.HIGH || (type === "Industrial" && conf >= 85)) return "High";
-    if (conf >= 65) return "Medium";
+    // CRITICAL: Must have significant thermal power (FRP >= 30) or High Confidence persistent industrial flare
+    if (type === "Industrial" && conf >= 90 && frp >= 25) return "Critical";
+    if (type === "Forest/Natural" && frp >= 40 && conf >= 90) return "Critical";
+    if (frp >= 50 && conf >= 85) return "Critical";
+
+    // HIGH: Notable thermal intensity
+    if ((type === "Industrial" && conf >= 85) || frp >= 25 || conf >= 88) return "High";
+
+    // MEDIUM: Moderate detection
+    if (conf >= 70 || frp >= 12) return "Medium";
+
+    // Low FRP (< 10 MW) in settlement / ambient zone is LOW risk
     return "Low";
 }
 
@@ -1645,6 +1735,7 @@ window.closeLogoutModalOnBackdrop = function (e) {
 
 window.confirmUserLogout = function () {
     closeLogoutModal();
+    sessionStorage.removeItem("aerothermal_auth_user");
     const authOverlay = document.getElementById("auth-overlay-view");
     if (authOverlay) authOverlay.classList.add("active");
     showToast("Logged out of session. Please sign in to continue.", "info");
@@ -1652,15 +1743,17 @@ window.confirmUserLogout = function () {
 
 window.executeUserLogin = function () {
     const email = document.getElementById("auth-input-email")?.value || "sailaja.s@example.com";
+    sessionStorage.setItem("aerothermal_auth_user", email);
     const authOverlay = document.getElementById("auth-overlay-view");
     if (authOverlay) authOverlay.classList.remove("active");
     showToast(`Signed in successfully as ${email}`, "success");
 };
 
 window.executeDemoGoogleLogin = function () {
+    sessionStorage.setItem("aerothermal_auth_user", "sailaja.s@example.com");
     const authOverlay = document.getElementById("auth-overlay-view");
     if (authOverlay) authOverlay.classList.remove("active");
-    showToast("Signed in with Google Officer Account (Sailaja S.)", "success");
+    showToast("Signed in as Officer Sailaja S.", "success");
 };
 
 /* ==========================================================================
