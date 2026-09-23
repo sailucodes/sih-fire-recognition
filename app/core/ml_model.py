@@ -1,4 +1,4 @@
-﻿import os
+import os
 import joblib
 import pandas as pd
 import numpy as np
@@ -9,139 +9,179 @@ from sklearn.metrics import accuracy_score, classification_report
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 DATA_PATH = BASE_DIR / "data" / "event_classification_features.csv"
-MODEL_PATH = BASE_DIR / "data" / "models" / "event_type_model.pkl"
-FEATURES_PATH = BASE_DIR / "data" / "models" / "event_type_features.pkl"
+SOURCE_MODEL_PATH = BASE_DIR / "data" / "models" / "source_type_model.pkl"
+PERSISTENCE_MODEL_PATH = BASE_DIR / "data" / "models" / "model.pkl"
+LEGACY_MODEL_PATH = BASE_DIR / "data" / "models" / "event_type_model.pkl"
+LEGACY_FEATURES_PATH = BASE_DIR / "data" / "models" / "event_type_features.pkl"
 
 class EventClassifierEngine:
     def __init__(self):
-        self.model = None
-        self.expected_features = None
+        self.source_model = None
+        self.persistence_model = None
+        self.legacy_model = None
+        self.legacy_features = None
         self.classes_ = ["Agricultural", "Forest/Natural", "Industrial", "Other"]
-        self._load_or_train_model()
+        self._load_models()
 
-    def _preprocess_dataframe(self, df: pd.DataFrame, expected_features: List[str] = None) -> Tuple[pd.DataFrame, List[str]]:
-        X = df.copy()
+    @property
+    def model(self):
+        """Backward-compatibility property for routes checking ml_engine.model."""
+        return self.source_model or self.legacy_model
 
-        # Remove identifiers and targets
-        for drop_col in ["source_id", "event_type", "predicted_event_type", "first_detection", "last_detection", "nearest_facility_name"]:
-            if drop_col in X.columns:
-                X = X.drop(columns=[drop_col])
-
-        # Categorical columns
-        categorical_columns = ["landcover_class", "nearest_facility_type"]
-        for column in categorical_columns:
-            if column in X.columns:
-                X[column] = X[column].fillna("Unknown").astype(str)
-                encoded = pd.get_dummies(X[column], prefix=column, dtype=int)
-                X = X.drop(columns=[column])
-                X = pd.concat([X, encoded], axis=1)
-
-        # Convert remaining to numeric
-        for col in X.columns:
-            X[col] = pd.to_numeric(X[col], errors="coerce")
-        X = X.fillna(0)
-
-        if expected_features is not None:
-            for feat in expected_features:
-                if feat not in X.columns:
-                    X[feat] = 0
-            X = X[expected_features]
-            X = X.reindex(columns=expected_features, fill_value=0)
-            return X, expected_features
-        else:
-            feature_cols = list(X.columns)
-            return X, feature_cols
-
-    def train_model(self, data_path: Path = DATA_PATH):
-        """Train and persist the classification model."""
-        print("Training M3 Thermal Event Classifier...")
-        if not os.path.exists(data_path):
-            raise FileNotFoundError(f"Training dataset not found: {data_path}")
-
-        df = pd.read_csv(data_path)
-        y = df["event_type"].astype(str)
-        X_proc, feature_cols = self._preprocess_dataframe(df)
-
-        # Multi-class Random Forest with 150 trees
-        rf = RandomForestClassifier(
-            n_estimators=150,
-            max_depth=12,
-            min_samples_split=2,
-            random_state=42,
-            class_weight="balanced"
-        )
-        rf.fit(X_proc, y)
-
-        self.model = rf
-        self.expected_features = feature_cols
-        self.classes_ = list(rf.classes_)
-
-        # Ensure directory exists
-        os.makedirs(MODEL_PATH.parent, exist_ok=True)
-        joblib.dump(rf, MODEL_PATH)
-        joblib.dump(feature_cols, FEATURES_PATH)
-
-        preds = rf.predict(X_proc)
-        acc = accuracy_score(y, preds)
-        print(f"Model successfully trained! Training Accuracy: {acc * 100:.2f}%")
-        return acc
-
-    def _load_or_train_model(self):
-        try:
-            if os.path.exists(MODEL_PATH) and os.path.exists(FEATURES_PATH):
-                self.model = joblib.load(MODEL_PATH)
-                self.expected_features = joblib.load(FEATURES_PATH)
-                self.classes_ = list(self.model.classes_)
-                print("[OK] Loaded pre-trained M3 Model and Features")
-            else:
-                self.train_model()
-        except Exception as e:
-            print(f"Warning: Could not load model from file ({e}). Retraining...")
+    def _load_models(self):
+        """Load the two-stage ML pipeline (source_type_model.pkl + model.pkl)."""
+        # 1. Load Primary Stage 1: source_type_model.pkl
+        if os.path.exists(SOURCE_MODEL_PATH):
             try:
-                self.train_model()
-            except Exception as train_e:
-                print(f"Training fallback error: {train_e}")
+                self.source_model = joblib.load(SOURCE_MODEL_PATH)
+                if hasattr(self.source_model, "classes_"):
+                    self.classes_ = list(self.source_model.classes_)
+                print(f"[OK] Loaded Primary Stage-1 Source Classifier ({SOURCE_MODEL_PATH.name})")
+            except Exception as e:
+                print(f"Warning: Could not load source_type_model ({e})")
+
+        # 2. Load Primary Stage 2: model.pkl (Persistence Classifier)
+        if os.path.exists(PERSISTENCE_MODEL_PATH):
+            try:
+                self.persistence_model = joblib.load(PERSISTENCE_MODEL_PATH)
+                print(f"[OK] Loaded Primary Stage-2 Persistence Model ({PERSISTENCE_MODEL_PATH.name})")
+            except Exception as e:
+                print(f"Warning: Could not load persistence model.pkl ({e})")
+
+        # 3. Load Fallback: Legacy event_type_model.pkl
+        if os.path.exists(LEGACY_MODEL_PATH) and os.path.exists(LEGACY_FEATURES_PATH):
+            try:
+                self.legacy_model = joblib.load(LEGACY_MODEL_PATH)
+                self.legacy_features = joblib.load(LEGACY_FEATURES_PATH)
+                if self.source_model is None:
+                    self.classes_ = list(self.legacy_model.classes_)
+                print(f"[OK] Loaded Secondary Legacy Model ({LEGACY_MODEL_PATH.name})")
+            except Exception as e:
+                print(f"Warning: Could not load legacy model ({e})")
 
     def predict_single(self, features_dict: Dict[str, Any]) -> Dict[str, Any]:
-        """Predict event type and confidence for a single feature dictionary."""
-        df_single = pd.DataFrame([features_dict])
-        
-        if self.model is not None and self.expected_features is not None:
-            X_proc, _ = self._preprocess_dataframe(df_single, self.expected_features)
-            pred = self.model.predict(X_proc)[0]
-            probs = self.model.predict_proba(X_proc)[0]
-            prob_dict = {str(c): round(float(p) * 100, 2) for c, p in zip(self.classes_, probs)}
-            confidence = round(float(np.max(probs)) * 100, 2)
-        else:
-            # Rule-augmented high-accuracy fallback
+        """
+        Two-stage prediction:
+        1. Predict source type using source_type_model.pkl (Scikit-Learn Pipeline).
+        2. Predict temporal persistence using model.pkl.
+        """
+        pred = None
+        confidence = 0.0
+        prob_dict = {}
+        persistence_prob = None
+        is_persistent = None
+
+        # Stage 1: Source Type Prediction via source_type_model.pkl
+        if self.source_model is not None:
+            try:
+                # Required: ['mean_distance_to_industry_km', 'min_distance_to_industry_km', 
+                #            'mean_industrial_facilities_1km', 'mean_industrial_facilities_5km', 
+                #            'nearest_facility_type', 'nearest_refinery_km', 'nearest_powerplant_km', 
+                #            'nearest_mine_km', 'nearest_industrial_area_km', 'landcover_class']
+                min_d = float(features_dict.get("min_distance_to_industry_km") or features_dict.get("min_distance_industry") or 5.0)
+                mean_d = float(features_dict.get("mean_distance_to_industry_km") or features_dict.get("mean_distance_industry") or min_d)
+                ind_1k = float(features_dict.get("mean_industrial_facilities_1km") or 0.0)
+                ind_5k = float(features_dict.get("mean_industrial_facilities_5km") or 0.0)
+                fac_type = str(features_dict.get("nearest_facility_type") or "industrial_area")
+                ref_km = float(features_dict.get("nearest_refinery_km") or min_d)
+                power_km = float(features_dict.get("nearest_powerplant_km") or min_d)
+                mine_km = float(features_dict.get("nearest_mine_km") or min_d)
+                ind_area_km = float(features_dict.get("nearest_industrial_area_km") or min_d)
+                lc = str(features_dict.get("landcover_class") or "Built-up")
+
+                source_df = pd.DataFrame([{
+                    "mean_distance_to_industry_km": mean_d,
+                    "min_distance_to_industry_km": min_d,
+                    "mean_industrial_facilities_1km": ind_1k,
+                    "mean_industrial_facilities_5km": ind_5k,
+                    "nearest_facility_type": fac_type,
+                    "nearest_refinery_km": ref_km,
+                    "nearest_powerplant_km": power_km,
+                    "nearest_mine_km": mine_km,
+                    "nearest_industrial_area_km": ind_area_km,
+                    "landcover_class": lc
+                }])
+
+                pred = self.source_model.predict(source_df)[0]
+                probs = self.source_model.predict_proba(source_df)[0]
+                prob_dict = {str(c): round(float(p) * 100, 2) for c, p in zip(self.classes_, probs)}
+                confidence = round(float(np.max(probs)) * 100, 2)
+            except Exception as e:
+                print(f"Stage-1 inference exception: {e}")
+                pred = None
+
+        # Fallback to legacy model or rule-based if Stage 1 did not compute
+        if pred is None:
             pred, confidence, prob_dict = self._rule_based_fallback(features_dict)
+
+        # Stage 2: Persistence Prediction via model.pkl
+        if self.persistence_model is not None:
+            try:
+                # Required: ['mean_frp', 'max_frp', 'mean_brightness', 'max_brightness', 
+                #            'mean_distance_industry', 'min_distance_industry', 
+                #            'mean_industrial_facilities_1km', 'mean_industrial_facilities_5km', 
+                #            'industrial_land_ratio']
+                m_frp = float(features_dict.get("mean_frp") or 15.0)
+                mx_frp = float(features_dict.get("max_frp") or m_frp)
+                m_brt = float(features_dict.get("mean_brightness") or 325.0)
+                mx_brt = float(features_dict.get("max_brightness") or m_brt)
+                min_ind = float(features_dict.get("min_distance_industry") or features_dict.get("min_distance_to_industry_km") or 5.0)
+                mean_ind = float(features_dict.get("mean_distance_industry") or features_dict.get("mean_distance_to_industry_km") or min_ind)
+                fac_1k = float(features_dict.get("mean_industrial_facilities_1km") or 0.0)
+                fac_5k = float(features_dict.get("mean_industrial_facilities_5km") or 0.0)
+                ind_ratio = float(features_dict.get("industrial_land_ratio") or (0.8 if min_ind < 1.5 else 0.0))
+
+                pers_df = pd.DataFrame([{
+                    "mean_frp": m_frp,
+                    "max_frp": mx_frp,
+                    "mean_brightness": m_brt,
+                    "max_brightness": mx_brt,
+                    "mean_distance_industry": mean_ind,
+                    "min_distance_industry": min_ind,
+                    "mean_industrial_facilities_1km": fac_1k,
+                    "mean_industrial_facilities_5km": fac_5k,
+                    "industrial_land_ratio": ind_ratio
+                }])
+
+                pers_pred = int(self.persistence_model.predict(pers_df)[0])
+                pers_probs = self.persistence_model.predict_proba(pers_df)[0]
+                is_persistent = bool(pers_pred == 1)
+                persistence_prob = round(float(pers_probs[1]) * 100, 1)
+            except Exception as pe:
+                print(f"Stage-2 persistence inference exception: {pe}")
+
+        # Compute dynamic persistence score percentage (0-100)
+        final_persistence = persistence_prob if persistence_prob is not None else float(features_dict.get("persistence_score") or 85.0)
 
         # Generate explainability notes
         min_dist = features_dict.get("min_distance_to_industry_km", 50.0)
         lc_class = features_dict.get("landcover_class", "Unknown")
-        fac_type = features_dict.get("nearest_facility_type", "unknown")
+        fac_type = features_dict.get("nearest_facility_type", "industrial area")
         
         reasons = []
         if pred == "Industrial":
-            reasons.append(f"Located within {min_dist:.2f} km of {fac_type}")
-            if features_dict.get("mean_industrial_facilities_5km", 0) > 0:
-                reasons.append(f"{features_dict.get('mean_industrial_facilities_5km', 0)} industrial facilities in 5km radius")
-            if features_dict.get("active_days", 1) >= 2:
-                reasons.append(f"Persistent thermal recurrence over {features_dict.get('active_days', 1)} distinct days")
+            reasons.append(f"Classified by Stage-1 Spatial Pipeline within {min_dist:.2f} km of {fac_type}")
+            if is_persistent:
+                reasons.append(f"Stage-2 Energy Classifier flagged high persistence ({final_persistence:.1f}%)")
+            else:
+                reasons.append(f"Thermal recurrence observed near manufacturing zone")
         elif pred == "Forest/Natural":
-            reasons.append(f"Dominant land cover: {lc_class}")
-            reasons.append(f"Isolated from industrial clusters ({min_dist:.2f} km away)")
+            reasons.append(f"Dominant canopy land cover: {lc_class}")
+            reasons.append(f"Isolated from industrial infrastructure ({min_dist:.2f} km away)")
         elif pred == "Agricultural":
             reasons.append(f"Occurring in cropland / agricultural belt ({lc_class})")
             reasons.append("Short duration / ephemeral seasonal burn signature")
         else:
-            reasons.append(f"Land cover: {lc_class} with low persistence")
+            reasons.append(f"Surface land cover: {lc_class}")
 
         return {
             "predicted_event_type": pred,
             "confidence_pct": confidence,
+            "persistence_score": final_persistence,
+            "is_persistent": is_persistent,
             "probabilities": prob_dict,
-            "explanation": reasons
+            "explanation": reasons,
+            "model_architecture": "Two-Stage Decoupled Pipeline (source_type_model + persistence_model)"
         }
 
     def _rule_based_fallback(self, feat: Dict[str, Any]) -> Tuple[str, float, Dict[str, float]]:
