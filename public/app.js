@@ -103,6 +103,14 @@ let recentReportsList = [
 /* ==========================================================================
    INITIALIZATION
    ========================================================================== */
+function checkStartupAuthentication() {
+    const userSession = sessionStorage.getItem("aerothermal_auth_user");
+    const authOverlay = document.getElementById("auth-overlay-view");
+    if (!userSession && authOverlay) {
+        authOverlay.classList.add("active");
+    }
+}
+
 document.addEventListener("DOMContentLoaded", function () {
     checkStartupAuthentication();
     restoreThemePreference();
@@ -193,6 +201,7 @@ function initSmoothLeafletMap() {
     }).addTo(map);
 
     markersLayer = L.layerGroup().addTo(map);
+    setTimeout(() => { if (map) map.invalidateSize(); }, 250);
 
     // CLICK MAP INSPECTION: Click anywhere on map to inspect coordinates
     map.on('click', function (e) {
