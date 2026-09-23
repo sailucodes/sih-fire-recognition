@@ -14,6 +14,20 @@
  * - Dedicated Login / Logout screen
  */
 
+// Base API URL resolver (handles local file, VS Code Live Server on :5500, or FastAPI on :8000)
+function getApiBase() {
+    if (typeof window === "undefined") return "http://127.0.0.1:8000";
+    if (window.location.protocol === "file:") return "http://127.0.0.1:8000";
+    if (window.location.port && window.location.port !== "8000" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")) {
+        return `${window.location.protocol}//${window.location.hostname}:8000`;
+    }
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+        if (window.location.port === "8000") return "";
+        return "http://127.0.0.1:8000";
+    }
+    return "";
+}
+
 // Application State
 let allEvents = [];
 let filteredEvents = [];
@@ -112,17 +126,37 @@ function checkStartupAuthentication() {
     }
 }
 
-document.addEventListener("DOMContentLoaded", function () {
+document.addEventListener("DOMContentLoaded", async function () {
     checkStartupAuthentication();
     restoreThemePreference();
     populateRegionFilter();
     initSmoothLeafletMap();
     initMapResizer();
     initGlobalSearch();
-    loadInitialData();
     renderRecentReportsLibrary();
-    startLiveNasaWidget();
     showSettingsTab('profile');
+
+    // Retrieve saved period selection from localStorage, default to Live Pass (1 day)
+    const savedPeriod = localStorage.getItem("thermal_selected_period") || "Live Satellite Pass (Today)";
+    const savedDays = parseInt(localStorage.getItem("thermal_selected_days") || "1", 10);
+
+    const dateText = document.getElementById("header-date-text");
+    if (dateText) dateText.innerText = savedPeriod;
+
+    // Load active dataset directly from backend FIRMS sync pipeline
+    try {
+        await syncBackendFirms(savedDays, false);
+    } catch (e) {
+        console.warn("[Startup] Initial backend sync failed:", e);
+    }
+
+    // Auto-sync timer (every 60s for 1-day live telemetry only)
+    setInterval(() => {
+        const curDays = parseInt(localStorage.getItem("thermal_selected_days") || "1", 10);
+        if (curDays === 1) {
+            syncBackendFirms(1, false).catch(() => {});
+        }
+    }, 60000);
 });
 
 /* ==========================================================================
@@ -391,30 +425,32 @@ window.selectDatePreset = async function (presetName) {
     if (drop) drop.classList.remove("active");
 
     let days = 1;
-    if (presetName.includes("7 Days")) {
+    if (presetName.toLowerCase().includes("7 day")) {
         days = 7;
-    } else if (presetName.includes("30 Days")) {
+    } else if (presetName.toLowerCase().includes("30 day")) {
         days = 30;
     } else {
         days = 1;
     }
 
+    // Persist to localStorage so page refresh preserves user's chosen view
+    localStorage.setItem("thermal_selected_period", presetName);
+    localStorage.setItem("thermal_selected_days", String(days));
+
     showToast(`Loading satellite data for: ${presetName} (fetching NASA FIRMS ${days}-day telemetry via AI pipeline)...`, "info");
 
     try {
-        const count = await updateNasaFirmsWidget(true, days);
-        const liveCount = count > 0 ? count : filteredEvents.length;
-        showToast(`Loaded ${presetName}: ${liveCount} real thermal sources classified by AI!`, "success");
+        const count = await syncBackendFirms(days, false);
+        showToast(`Loaded ${presetName}: ${count} real thermal sources classified by AI!`, "success");
     } catch (err) {
         console.error("Error loading date preset:", err);
-        showToast(`Loaded ${presetName} cached telemetry`, "success");
     }
 };
 
 /* ==========================================================================
    DATA LOADING & NASA FIRMS LIVE SYNC
    ========================================================================== */
-function loadInitialData() {
+function loadInitialFallbackData() {
     if (typeof INITIAL_563_EVENTS !== "undefined" && Array.isArray(INITIAL_563_EVENTS) && INITIAL_563_EVENTS.length > 0) {
         historicalArchiveEvents = INITIAL_563_EVENTS.map((item, idx) => ({
             source_id: item.source_id || `GT_${idx + 1}`,
@@ -423,10 +459,20 @@ function loadInitialData() {
             longitude: parseFloat(item.longitude),
             predicted_event_type: normalizeType(item.predicted_event_type || item.event_type || "Industrial"),
             confidence: parseFloat(item.confidence || 90.0),
+            confidence_pct: parseFloat(item.confidence || 90.0),
             persistence_score: parseFloat(item.persistence_score || 85.0),
             landcover: item.landcover || "Built-up",
+            landcover_class: item.landcover || "Built-up",
             mean_frp: parseFloat(item.mean_frp || item.frp || 25.0),
+            max_frp: parseFloat(item.mean_frp || item.frp || 25.0),
             brightness: parseFloat(item.brightness || 335.0),
+            risk_level: item.predicted_event_type === "Industrial" ? "Critical" : "High",
+            risk_description: "Ground truth database record",
+            sih_alert_severity: "LOW",
+            total_detections: 1,
+            active_days: 1,
+            is_persistent: false,
+            is_flare_anomaly: false,
             acq_time: item.acq_time || "09:00"
         }));
     }
@@ -440,27 +486,29 @@ function loadInitialData() {
     updateDashboard();
 }
 
-function startLiveNasaWidget() {
-    updateNasaFirmsWidget();
-    setInterval(() => updateNasaFirmsWidget(), 60000);
+// Backward-compatible alias
+function loadInitialData() {
+    loadInitialFallbackData();
 }
 
 window.manualSyncNasa = async function () {
     const icon = document.getElementById("sync-icon");
     if (icon) icon.classList.add("fa-spin");
-    showToast("Connecting to backend AI FIRMS sync pipeline...", "info");
+    showToast("Connecting to backend AI FIRMS sync pipeline (Today's Live Pass)...", "info");
 
-    const dateText = document.getElementById("header-date-text")?.innerText || "";
-    let days = 1;
-    if (dateText.includes("7 Days")) days = 7;
-    else if (dateText.includes("30 Days")) days = 30;
+    const days = 1;
+    const presetName = "Live Satellite Pass (Today)";
+    const dateText = document.getElementById("header-date-text");
+    if (dateText) dateText.innerText = presetName;
+
+    localStorage.setItem("thermal_selected_period", presetName);
+    localStorage.setItem("thermal_selected_days", "1");
 
     try {
-        const count = await updateNasaFirmsWidget(true, days);
-        const liveCount = count > 0 ? count : filteredEvents.length;
-        showToast(`Successfully synced ${liveCount} clustered thermal sources verified by backend AI!`, "success");
-    } catch (_) {
-        showToast("Live sync updated with latest cached satellite telemetry", "success");
+        const count = await syncBackendFirms(1, true);
+        showToast(`Successfully synced ${count} clustered thermal sources verified by backend AI!`, "success");
+    } catch (err) {
+        console.error("[Live Sync] Manual sync failed:", err);
     } finally {
         setTimeout(() => {
             if (icon) icon.classList.remove("fa-spin");
@@ -468,100 +516,86 @@ window.manualSyncNasa = async function () {
     }
 };
 
-async function updateNasaFirmsWidget(forceRefresh = false, days = 1) {
+async function syncBackendFirms(days = 1, isManual = false) {
     const now = new Date();
     const timeStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + ", " +
                     now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
 
     setText("nasa-last-update", "Last synced: " + timeStr + (days > 1 ? ` (${days}d window)` : ""));
 
-    let parsedLiveEvents = [];
+    const apiBase = getApiBase();
+    const url = `${apiBase}/api/v1/firms/sync?days=${days}`;
 
     try {
-        // Authoritative Pipeline: Call backend /api/v1/firms/sync
-        // Backend executes: NASA FIRMS -> cluster_firms_hotspots() -> thermal sources -> feature extraction -> ML prediction -> risk assessment -> storage
-        const res = await fetch(`/api/v1/firms/sync?days=${days}`);
-        if (res.ok) {
-            const data = await res.json();
-            const rawSources = data.clusters || data.sources || data.sample_clusters || [];
-            if (Array.isArray(rawSources) && rawSources.length > 0) {
-                parsedLiveEvents = rawSources.map((s, idx) => ({
-                    source_id: s.source_id || `LIVE_FIRMS_${String(idx + 1).padStart(4, "0")}`,
-                    state: s.state || getNearestState(s.latitude, s.longitude),
-                    latitude: parseFloat(s.latitude),
-                    longitude: parseFloat(s.longitude),
-                    predicted_event_type: normalizeType(s.predicted_event_type || s.event_type || "Other"),
-                    confidence: parseFloat(s.confidence || s.confidence_pct || 80.0),
-                    confidence_pct: parseFloat(s.confidence_pct || s.confidence || 80.0),
-                    persistence_score: parseFloat(s.persistence_score || 50.0),
-                    landcover: s.landcover_class || s.landcover || "Built-up",
-                    landcover_class: s.landcover_class || s.landcover || "Built-up",
-                    mean_frp: parseFloat(s.mean_frp || 15.0),
-                    max_frp: parseFloat(s.max_frp || s.mean_frp || 15.0),
-                    risk_level: s.risk_level || "Medium",
-                    risk_description: s.risk_description || "",
-                    sih_alert_severity: s.sih_alert_severity || "LOW",
-                    nearest_facility_name: s.nearest_facility_name || "",
-                    nearest_facility_type: s.nearest_facility_type || "",
-                    total_detections: parseInt(s.total_detections || 1),
-                    active_days: parseInt(s.active_days || 1),
-                    is_persistent: Boolean(s.is_persistent),
-                    is_flare_anomaly: Boolean(s.is_flare_anomaly),
-                    acq_time: s.acq_time || "09:30"
-                }));
-            }
+        const res = await fetch(url);
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status} (${res.statusText || 'Backend Error'})`);
         }
+        const data = await res.json();
+        const rawSources = data.clusters || data.sources || [];
+        if (!Array.isArray(rawSources)) {
+            throw new Error("Invalid response: 'clusters' array not found");
+        }
+
+        // Replace allEvents strictly with the backend FIRMS response clusters
+        allEvents = rawSources.map((s, idx) => {
+            const lat = parseFloat(s.latitude);
+            const lng = parseFloat(s.longitude);
+            const type = normalizeType(s.predicted_event_type || s.event_type || "Other");
+            const conf = parseFloat(s.confidence || s.confidence_pct || 80.0);
+            const frp = parseFloat(s.mean_frp || s.frp || 15.0);
+            const maxFrp = parseFloat(s.max_frp || frp);
+            const persScore = parseFloat(s.persistence_score || (s.is_persistent ? 85.0 : 40.0));
+            const state = s.state || getNearestState(lat, lng);
+            const risk = s.risk_level || (type === "Industrial" && conf >= 85 ? "Critical" : (frp >= 25 ? "High" : "Medium"));
+
+            return {
+                source_id: s.source_id || `FIRMS_${String(idx + 1).padStart(4, "0")}`,
+                state: state,
+                latitude: lat,
+                longitude: lng,
+                predicted_event_type: type,
+                confidence: conf,
+                confidence_pct: conf,
+                persistence_score: persScore,
+                landcover: s.landcover_class || s.landcover || "Built-up",
+                landcover_class: s.landcover_class || s.landcover || "Built-up",
+                mean_frp: frp,
+                max_frp: maxFrp,
+                risk_level: risk,
+                risk_description: s.risk_description || "",
+                sih_alert_severity: s.sih_alert_severity || (risk === "Critical" ? "CRITICAL" : "LOW"),
+                nearest_facility_name: s.nearest_facility_name || "",
+                nearest_facility_type: s.nearest_facility_type || "",
+                total_detections: parseInt(s.total_detections || 1, 10),
+                active_days: parseInt(s.active_days || 1, 10),
+                is_persistent: Boolean(s.is_persistent),
+                is_flare_anomaly: Boolean(s.is_flare_anomaly),
+                acq_time: s.acq_time || "09:30"
+            };
+        });
+
+        // Set filteredEvents to active dataset & reset table pagination
+        filteredEvents = [...allEvents];
+        eventsCurrentPage = 1;
+        updateDashboard();
+
+        return allEvents.length;
     } catch (err) {
-        console.warn("[Live Sync] Backend sync error, falling back to stored sources:", err);
-    }
+        console.error("[Live Sync] Backend sync error:", err);
+        showToast(`Backend connection failed: ${err.message}`, "error");
 
-    // Fallback to indexed backend sources if live sync returned nothing
-    if (parsedLiveEvents.length === 0) {
-        try {
-            const apiRes = await fetch("/api/v1/sources?limit=150");
-            if (apiRes.ok) {
-                const apiData = await apiRes.json();
-                const items = apiData.sources || apiData.data || [];
-                if (Array.isArray(items) && items.length > 0) {
-                    parsedLiveEvents = items.map((s, idx) => ({
-                        source_id: s.source_id || `SOURCE_${String(idx + 1).padStart(4, "0")}`,
-                        state: s.state || getNearestState(s.latitude, s.longitude),
-                        latitude: parseFloat(s.latitude),
-                        longitude: parseFloat(s.longitude),
-                        predicted_event_type: normalizeType(s.predicted_event_type || s.event_type || "Other"),
-                        confidence: parseFloat(s.confidence || s.confidence_pct || 80.0),
-                        confidence_pct: parseFloat(s.confidence_pct || s.confidence || 80.0),
-                        persistence_score: parseFloat(s.persistence_score || 50.0),
-                        landcover: s.landcover_class || s.landcover || "Built-up",
-                        landcover_class: s.landcover_class || s.landcover || "Built-up",
-                        mean_frp: parseFloat(s.mean_frp || 15.0),
-                        max_frp: parseFloat(s.max_frp || 15.0),
-                        risk_level: s.risk_level || "Low",
-                        risk_description: s.risk_description || "",
-                        sih_alert_severity: s.sih_alert_severity || "LOW",
-                        nearest_facility_name: s.nearest_facility_name || "",
-                        nearest_facility_type: s.nearest_facility_type || "",
-                        total_detections: parseInt(s.total_detections || 1),
-                        active_days: parseInt(s.active_days || 1),
-                        is_persistent: Boolean(s.is_persistent),
-                        is_flare_anomaly: Boolean(s.is_flare_anomaly),
-                        acq_time: s.acq_time || "09:30"
-                    }));
-                }
-            }
-        } catch (_) {}
+        // Only fall back to emergency cache if we literally have zero events loaded
+        if (allEvents.length === 0) {
+            loadInitialFallbackData();
+            showToast("Offline fallback dataset loaded", "warning");
+        }
+        throw err;
     }
-
-    if (parsedLiveEvents.length > 0) {
-        allEvents = parsedLiveEvents;
-    } else if (allEvents.length === 0) {
-        allEvents = [...defaultFallbackEvents];
-    }
-
-    filteredEvents = [...allEvents];
-    updateDashboard();
-    return allEvents.length;
 }
+
+// Alias for backwards compatibility
+window.updateNasaFirmsWidget = syncBackendFirms;
 
 /* ==========================================================================
    DASHBOARD UPDATES & MAP MARKERS WITH DETAILS POPUP
@@ -1137,7 +1171,7 @@ window.executePrediction = async function () {
 
         // Try local backend Stage 1 + Stage 2 ML inference
         try {
-            const res = await fetch("/api/v1/predict", {
+            const res = await fetch(`${getApiBase()}/api/v1/predict`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ latitude: lat, longitude: lng, state: state, mean_frp: frp })

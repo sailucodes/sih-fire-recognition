@@ -43,14 +43,14 @@
                     <div class="sync-icon-box"><i class="fa-solid fa-rotate" id="sync-icon"></i></div>
                     <div class="sync-text-group">
                         <span class="sync-title">Live Data Sync</span>
-                        <span class="sync-subtitle" id="nasa-last-update">Last synced: 27 Aug 2025, 09:29 AM</span>
+                        <span class="sync-subtitle" id="nasa-last-update">Connecting to backend AI FIRMS...</span>
                     </div>
                 </div>
 
                 <!-- Date Range Selector -->
                 <div class="date-picker-btn" id="header-date-picker" onclick="toggleDatePresetDropdown()">
                     <i class="fa-regular fa-calendar" style="color: var(--primary-color);"></i>
-                    <span id="header-date-text">27 Aug 2025</span>
+                    <span id="header-date-text">Live Satellite Pass (Today)</span>
                     <i class="fa-solid fa-chevron-down" style="font-size: 11px; margin-left: 4px; color: var(--text-muted);"></i>
                     <!-- Date Presets Dropdown -->
                     <div class="date-preset-dropdown" id="date-preset-dropdown" onclick="event.stopPropagation()">
@@ -138,7 +138,7 @@
                                 <span class="stat-card-title">Total Sources</span>
                                 <div class="stat-icon-wrapper"><i class="fa-solid fa-globe"></i></div>
                             </div>
-                            <strong class="stat-card-value" id="stat-total-sources">918</strong>
+                            <strong class="stat-card-value" id="stat-total-sources">--</strong>
                             <span class="stat-trend-pill positive"><i class="fa-solid fa-arrow-trend-up"></i> +12.4% vs last week</span>
                                                         <div class="stat-sparkline-box">
                                 <svg width="100%" height="32" viewBox="0 0 100 32" preserveAspectRatio="none">
@@ -159,7 +159,7 @@
                                 <span class="stat-card-title">Industrial</span>
                                 <div class="stat-icon-wrapper"><i class="fa-solid fa-industry"></i></div>
                             </div>
-                            <strong class="stat-card-value" id="stat-industrial">193</strong>
+                            <strong class="stat-card-value" id="stat-industrial">--</strong>
                             <span class="stat-trend-pill negative"><i class="fa-solid fa-arrow-trend-up"></i> +3.2% vs baseline</span>
                                                         <div class="stat-sparkline-box">
                                 <svg width="100%" height="32" viewBox="0 0 100 32" preserveAspectRatio="none">
@@ -180,7 +180,7 @@
                                 <span class="stat-card-title">Forest Fire</span>
                                 <div class="stat-icon-wrapper"><i class="fa-solid fa-tree"></i></div>
                             </div>
-                            <strong class="stat-card-value" id="stat-forest">452</strong>
+                            <strong class="stat-card-value" id="stat-forest">--</strong>
                             <span class="stat-trend-pill positive"><i class="fa-solid fa-arrow-trend-down"></i> -8.5% seasonal</span>
                                                         <div class="stat-sparkline-box">
                                 <svg width="100%" height="32" viewBox="0 0 100 32" preserveAspectRatio="none">
@@ -201,7 +201,7 @@
                                 <span class="stat-card-title">Agricultural</span>
                                 <div class="stat-icon-wrapper"><i class="fa-solid fa-wheat-awn"></i></div>
                             </div>
-                            <strong class="stat-card-value" id="stat-agri">164</strong>
+                            <strong class="stat-card-value" id="stat-agri">--</strong>
                             <span class="stat-trend-pill negative"><i class="fa-solid fa-arrow-trend-up"></i> +18.7% stubble peak</span>
                                                         <div class="stat-sparkline-box">
                                 <svg width="100%" height="32" viewBox="0 0 100 32" preserveAspectRatio="none">
@@ -222,7 +222,7 @@
                                 <span class="stat-card-title">Other</span>
                                 <div class="stat-icon-wrapper"><i class="fa-solid fa-circle-question"></i></div>
                             </div>
-                            <strong class="stat-card-value" id="stat-other">109</strong>
+                            <strong class="stat-card-value" id="stat-other">--</strong>
                             <span class="stat-trend-pill neutral"><i class="fa-solid fa-minus"></i> -2.1% variation</span>
                                                         <div class="stat-sparkline-box">
                                 <svg width="100%" height="32" viewBox="0 0 100 32" preserveAspectRatio="none">
@@ -243,7 +243,7 @@
                                 <span class="stat-card-title">Critical Alerts</span>
                                 <div class="stat-icon-wrapper"><i class="fa-solid fa-triangle-exclamation"></i></div>
                             </div>
-                            <strong class="stat-card-value" id="stat-critical">24</strong>
+                            <strong class="stat-card-value" id="stat-critical">--</strong>
                             <span class="stat-trend-pill negative"><i class="fa-solid fa-arrow-trend-up"></i> +5.4% escalations</span>
                                                         <div class="stat-sparkline-box">
                                 <svg width="100%" height="32" viewBox="0 0 100 32" preserveAspectRatio="none">
