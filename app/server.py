@@ -144,6 +144,7 @@ window.__AEROTHERMAL_CONFIG__ = {{
                 data = f.read()
             self.send_response(200)
             self.send_header("Content-Type", ctype)
+            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
             self._send_cors_headers()
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
@@ -159,6 +160,9 @@ window.__AEROTHERMAL_CONFIG__ = {{
                 pass
 
     def _serve_static_html(self, filename: str):
+        if filename == "index.html" and (BASE_DIR / "index.html").is_file():
+            self._serve_file(BASE_DIR / "index.html")
+            return
         filepath = STATIC_DIR / filename
         if os.path.exists(filepath):
             self._serve_file(filepath)
