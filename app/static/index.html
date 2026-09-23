@@ -1,842 +1,800 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>THERMAL-AI - Satellite Multi-Modal Thermal Event Intelligence</title>
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <!-- FontAwesome 6 Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-    <!-- Google Font: Inter -->
+    <title>THERMAL-AI | Space-borne Thermal Anomaly & Emission Intelligence</title>
+    <!-- Inter Font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- Custom Stylesheet -->
+    <!-- FontAwesome 6 Pro/Free Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <!-- Main Stylesheet -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-    <!-- =======================================================================
-         TOP HEADER BAR
-         ======================================================================= -->
-    <header class="app-header">
-        <div class="header-left-group">
-            <div class="header-brand" onclick="switchView('dashboard-section')">
-                THERMAL-AI
-            </div>
-            <div class="header-search">
-                <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" id="global-search-input" placeholder="Search location, source ID, or event...">
-            </div>
-        </div>
-
-        <div class="header-right-group">
-            <div class="sync-status-pill" id="header-sync-pill" title="Click to trigger manual sync with NASA satellites" onclick="window.manualSyncNasa()">
-                <div class="sync-icon-box"><i class="fa-solid fa-rotate" id="sync-icon"></i></div>
-                <div class="sync-text-group">
-                    <div class="sync-title">Live Data Sync <span class="sync-dot"></span></div>
-                    <div class="sync-subtitle" id="nasa-last-update">Last synced: 27 Aug 2025, 09:29 AM</div>
+    <div class="app-container">
+        <!-- ==========================================================================
+             TOP FIXED HEADER
+             ========================================================================== -->
+        <header class="top-header">
+            <div class="header-left-col">
+                <div class="header-brand" onclick="switchView('dashboard-section')">
+                    <div class="brand-icon-box">
+                        <i class="fa-solid fa-fire-flame-curved"></i>
+                    </div>
+                    <div>
+                        <span class="brand-title">THERMAL-AI</span>
+                        <span class="brand-sub">National Thermal Intelligence</span>
+                    </div>
+                </div>
+                <div class="header-search-bar">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="global-search-input" placeholder="Search location, source ID, coordinates...">
                 </div>
             </div>
 
-            <div class="date-picker-btn" id="header-date-picker">
-                <i class="fa-regular fa-calendar"></i>
-                <span id="header-date-text">27 Aug 2025</span>
-                <i class="fa-solid fa-chevron-down" style="font-size: 11px;"></i>
-            </div>
+            <div class="header-right-col">
+                <!-- Live Data Sync Pill -->
+                <div class="sync-status-pill" id="header-sync-pill" title="Click to trigger manual sync with NASA satellites" onclick="window.manualSyncNasa()">
+                    <div class="sync-icon-box"><i class="fa-solid fa-rotate" id="sync-icon"></i></div>
+                    <div class="sync-text-group">
+                        <span class="sync-title">Live Data Sync</span>
+                        <span class="sync-subtitle" id="nasa-last-update">Last synced: 27 Aug 2025, 09:29 AM</span>
+                    </div>
+                </div>
 
-            <div class="notif-bell-btn" id="header-notif-btn" title="View Alerts" onclick="switchView('alerts-section')">
-                <i class="fa-regular fa-bell"></i>
-                <span class="notif-badge-bubble" id="header-notif-count">3</span>
-            </div>
+                <!-- Date Range Selector -->
+                <div class="date-picker-btn" id="header-date-picker" onclick="toggleDatePresetDropdown()">
+                    <i class="fa-regular fa-calendar" style="color: var(--primary-color);"></i>
+                    <span id="header-date-text">27 Aug 2025</span>
+                    <i class="fa-solid fa-chevron-down" style="font-size: 11px; margin-left: 4px; color: var(--text-muted);"></i>
+                    <!-- Date Presets Dropdown -->
+                    <div class="date-preset-dropdown" id="date-preset-dropdown" onclick="event.stopPropagation()">
+                        <div class="date-preset-option" onclick="selectDatePreset('Today (Live Pass)')">Today (Live Satellite Pass)</div>
+                        <div class="date-preset-option" onclick="selectDatePreset('Yesterday')">Yesterday</div>
+                        <div class="date-preset-option" onclick="selectDatePreset('Last 7 Days')">Last 7 Days</div>
+                        <div class="date-preset-option" onclick="selectDatePreset('Last 30 Days')">Last 30 Days</div>
+                        <div class="date-preset-option" onclick="selectDatePreset('27 Aug 2025')">27 Aug 2025 (Reference Pass)</div>
+                    </div>
+                </div>
 
-            <div class="user-profile-btn" id="header-user-profile" onclick="switchView('settings-section')">
-                <div class="user-avatar-circle" id="header-avatar-initials">SS</div>
-                <span class="user-name-text" id="header-user-name">Sailaja S.</span>
-            </div>
-        </div>
-    </header>
+                <!-- Dark / Light Theme Toggle -->
+                <button class="theme-toggle-btn" id="header-theme-toggle" onclick="toggleDarkTheme()" title="Toggle Dark/Light Mode">
+                    <i class="fa-solid fa-moon" id="theme-toggle-icon"></i>
+                </button>
 
-    <!-- =======================================================================
-         SIDEBAR NAVIGATION + MAIN VIEW CONTAINER
-         ======================================================================= -->
-    <div class="app-container">
-        
-        <!-- LEFT SIDEBAR -->
-        <aside class="app-sidebar">
-            <div class="sidebar-nav-group">
-                <a href="javascript:void(0)" class="nav-link-item active" data-target="dashboard-section" onclick="switchView('dashboard-section')">
-                    <div class="nav-link-content">
-                        <i class="fa-solid fa-house"></i>
+                <!-- Notifications Bell -->
+                <div class="notif-bell-btn" id="header-notif-btn" title="View Active Alerts" onclick="switchView('alerts-section')">
+                    <i class="fa-regular fa-bell"></i>
+                    <span class="notif-badge-bubble" id="header-notif-count">24</span>
+                </div>
+
+                <!-- User Profile -->
+                <div class="user-profile-btn" id="header-user-profile" onclick="switchView('settings-section')">
+                    <div class="user-avatar-circle" id="header-avatar-initials">SS</div>
+                    <span class="user-name-text" id="header-user-name">Sailaja S.</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- ==========================================================================
+             MAIN CONTENT LAYOUT: SIDEBAR + CONTENT
+             ========================================================================== -->
+        <div class="main-wrapper">
+            <!-- Sidebar Navigation (Streamlined without redundant live map) -->
+            <aside class="app-sidebar">
+                <nav class="sidebar-nav-group">
+                    <a href="javascript:void(0)" class="nav-link-item active" data-target="dashboard-section" onclick="switchView('dashboard-section')">
+                        <i class="fa-solid fa-chart-line"></i>
                         <span>Dashboard</span>
-                    </div>
-                </a>
-                <a href="javascript:void(0)" class="nav-link-item" data-target="live-map-section" onclick="switchView('live-map-section')">
-                    <div class="nav-link-content">
-                        <i class="fa-solid fa-map-location-dot"></i>
-                        <span>Live Map</span>
-                    </div>
-                </a>
-                <a href="javascript:void(0)" class="nav-link-item" data-target="prediction-section" onclick="switchView('prediction-section')">
-                    <div class="nav-link-content">
-                        <i class="fa-solid fa-brain"></i>
+                    </a>
+                    <a href="javascript:void(0)" class="nav-link-item" data-target="prediction-section" onclick="switchView('prediction-section')">
+                        <i class="fa-solid fa-satellite-dish"></i>
                         <span>AI Predictor</span>
-                    </div>
-                </a>
-                <a href="javascript:void(0)" class="nav-link-item" data-target="events-section" onclick="switchView('events-section')">
-                    <div class="nav-link-content">
+                    </a>
+                    <a href="javascript:void(0)" class="nav-link-item" data-target="events-section" onclick="switchView('events-section')">
                         <i class="fa-solid fa-database"></i>
                         <span>Events</span>
-                    </div>
-                </a>
-                <a href="javascript:void(0)" class="nav-link-item" data-target="analytics-section" onclick="switchView('analytics-section')">
-                    <div class="nav-link-content">
-                        <i class="fa-solid fa-chart-simple"></i>
+                    </a>
+                    <a href="javascript:void(0)" class="nav-link-item" data-target="analytics-section" onclick="switchView('analytics-section')">
+                        <i class="fa-solid fa-chart-pie"></i>
                         <span>Analytics</span>
-                    </div>
-                </a>
-                <a href="javascript:void(0)" class="nav-link-item" data-target="alerts-section" onclick="switchView('alerts-section')">
-                    <div class="nav-link-content">
-                        <i class="fa-solid fa-bell"></i>
+                    </a>
+                    <a href="javascript:void(0)" class="nav-link-item" data-target="alerts-section" onclick="switchView('alerts-section')">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
                         <span>Alerts</span>
-                    </div>
-                    <span class="sidebar-badge-pill" id="sidebar-alert-badge">3</span>
-                </a>
-                <a href="javascript:void(0)" class="nav-link-item" data-target="reports-section" onclick="switchView('reports-section')">
-                    <div class="nav-link-content">
-                        <i class="fa-solid fa-file-lines"></i>
+                        <span class="sidebar-badge-pill" id="sidebar-alert-badge">24</span>
+                    </a>
+                    <a href="javascript:void(0)" class="nav-link-item" data-target="reports-section" onclick="switchView('reports-section')">
+                        <i class="fa-regular fa-file-lines"></i>
                         <span>Reports</span>
-                    </div>
-                </a>
-            </div>
+                    </a>
+                </nav>
 
-            <div class="sidebar-bottom-group">
-                <a href="javascript:void(0)" class="nav-link-item" data-target="settings-section" onclick="switchView('settings-section')">
-                    <div class="nav-link-content">
+                <div class="sidebar-nav-group">
+                    <a href="javascript:void(0)" class="nav-link-item" data-target="settings-section" onclick="switchView('settings-section')">
                         <i class="fa-solid fa-gear"></i>
                         <span>Settings</span>
-                    </div>
-                </a>
-                <a href="javascript:void(0)" class="nav-link-item" id="sidebar-logout-btn" onclick="openLogoutModal()">
-                    <div class="nav-link-content">
+                    </a>
+                    <a href="javascript:void(0)" class="nav-link-item" id="sidebar-logout-btn" onclick="openLogoutModal()">
                         <i class="fa-solid fa-arrow-right-from-bracket"></i>
                         <span>Logout</span>
-                    </div>
-                </a>
-            </div>
-        </aside>
-
-        <!-- MAIN CONTENT AREA -->
-        <main class="app-main">
-
-            <!-- ===============================================================
-                 SCREEN 1: DASHBOARD (DEFAULT VIEW)
-                 =============================================================== -->
-            <section id="dashboard-section" class="view-section active">
-                
-                <!-- TOP 6 METRIC CARDS -->
-                <div class="stat-cards-row">
-                    <!-- 1. Total Sources -->
-                    <div class="stat-card-widget">
-                        <div class="stat-card-top">
-                            <div class="stat-icon-square blue"><i class="fa-solid fa-database"></i></div>
-                            <div class="stat-value-group">
-                                <strong id="stat-total-sources">918</strong>
-                                <span>Total Sources</span>
-                            </div>
-                        </div>
-                        <div class="stat-card-bottom">
-                            <span class="stat-trend up-green"><i class="fa-solid fa-arrow-up"></i> 12%</span>
-                            <svg class="mini-sparkline" viewBox="0 0 50 20" fill="none">
-                                <path d="M2 16 L12 14 L24 10 L36 12 L48 4" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                        </div>
-                    </div>
-
-                    <!-- 2. Industrial -->
-                    <div class="stat-card-widget">
-                        <div class="stat-card-top">
-                            <div class="stat-icon-square red"><i class="fa-solid fa-industry"></i></div>
-                            <div class="stat-value-group">
-                                <strong id="stat-industrial">193</strong>
-                                <span>Industrial</span>
-                            </div>
-                        </div>
-                        <div class="stat-card-bottom">
-                            <span class="stat-trend up-red"><i class="fa-solid fa-arrow-up"></i> 3%</span>
-                            <svg class="mini-sparkline" viewBox="0 0 50 20" fill="none">
-                                <path d="M2 15 L14 12 L26 14 L38 8 L48 5" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                        </div>
-                    </div>
-
-                    <!-- 3. Forest / Natural -->
-                    <div class="stat-card-widget">
-                        <div class="stat-card-top">
-                            <div class="stat-icon-square green"><i class="fa-solid fa-tree"></i></div>
-                            <div class="stat-value-group">
-                                <strong id="stat-forest">452</strong>
-                                <span>Forest / Natural</span>
-                            </div>
-                        </div>
-                        <div class="stat-card-bottom">
-                            <span class="stat-trend up-green"><i class="fa-solid fa-arrow-up"></i> 8%</span>
-                            <svg class="mini-sparkline" viewBox="0 0 50 20" fill="none">
-                                <path d="M2 16 L14 13 L26 9 L36 11 L48 6" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                        </div>
-                    </div>
-
-                    <!-- 4. Agricultural -->
-                    <div class="stat-card-widget">
-                        <div class="stat-card-top">
-                            <div class="stat-icon-square yellow"><i class="fa-solid fa-wheat-awn"></i></div>
-                            <div class="stat-value-group">
-                                <strong id="stat-agri">164</strong>
-                                <span>Agricultural</span>
-                            </div>
-                        </div>
-                        <div class="stat-card-bottom">
-                            <span class="stat-trend up-green"><i class="fa-solid fa-arrow-up"></i> 3%</span>
-                            <svg class="mini-sparkline" viewBox="0 0 50 20" fill="none">
-                                <path d="M2 14 L12 16 L24 11 L36 13 L48 7" stroke="#eab308" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                        </div>
-                    </div>
-
-                    <!-- 5. Other / Unknown -->
-                    <div class="stat-card-widget">
-                        <div class="stat-card-top">
-                            <div class="stat-icon-square purple"><i class="fa-solid fa-circle-question"></i></div>
-                            <div class="stat-value-group">
-                                <strong id="stat-other">109</strong>
-                                <span>Other / Unknown</span>
-                            </div>
-                        </div>
-                        <div class="stat-card-bottom">
-                            <span class="stat-trend up-green"><i class="fa-solid fa-arrow-up"></i> 1%</span>
-                            <svg class="mini-sparkline" viewBox="0 0 50 20" fill="none">
-                                <path d="M2 15 L14 14 L26 11 L38 12 L48 8" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                        </div>
-                    </div>
-
-                    <!-- 6. Critical Hotspots -->
-                    <div class="stat-card-widget">
-                        <div class="stat-card-top">
-                            <div class="stat-icon-square red"><i class="fa-solid fa-triangle-exclamation"></i></div>
-                            <div class="stat-value-group">
-                                <strong id="stat-critical">247</strong>
-                                <span>Critical Hotspots</span>
-                            </div>
-                        </div>
-                        <div class="stat-card-bottom">
-                            <span class="stat-trend up-red"><i class="fa-solid fa-arrow-up"></i> 5%</span>
-                            <svg class="mini-sparkline" viewBox="0 0 50 20" fill="none">
-                                <path d="M2 17 L14 13 L26 15 L36 9 L48 5" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                        </div>
-                    </div>
+                    </a>
                 </div>
+            </aside>
 
-                <!-- MAIN SPLIT GRID: MAP (LEFT) & FILTERS + ALERTS (RIGHT) -->
-                <div class="dashboard-grid-layout">
-                    
-                    <!-- GIS SATELLITE MAP -->
-                    <div class="gis-map-container-card">
-                        <div id="map"></div>
-
-                        <!-- FLOATING MAP CONTROLS -->
-                        <div class="map-layer-switcher-pill">
-                            <button class="layer-pill-btn active" id="layer-satellite-btn" onclick="setMapBaseLayer('satellite')">Satellite</button>
-                            <button class="layer-pill-btn" id="layer-terrain-btn" onclick="setMapBaseLayer('terrain')">Terrain</button>
-                            <button class="layer-pill-btn" id="layer-labels-btn" onclick="toggleMapLabels()">Labels</button>
+            <!-- Main Content Pane -->
+            <main class="content-area-pane">
+                <!-- ==============================================================
+                     1. DASHBOARD VIEW (PRIMARY)
+                     ============================================================== -->
+                <section id="dashboard-section" class="view-section active">
+                    <!-- Top 6 Stat Cards with Percentage Trends -->
+                    <div class="stats-cards-grid">
+                        <div class="stat-widget-card total-sources">
+                            <div class="stat-card-header">
+                                <span class="stat-card-title">Total Sources</span>
+                                <div class="stat-icon-wrapper"><i class="fa-solid fa-globe"></i></div>
+                            </div>
+                            <strong class="stat-card-value" id="stat-total-sources">918</strong>
+                            <span class="stat-trend-pill positive"><i class="fa-solid fa-arrow-trend-up"></i> +12.4% vs last week</span>
+                            <div class="stat-sparkline-box">
+                                <svg width="100%" height="24" viewBox="0 0 100 24">
+                                    <path d="M 0,18 Q 20,8 40,15 T 80,6 T 100,10" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round"/>
+                                </svg>
+                            </div>
                         </div>
 
-                        <div class="map-zoom-controls-col">
-                            <button class="map-control-btn" onclick="mapZoomIn()" title="Zoom In"><i class="fa-solid fa-plus"></i></button>
-                            <button class="map-control-btn" onclick="mapZoomOut()" title="Zoom Out"><i class="fa-solid fa-minus"></i></button>
-                            <button class="map-control-btn" onclick="mapResetView()" title="Locate / Reset View"><i class="fa-solid fa-crosshairs"></i></button>
+                        <div class="stat-widget-card industrial">
+                            <div class="stat-card-header">
+                                <span class="stat-card-title">Industrial</span>
+                                <div class="stat-icon-wrapper"><i class="fa-solid fa-industry"></i></div>
+                            </div>
+                            <strong class="stat-card-value" id="stat-industrial">193</strong>
+                            <span class="stat-trend-pill negative"><i class="fa-solid fa-arrow-trend-up"></i> +3.2% vs baseline</span>
+                            <div class="stat-sparkline-box">
+                                <svg width="100%" height="24" viewBox="0 0 100 24">
+                                    <path d="M 0,20 Q 25,12 50,16 T 85,7 T 100,5" fill="none" stroke="#ef4444" stroke-width="2.2" stroke-linecap="round"/>
+                                </svg>
+                            </div>
                         </div>
 
-                        <div class="map-scale-badge">500 km</div>
+                        <div class="stat-widget-card forest-fire">
+                            <div class="stat-card-header">
+                                <span class="stat-card-title">Forest Fire</span>
+                                <div class="stat-icon-wrapper"><i class="fa-solid fa-tree"></i></div>
+                            </div>
+                            <strong class="stat-card-value" id="stat-forest">452</strong>
+                            <span class="stat-trend-pill positive"><i class="fa-solid fa-arrow-trend-down"></i> -8.5% seasonal</span>
+                            <div class="stat-sparkline-box">
+                                <svg width="100%" height="24" viewBox="0 0 100 24">
+                                    <path d="M 0,8 Q 30,18 60,10 T 90,16 T 100,14" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round"/>
+                                </svg>
+                            </div>
+                        </div>
 
-                        <div class="map-legend-floating-card">
-                            <div class="legend-card-title">Event Type (Classification)</div>
-                            <div class="legend-list">
-                                <div class="legend-item"><span class="legend-dot red"></span> Industrial</div>
-                                <div class="legend-item"><span class="legend-dot green"></span> Forest / Natural</div>
-                                <div class="legend-item"><span class="legend-dot yellow"></span> Agricultural</div>
-                                <div class="legend-item"><span class="legend-dot purple"></span> Other / Unknown</div>
+                        <div class="stat-widget-card agricultural">
+                            <div class="stat-card-header">
+                                <span class="stat-card-title">Agricultural</span>
+                                <div class="stat-icon-wrapper"><i class="fa-solid fa-wheat-awn"></i></div>
+                            </div>
+                            <strong class="stat-card-value" id="stat-agri">164</strong>
+                            <span class="stat-trend-pill negative"><i class="fa-solid fa-arrow-trend-up"></i> +18.7% stubble peak</span>
+                            <div class="stat-sparkline-box">
+                                <svg width="100%" height="24" viewBox="0 0 100 24">
+                                    <path d="M 0,16 Q 20,22 45,12 T 80,14 T 100,6" fill="none" stroke="#eab308" stroke-width="2.2" stroke-linecap="round"/>
+                                </svg>
+                            </div>
+                        </div>
+
+                        <div class="stat-widget-card other-sources">
+                            <div class="stat-card-header">
+                                <span class="stat-card-title">Other</span>
+                                <div class="stat-icon-wrapper"><i class="fa-solid fa-circle-question"></i></div>
+                            </div>
+                            <strong class="stat-card-value" id="stat-other">109</strong>
+                            <span class="stat-trend-pill neutral"><i class="fa-solid fa-minus"></i> -2.1% variation</span>
+                            <div class="stat-sparkline-box">
+                                <svg width="100%" height="24" viewBox="0 0 100 24">
+                                    <path d="M 0,12 Q 35,16 65,11 T 85,15 T 100,12" fill="none" stroke="#8b5cf6" stroke-width="2.2" stroke-linecap="round"/>
+                                </svg>
+                            </div>
+                        </div>
+
+                        <div class="stat-widget-card critical-alerts">
+                            <div class="stat-card-header">
+                                <span class="stat-card-title">Critical Alerts</span>
+                                <div class="stat-icon-wrapper"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                            </div>
+                            <strong class="stat-card-value" id="stat-critical">24</strong>
+                            <span class="stat-trend-pill negative"><i class="fa-solid fa-arrow-trend-up"></i> +5.4% escalations</span>
+                            <div class="stat-sparkline-box">
+                                <svg width="100%" height="24" viewBox="0 0 100 24">
+                                    <path d="M 0,18 Q 30,6 60,14 T 85,4 T 100,8" fill="none" stroke="#ef4444" stroke-width="2.2" stroke-linecap="round"/>
+                                </svg>
                             </div>
                         </div>
                     </div>
 
-                    <!-- RIGHT PANEL: FILTERS & RECENT ALERTS -->
-                    <div class="dashboard-right-panel">
-                        
-                        <!-- FILTERS CARD -->
-                        <div class="panel-card-widget">
-                            <div class="panel-card-header">
-                                <span class="panel-card-title"><i class="fa-solid fa-filter" style="color: #2563eb;"></i> Filters</span>
-                                <a href="javascript:void(0)" class="panel-action-link" onclick="resetAllFilters()">Reset <i class="fa-solid fa-rotate"></i></a>
+                    <!-- Split GIS Map & Filters/Alerts Side Panel with Resizer -->
+                    <div class="dashboard-main-split" id="dashboard-split-container">
+                        <!-- Left: Interactive Leaflet GIS Map -->
+                        <div class="map-column-container" id="map-col-wrapper">
+                            <div id="map"></div>
+
+                            <!-- Floating Basemap Layer Switcher -->
+                            <div class="floating-layer-switcher">
+                                <button class="layer-pill-btn active" id="layer-satellite-btn" onclick="setMapBaseLayer('satellite')">Satellite</button>
+                                <button class="layer-pill-btn" id="layer-terrain-btn" onclick="setMapBaseLayer('terrain')">Terrain</button>
+                                <button class="layer-pill-btn" id="layer-labels-btn" onclick="toggleMapLabels()">Labels</button>
                             </div>
 
-                            <div class="filter-fields-col">
-                                <div class="filter-input-row">
-                                    <label for="filter-region">Region (State)</label>
-                                    <select id="filter-region">
-                                        <option value="">All States</option>
+                            <!-- Floating Zoom & Reset Map Controls -->
+                            <div class="floating-map-controls">
+                                <button class="map-control-btn" onclick="mapZoomIn()" title="Zoom In"><i class="fa-solid fa-plus"></i></button>
+                                <button class="map-control-btn" onclick="mapZoomOut()" title="Zoom Out"><i class="fa-solid fa-minus"></i></button>
+                                <button class="map-control-btn" onclick="mapResetView()" title="Locate / Reset View"><i class="fa-solid fa-crosshairs"></i></button>
+                            </div>
+
+                            <!-- Floating Classification Legend -->
+                            <div class="floating-map-legend">
+                                <div class="legend-title">Classification Legend</div>
+                                <div class="legend-items-list">
+                                    <div class="legend-item"><span class="legend-color-dot industrial"></span> Industrial</div>
+                                    <div class="legend-item"><span class="legend-color-dot forest"></span> Forest / Natural</div>
+                                    <div class="legend-item"><span class="legend-color-dot agricultural"></span> Agricultural</div>
+                                    <div class="legend-item"><span class="legend-color-dot other"></span> Other / Unknown</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Draggable Resizer Divider Handle -->
+                        <div class="resizer-divider" id="map-resizer-bar" title="Drag to adjust map and sidebar ratio"></div>
+
+                        <!-- Right: Filters & Recent Alerts Panel -->
+                        <div class="side-panel-column" id="dashboard-side-panel">
+                            <!-- Filters Widget -->
+                            <div class="side-panel-widget">
+                                <div class="panel-widget-header">
+                                    <span class="panel-widget-title"><i class="fa-solid fa-sliders" style="margin-right: 6px; color: var(--primary-color);"></i> Filters</span>
+                                    <a href="javascript:void(0)" class="panel-action-link" onclick="resetAllFilters()">Reset <i class="fa-solid fa-rotate"></i></a>
+                                </div>
+
+                                <div class="filters-form-grid">
+                                    <div class="filter-field-group">
+                                        <label>Region / State</label>
+                                        <select id="filter-region" onchange="applyAllFilters()"></select>
+                                    </div>
+
+                                    <div class="filter-field-group">
+                                        <label>Classification Type</label>
+                                        <select id="filter-type" onchange="applyAllFilters()">
+                                            <option value="all">All Types</option>
+                                            <option value="industrial">Industrial</option>
+                                            <option value="forest/natural">Forest / Natural</option>
+                                            <option value="agricultural">Agricultural</option>
+                                            <option value="other">Other</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="filter-field-group">
+                                        <label>Landcover Type</label>
+                                        <select id="filter-landcover" onchange="applyAllFilters()">
+                                            <option value="all">All Landcover</option>
+                                            <option value="built-up">Built-up / Industrial</option>
+                                            <option value="tree cover">Tree Cover / Forest</option>
+                                            <option value="cropland">Cropland / Agricultural</option>
+                                            <option value="shrubland">Shrubland / Grassland</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="filter-field-group">
+                                        <label>Model Confidence</label>
+                                        <select id="filter-confidence" onchange="applyAllFilters()">
+                                            <option value="all">All Confidence Levels</option>
+                                            <option value="gt90">&gt; 90% (High Confidence)</option>
+                                            <option value="80-90">80% - 90% (Standard)</option>
+                                            <option value="lt80">&lt; 80% (Moderate/Review)</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="filter-field-group">
+                                        <label>Persistence Score</label>
+                                        <select id="filter-persistence" onchange="applyAllFilters()">
+                                            <option value="all">All Persistence</option>
+                                            <option value="gt80">&gt; 80 (Permanent / Industrial)</option>
+                                            <option value="50-80">50 - 80 (Intermittent)</option>
+                                            <option value="lt50">&lt; 50 (Ephemeral / Stubble)</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="filter-field-group">
+                                        <label>Risk Level</label>
+                                        <select id="filter-risk" onchange="applyAllFilters()">
+                                            <option value="all">All Risk Levels</option>
+                                            <option value="critical">Critical</option>
+                                            <option value="high">High</option>
+                                            <option value="medium">Medium</option>
+                                            <option value="low">Low</option>
+                                        </select>
+                                    </div>
+
+                                    <button class="btn-apply-filters" id="btn-apply-filters" onclick="applyAllFilters()">Apply Filters</button>
+                                </div>
+                            </div>
+
+                            <!-- Recent Alerts Widget -->
+                            <div class="side-panel-widget">
+                                <div class="panel-widget-header">
+                                    <span class="panel-widget-title"><i class="fa-solid fa-bell" style="margin-right: 6px; color: var(--color-critical);"></i> Recent Alerts</span>
+                                    <a href="javascript:void(0)" class="panel-action-link" onclick="switchView('alerts-section')">View All</a>
+                                </div>
+                                <div class="recent-alerts-list" id="recent-alerts-dashboard-list">
+                                    <!-- Populated dynamically via JS -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==============================================================
+                     2. AI PREDICTOR VIEW
+                     ============================================================== -->
+                <section id="prediction-section" class="view-section">
+                    <div style="margin-bottom: 20px;">
+                        <h2 style="font-size: 20px; margin-bottom: 4px;">AI Predictor</h2>
+                        <p style="font-size: 13.5px; color: var(--text-muted);">Two-Stage Decoupled Random Forest Inference (Source Classification & Thermal Persistence)</p>
+                    </div>
+
+                    <!-- Preset Coordinate Buttons -->
+                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px 18px; margin-bottom: 20px;">
+                        <span style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">1-Click Pre-defined Coordinate Presets:</span>
+                        <div style="display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;">
+                            <button class="btn-export-outline" style="font-size: 12px; padding: 6px 12px;" onclick="setPresetCoordinates(20.8520, 85.1250, 'Odisha', 48.5)">
+                                🏭 Odisha Mineral Belt (20.85, 85.12)
+                            </button>
+                            <button class="btn-export-outline" style="font-size: 12px; padding: 6px 12px;" onclick="setPresetCoordinates(21.6800, 72.9800, 'Gujarat', 42.0)">
+                                ⚡ Gujarat Petrochemical (21.68, 72.98)
+                            </button>
+                            <button class="btn-export-outline" style="font-size: 12px; padding: 6px 12px;" onclick="setPresetCoordinates(30.9000, 75.8500, 'Punjab', 18.0)">
+                                🌾 Punjab Stubble Agriculture (30.90, 75.85)
+                            </button>
+                            <button class="btn-export-outline" style="font-size: 12px; padding: 6px 12px;" onclick="setPresetCoordinates(22.4500, 77.8200, 'Madhya Pradesh', 24.0)">
+                                🌲 MP Forest Reserve (22.45, 77.82)
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 24px; box-shadow: var(--shadow-sm);">
+                            <h3 style="font-size: 16px; margin-bottom: 16px;">Target Anomaly Parameters</h3>
+                            <div class="filters-form-grid">
+                                <div class="filter-field-group">
+                                    <label>Latitude (-90 to 90)</label>
+                                    <input type="number" step="any" id="pred-lat" placeholder="e.g. 20.8520" value="20.8520">
+                                </div>
+                                <div class="filter-field-group">
+                                    <label>Longitude (-180 to 180)</label>
+                                    <input type="number" step="any" id="pred-lng" placeholder="e.g. 85.1250" value="85.1250">
+                                </div>
+                                <div class="filter-field-group">
+                                    <label>Satellite Pass Date & Time</label>
+                                    <input type="datetime-local" id="pred-datetime" value="2025-08-27T09:30">
+                                </div>
+                                <div class="filter-field-group">
+                                    <label>Estimated Mean FRP (MW)</label>
+                                    <input type="number" step="any" id="pred-frp" placeholder="e.g. 35.0" value="35.0">
+                                </div>
+                                <button class="btn-apply-filters" id="btn-run-prediction" style="margin-top: 10px;" onclick="executePrediction()">
+                                    <i class="fa-solid fa-microchip" style="margin-right: 6px;"></i> Run AI Prediction
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Results Card -->
+                        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 24px; box-shadow: var(--shadow-sm);" id="prediction-result-panel">
+                            <h3 style="font-size: 16px; margin-bottom: 16px;">Model Inference Result</h3>
+                            <div id="prediction-empty-state" style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
+                                <i class="fa-solid fa-satellite-dish" style="font-size: 40px; margin-bottom: 12px; opacity: 0.6;"></i>
+                                <h4 style="font-size: 15px; margin-bottom: 6px;">Ready for Evaluation</h4>
+                                <p style="font-size: 13px;">Enter coordinates or select a 1-click preset above, then click Run AI Prediction.</p>
+                            </div>
+                            <div id="prediction-output-details" style="display: none;"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==============================================================
+                     3. EVENTS DATABASE VIEW
+                     ============================================================== -->
+                <section id="events-section" class="view-section">
+                    <div style="margin-bottom: 20px;">
+                        <h2 style="font-size: 20px; margin-bottom: 4px;">Thermal Event Database</h2>
+                        <p style="font-size: 13.5px; color: var(--text-muted);">Searchable inventory of ground-truth sources and live satellite detections</p>
+                    </div>
+
+                    <div class="table-container-card">
+                        <div class="table-header-toolbar">
+                            <input type="text" class="table-search-input" id="db-table-search" placeholder="Search by source ID, state, classification...">
+                            <button class="btn-export-outline" onclick="exportEventsCSV()">
+                                <i class="fa-solid fa-download"></i> Export CSV
+                            </button>
+                        </div>
+
+                        <div style="overflow-x: auto;">
+                            <table class="custom-data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Source ID</th>
+                                        <th>State / Region</th>
+                                        <th>Coordinates</th>
+                                        <th>Classification</th>
+                                        <th>Confidence</th>
+                                        <th>Persistence</th>
+                                        <th>Landcover</th>
+                                        <th>Risk Level</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="events-table-body">
+                                    <!-- Populated dynamically via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="table-pagination-footer">
+                            <span id="db-pagination-summary">Showing 1-10 of 918</span>
+                            <div class="pagination-btn-group" id="db-pagination-controls"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==============================================================
+                     4. ANALYTICS & INSIGHTS VIEW
+                     ============================================================== -->
+                <section id="analytics-section" class="view-section">
+                    <div style="margin-bottom: 20px;">
+                        <h2 style="font-size: 20px; margin-bottom: 4px;">Analytics & Insights</h2>
+                        <p style="font-size: 13.5px; color: var(--text-muted);">Spatial distribution, temporal trends, and risk assessment breakdown</p>
+                    </div>
+
+                    <!-- 4 Summary Metric Cards with Comparison Trends -->
+                    <div class="analytics-grid-row">
+                        <div class="analytics-card-metric">
+                            <span>Total Monitored Hotspots</span>
+                            <strong id="analytics-total-events">918</strong>
+                            <span class="stat-trend-pill positive"><i class="fa-solid fa-arrow-trend-up"></i> +12.4% vs last month</span>
+                        </div>
+                        <div class="analytics-card-metric">
+                            <span>Persistent Industrial Sources</span>
+                            <strong id="analytics-persistent-sources">193</strong>
+                            <span class="stat-trend-pill negative"><i class="fa-solid fa-arrow-trend-up"></i> +4.1% vs baseline</span>
+                        </div>
+                        <div class="analytics-card-metric">
+                            <span>Average Model Confidence</span>
+                            <strong id="analytics-avg-conf">91.4%</strong>
+                            <span class="stat-trend-pill positive"><i class="fa-solid fa-check"></i> High Precision</span>
+                        </div>
+                        <div class="analytics-card-metric">
+                            <span>Critical / High Severity</span>
+                            <strong id="analytics-high-risk">24</strong>
+                            <span class="stat-trend-pill negative"><i class="fa-solid fa-shield-halved"></i> Active Escalations</span>
+                        </div>
+                    </div>
+
+                    <!-- 4 Analytics Charts -->
+                    <div class="analytics-charts-grid">
+                        <div class="analytics-chart-panel">
+                            <h3><i class="fa-solid fa-chart-pie" style="color: var(--primary-color); margin-right: 6px;"></i> Events by Classification Type</h3>
+                            <div id="chart-events-type-donut"></div>
+                        </div>
+
+                        <div class="analytics-chart-panel">
+                            <h3><i class="fa-solid fa-chart-column" style="color: var(--color-forest); margin-right: 6px;"></i> Events by Landcover Class</h3>
+                            <div id="chart-landcover-bars"></div>
+                        </div>
+
+                        <div class="analytics-chart-panel">
+                            <h3><i class="fa-solid fa-chart-line" style="color: var(--color-critical); margin-right: 6px;"></i> Seasonal Monthly Trend (Flares vs Wildfires)</h3>
+                            <div id="chart-monthly-trend"></div>
+                        </div>
+
+                        <div class="analytics-chart-panel">
+                            <h3><i class="fa-solid fa-triangle-exclamation" style="color: var(--color-high); margin-right: 6px;"></i> Anomaly Severity Distribution</h3>
+                            <div id="chart-risk-donut"></div>
+                        </div>
+                    </div>
+
+                    <!-- State Risk Rankings Table -->
+                    <div class="table-container-card" style="margin-top: 24px;">
+                        <div style="padding: 16px 20px; border-bottom: 1px solid var(--border-color);">
+                            <h3 style="font-size: 15px; margin: 0;">Top Indian States by Active Thermal Anomalies</h3>
+                        </div>
+                        <table class="custom-data-table">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>State / UT</th>
+                                    <th>Total Hotspots</th>
+                                    <th>Industrial Flares</th>
+                                    <th>Forest Fires</th>
+                                    <th>Stubble Burning</th>
+                                    <th>State Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="analytics-state-table">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- ==============================================================
+                     5. ALERTS VIEW
+                     ============================================================== -->
+                <section id="alerts-section" class="view-section">
+                    <div style="margin-bottom: 20px;">
+                        <h2 style="font-size: 20px; margin-bottom: 4px;">Active Thermal Alerts</h2>
+                        <p style="font-size: 13.5px; color: var(--text-muted);">Real-time high severity notifications with one-click authority dispatch</p>
+                    </div>
+
+                    <!-- Severity Filter Tabs -->
+                    <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+                        <button class="layer-pill-btn active" onclick="filterAlertsTab('all', this)">All Alerts</button>
+                        <button class="layer-pill-btn" onclick="filterAlertsTab('Critical', this)">Critical</button>
+                        <button class="layer-pill-btn" onclick="filterAlertsTab('High', this)">High</button>
+                        <button class="layer-pill-btn" onclick="filterAlertsTab('Medium', this)">Medium</button>
+                        <button class="layer-pill-btn" onclick="filterAlertsTab('Low', this)">Low</button>
+                    </div>
+
+                    <div class="table-container-card">
+                        <table class="custom-data-table">
+                            <thead>
+                                <tr>
+                                    <th>Alert ID</th>
+                                    <th>Severity</th>
+                                    <th>State</th>
+                                    <th>Coordinates</th>
+                                    <th>Classification</th>
+                                    <th>Confidence</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="alerts-full-table-body">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- ==============================================================
+                     6. REPORTS VIEW
+                     ============================================================== -->
+                <section id="reports-section" class="view-section">
+                    <div style="margin-bottom: 20px;">
+                        <h2 style="font-size: 20px; margin-bottom: 4px;">Thermal Intelligence Reports</h2>
+                        <p style="font-size: 13.5px; color: var(--text-muted);">Generate, view, and export compliance and emergency briefing documents</p>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                        <!-- Report Generator Form -->
+                        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 24px; box-shadow: var(--shadow-sm);">
+                            <h3 style="font-size: 16px; margin-bottom: 16px;">Generate New Report</h3>
+                            <div class="filters-form-grid">
+                                <div class="filter-field-group">
+                                    <label>Report Scope / Type</label>
+                                    <select id="report-type-select">
+                                        <option value="National Thermal Overview">National Thermal Overview</option>
+                                        <option value="Industrial High-Persistence Audit">Industrial High-Persistence Audit</option>
+                                        <option value="Forest Fire Early Warning Summary">Forest Fire Early Warning Summary</option>
+                                        <option value="Agricultural Crop Residue Assessment">Agricultural Crop Residue Assessment</option>
                                     </select>
                                 </div>
-
-                                <div class="filter-input-row">
-                                    <label for="filter-date">Date & Time</label>
-                                    <input type="text" id="filter-date" value="27 Aug 2025 - 27 Aug 2025" readonly>
+                                <div class="filter-field-group">
+                                    <label>Date Range</label>
+                                    <input type="text" id="report-date-range" value="27 Aug 2025 - 27 Aug 2025">
                                 </div>
-
-                                <div class="filter-input-row">
-                                    <label for="filter-type">Event Type</label>
-                                    <select id="filter-type">
-                                        <option value="">All</option>
-                                        <option value="Industrial">Industrial</option>
-                                        <option value="Forest/Natural">Forest / Natural</option>
-                                        <option value="Agricultural">Agricultural</option>
-                                        <option value="Other">Other / Unknown</option>
+                                <div class="filter-field-group">
+                                    <label>Format</label>
+                                    <select id="report-format-select">
+                                        <option value="PDF">Interactive PDF Report</option>
+                                        <option value="CSV">Comma Separated Values (CSV)</option>
                                     </select>
                                 </div>
-
-                                <div class="filter-input-row">
-                                    <label for="filter-landcover">Landcover Class</label>
-                                    <select id="filter-landcover">
-                                        <option value="">All</option>
-                                        <option value="Built-up">Built-up</option>
-                                        <option value="Cropland">Cropland</option>
-                                        <option value="Tree cover">Tree cover</option>
-                                        <option value="Grassland">Grassland</option>
-                                        <option value="Bare">Bare / sparse</option>
-                                    </select>
-                                </div>
-
-                                <div class="filter-input-row">
-                                    <label for="filter-confidence">Confidence ≥</label>
-                                    <select id="filter-confidence">
-                                        <option value="0">All</option>
-                                        <option value="50">≥ 50%</option>
-                                        <option value="70">≥ 70%</option>
-                                        <option value="85">≥ 85%</option>
-                                        <option value="90">≥ 90%</option>
-                                    </select>
-                                </div>
-
-                                <div class="filter-input-row">
-                                    <label for="filter-persistence">Persistence</label>
-                                    <select id="filter-persistence">
-                                        <option value="">All</option>
-                                        <option value="persistent">Persistent</option>
-                                        <option value="non-persistent">Non-Persistent</option>
-                                    </select>
-                                </div>
-
-                                <div class="filter-input-row">
-                                    <label for="filter-risk">Risk Level</label>
-                                    <select id="filter-risk">
-                                        <option value="">All</option>
-                                        <option value="Critical">Critical</option>
-                                        <option value="High">High</option>
-                                        <option value="Medium">Medium</option>
-                                        <option value="Low">Low</option>
-                                    </select>
-                                </div>
-
-                                <button class="btn-apply-filters" id="btn-apply-filters" onclick="applyAllFilters()">Apply Filters</button>
+                                <button class="btn-apply-filters" style="margin-top: 10px;" onclick="generateAndOpenReport()">
+                                    <i class="fa-solid fa-file-circle-check" style="margin-right: 6px;"></i> Generate & View Report
+                                </button>
                             </div>
                         </div>
 
-                        <!-- RECENT ALERTS CARD -->
-                        <div class="panel-card-widget">
-                            <div class="panel-card-header">
-                                <span class="panel-card-title"><i class="fa-solid fa-bell" style="color: #ef4444;"></i> Recent Alerts</span>
-                                <a href="javascript:void(0)" class="panel-action-link" onclick="switchView('alerts-section')">View All →</a>
-                            </div>
-
-                            <div class="recent-alerts-list" id="recent-alerts-dashboard-list">
-                                <div class="alert-row-item" onclick="switchView('alerts-section')">
-                                    <div class="alert-item-left">
-                                        <span class="alert-dot red"></span>
-                                        <div class="alert-title-group">
-                                            <strong>Industrial</strong>
-                                            <span>12 new sources</span>
-                                        </div>
-                                    </div>
-                                    <div class="alert-item-right">
-                                        <span>2 mins ago</span>
-                                        <i class="fa-solid fa-chevron-right"></i>
-                                    </div>
-                                </div>
-
-                                <div class="alert-row-item" onclick="switchView('alerts-section')">
-                                    <div class="alert-item-left">
-                                        <span class="alert-dot green"></span>
-                                        <div class="alert-title-group">
-                                            <strong>Forest / Natural</strong>
-                                            <span>8 new sources</span>
-                                        </div>
-                                    </div>
-                                    <div class="alert-item-right">
-                                        <span>18 mins ago</span>
-                                        <i class="fa-solid fa-chevron-right"></i>
-                                    </div>
-                                </div>
-
-                                <div class="alert-row-item" onclick="switchView('alerts-section')">
-                                    <div class="alert-item-left">
-                                        <span class="alert-dot yellow"></span>
-                                        <div class="alert-title-group">
-                                            <strong>Agricultural</strong>
-                                            <span>5 new sources</span>
-                                        </div>
-                                    </div>
-                                    <div class="alert-item-right">
-                                        <span>25 mins ago</span>
-                                        <i class="fa-solid fa-chevron-right"></i>
-                                    </div>
-                                </div>
-
-                                <div class="alert-row-item" onclick="switchView('alerts-section')">
-                                    <div class="alert-item-left">
-                                        <span class="alert-dot purple"></span>
-                                        <div class="alert-title-group">
-                                            <strong>Other / Unknown</strong>
-                                            <span>3 new sources</span>
-                                        </div>
-                                    </div>
-                                    <div class="alert-item-right">
-                                        <span>40 mins ago</span>
-                                        <i class="fa-solid fa-chevron-right"></i>
-                                    </div>
-                                </div>
-
-                                <div class="alert-row-item" onclick="switchView('alerts-section')">
-                                    <div class="alert-item-left">
-                                        <span class="alert-dot red"></span>
-                                        <div class="alert-title-group">
-                                            <strong>Industrial</strong>
-                                            <span>7 new sources</span>
-                                        </div>
-                                    </div>
-                                    <div class="alert-item-right">
-                                        <span>1 hour ago</span>
-                                        <i class="fa-solid fa-chevron-right"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
-            </section>
-
-            <!-- ===============================================================
-                 SCREEN 2: AI PREDICTOR
-                 =============================================================== -->
-            <section id="prediction-section" class="view-section">
-                <div class="screen-header-bar">
-                    <h2 class="screen-title">Predict Event Type</h2>
-                </div>
-
-                <div class="pill-tabs-nav">
-                    <button class="pill-tab-btn active" id="tab-single-loc">Single Location</button>
-                    <button class="pill-tab-btn" id="tab-batch-pred" onclick="showToast('Batch prediction CSV upload ready in next update', 'info')">Batch Prediction</button>
-                </div>
-
-                <div class="predictor-two-col">
-                    <div class="panel-card-widget">
-                        <div class="form-group-item">
-                            <label for="pred-lat">Latitude</label>
-                            <input type="number" step="any" id="pred-lat" placeholder="e.g. 17.3850">
-                        </div>
-                        <div class="form-group-item">
-                            <label for="pred-lng">Longitude</label>
-                            <input type="number" step="any" id="pred-lng" placeholder="e.g. 78.4867">
-                        </div>
-                        <div class="form-group-item">
-                            <label for="pred-time">Date & Time</label>
-                            <input type="text" id="pred-time" value="27 Aug 2025 09:30 AM">
-                        </div>
-
-                        <button class="btn-predict-action" id="btn-run-prediction" onclick="executePrediction()">Predict</button>
-
-                        <div class="prediction-helper-note">
-                            <span>The model classifies thermal events into:</span>
-                            <span style="display:flex; align-items:center; gap:4px;"><span class="legend-dot red"></span> Industrial</span>
-                            <span style="display:flex; align-items:center; gap:4px;"><span class="legend-dot green"></span> Forest / Natural</span>
-                            <span style="display:flex; align-items:center; gap:4px;"><span class="legend-dot yellow"></span> Agricultural</span>
-                            <span style="display:flex; align-items:center; gap:4px;"><span class="legend-dot purple"></span> Other / Unknown</span>
-                        </div>
-                    </div>
-
-                    <div class="panel-card-widget" id="prediction-result-panel">
-                        <div class="result-placeholder-box" id="prediction-empty-state">
-                            <i class="fa-solid fa-brain"></i>
-                            <strong style="color: var(--text-primary); font-size: 15px; margin-bottom: 4px;">Prediction Result</strong>
-                            <p>Enter location details or click on the GIS map to get AI prediction</p>
-                        </div>
-                        <div id="prediction-output-details" style="display: none; padding: 10px;">
-                            <!-- Populated dynamically upon prediction -->
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- ===============================================================
-                 SCREEN 3: EVENTS (DATABASE)
-                 =============================================================== -->
-            <section id="events-section" class="view-section">
-                <div class="screen-header-bar">
-                    <h2 class="screen-title">Event Database</h2>
-                </div>
-
-                <div class="table-action-bar">
-                    <div style="position: relative;">
-                        <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px;"></i>
-                        <input type="text" class="table-search-input" id="db-table-search" placeholder="Search by source ID, location, type..." style="padding-left: 34px;">
-                    </div>
-                    <button class="btn-export-outline" onclick="exportEventsCSV()"><i class="fa-solid fa-download"></i> Export</button>
-                </div>
-
-                <div class="data-table-container">
-                    <table class="styled-data-table">
-                        <thead>
-                            <tr>
-                                <th>Source ID</th>
-                                <th>Date & Time</th>
-                                <th>Latitude</th>
-                                <th>Longitude</th>
-                                <th>Event Type</th>
-                                <th>Confidence</th>
-                                <th>Persistence</th>
-                                <th>Risk Level</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="events-table-body">
-                            <!-- Populated dynamically via app.js -->
-                        </tbody>
-                    </table>
-
-                    <div class="table-pagination-footer">
-                        <span id="db-pagination-summary">Showing 1-5 of 1,382</span>
-                        <div class="pagination-btn-group" id="db-pagination-controls">
-                            <!-- Page numbers -->
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- ===============================================================
-                 SCREEN 4: ANALYTICS & INSIGHTS
-                 =============================================================== -->
-            <section id="analytics-section" class="view-section">
-                <div class="screen-header-bar" style="display: flex; justify-content: space-between; align-items: center;">
-                    <h2 class="screen-title">Analytics & Insights</h2>
-                    <div class="date-picker-btn">
-                        <i class="fa-regular fa-calendar"></i> <span>27 Aug 2025 - 27 Aug 2025</span> <i class="fa-solid fa-chevron-down" style="font-size: 11px;"></i>
-                    </div>
-                </div>
-
-                <div class="analytics-top-metrics">
-                    <div class="analytics-metric-box">
-                        <span>Total Events</span>
-                        <strong id="analytics-total-events">1,382</strong>
-                    </div>
-                    <div class="analytics-metric-box">
-                        <span>Persistent Sources</span>
-                        <strong id="analytics-persistent-sources">348</strong>
-                    </div>
-                    <div class="analytics-metric-box">
-                        <span>Average Confidence</span>
-                        <strong id="analytics-avg-conf">87.3%</strong>
-                    </div>
-                    <div class="analytics-metric-box">
-                        <span style="display: flex; align-items: center; gap: 6px; color: #ef4444;"><i class="fa-solid fa-triangle-exclamation"></i> High Risk Events</span>
-                        <strong id="analytics-high-risk">247</strong>
-                    </div>
-                </div>
-
-                <div class="analytics-charts-grid">
-                    <!-- Chart 1: Events by Type -->
-                    <div class="chart-panel-card">
-                        <div class="chart-panel-title">Events by Type</div>
-                        <div id="chart-events-type-donut" style="display: flex; align-items: center; justify-content: space-around; height: 220px;">
-                            <!-- SVG Donut Chart injected via app.js -->
-                        </div>
-                    </div>
-
-                    <!-- Chart 2: Events by Landcover -->
-                    <div class="chart-panel-card">
-                        <div class="chart-panel-title">Events by Landcover</div>
-                        <div id="chart-landcover-bars" style="height: 220px; display: flex; flex-direction: column; justify-content: space-between;">
-                            <!-- SVG Horizontal Bars injected via app.js -->
-                        </div>
-                    </div>
-
-                    <!-- Chart 3: Monthly Trend -->
-                    <div class="chart-panel-card">
-                        <div class="chart-panel-title">Monthly Trend</div>
-                        <div id="chart-monthly-trend" style="height: 220px;">
-                            <!-- SVG Multi-line Chart injected via app.js -->
-                        </div>
-                    </div>
-
-                    <!-- Chart 4: Risk Level Distribution -->
-                    <div class="chart-panel-card">
-                        <div class="chart-panel-title">Risk Level Distribution</div>
-                        <div id="chart-risk-donut" style="display: flex; align-items: center; justify-content: space-around; height: 220px;">
-                            <!-- SVG Donut Chart injected via app.js -->
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- ===============================================================
-                 SCREEN 5: ALERTS
-                 =============================================================== -->
-            <section id="alerts-section" class="view-section">
-                <div class="screen-header-bar">
-                    <h2 class="screen-title">Alerts</h2>
-                </div>
-
-                <div class="alerts-filter-pills">
-                    <button class="alert-filter-pill-btn active" onclick="filterAlertsTab('all', this)">All Alerts</button>
-                    <button class="alert-filter-pill-btn" onclick="filterAlertsTab('Critical', this)">Critical</button>
-                    <button class="alert-filter-pill-btn" onclick="filterAlertsTab('High', this)">High</button>
-                    <button class="alert-filter-pill-btn" onclick="filterAlertsTab('Medium', this)">Medium</button>
-                    <button class="alert-filter-pill-btn" onclick="filterAlertsTab('Low', this)">Low</button>
-                </div>
-
-                <div class="data-table-container">
-                    <table class="styled-data-table">
-                        <thead>
-                            <tr>
-                                <th>Time</th>
-                                <th>Type</th>
-                                <th>Location (State)</th>
-                                <th>Details</th>
-                                <th>Risk Level</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="alerts-full-table-body">
-                            <!-- Populated dynamically via app.js -->
-                        </tbody>
-                    </table>
-
-                    <div class="table-pagination-footer">
-                        <span>Showing 1-10 of 45</span>
-                        <div class="pagination-btn-group">
-                            <button class="page-num-btn active">1</button>
-                            <button class="page-num-btn">2</button>
-                            <button class="page-num-btn">3</button>
-                            <span style="padding: 0 4px;">...</span>
-                            <button class="page-num-btn">45</button>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- ===============================================================
-                 SCREEN 6: REPORTS
-                 =============================================================== -->
-            <section id="reports-section" class="view-section">
-                <div class="screen-header-bar">
-                    <h2 class="screen-title">Generate Report</h2>
-                </div>
-
-                <div class="pill-tabs-nav">
-                    <button class="pill-tab-btn active">Generate Report</button>
-                    <button class="pill-tab-btn" onclick="showToast('Automated scheduled reporting active (Weekly Sunday 08:00 AM)', 'info')">Scheduled Reports</button>
-                </div>
-
-                <div class="reports-layout-grid">
-                    <div class="panel-card-widget">
-                        <div class="form-group-item">
-                            <label for="report-type-select">Report Type</label>
-                            <select id="report-type-select" style="padding: 9px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 13px;">
-                                <option value="all">All Events Summary</option>
-                                <option value="state">State-wise Analysis</option>
-                                <option value="event">Event Type Analysis</option>
-                                <option value="persistent">Persistent Sources</option>
-                                <option value="custom">Custom Date Range</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group-item">
-                            <label for="report-date-range">Date Range</label>
-                            <input type="text" id="report-date-range" value="27 Aug 2025 - 27 Aug 2025">
-                        </div>
-
-                        <div class="form-group-item">
-                            <label for="report-format-select">Format</label>
-                            <select id="report-format-select" style="padding: 9px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 13px;">
-                                <option value="pdf">PDF Document (.pdf)</option>
-                                <option value="csv">CSV Spreadsheet (.csv)</option>
-                                <option value="json">GeoJSON Dataset (.json)</option>
-                                <option value="excel">Excel Workbook (.xlsx)</option>
-                            </select>
-                        </div>
-
-                        <button class="btn-apply-filters" style="margin-top: 20px;" onclick="downloadGeneratedReport()">Generate Report</button>
-                    </div>
-
-                    <div class="panel-card-widget">
-                        <div class="panel-card-header">
-                            <span class="panel-card-title"><i class="fa-regular fa-file-pdf" style="color: #ef4444;"></i> Recent Reports</span>
-                        </div>
-                        <div class="recent-reports-col">
-                            <div class="report-file-card" onclick="downloadExistingReport('India_Overview_Aug2025.pdf')">
-                                <div class="report-file-info">
-                                    <i class="fa-regular fa-file-pdf"></i>
-                                    <div>
-                                        <strong style="font-size: 13px; color: var(--text-primary);">India_Overview_Aug2025.pdf</strong>
-                                        <div style="font-size: 11px; color: var(--text-muted);">27 Aug 2025, 09:24 AM</div>
-                                    </div>
-                                </div>
-                                <i class="fa-solid fa-chevron-right" style="color: var(--text-muted); font-size: 12px;"></i>
-                            </div>
-
-                            <div class="report-file-card" onclick="downloadExistingReport('Telangana_Events.pdf')">
-                                <div class="report-file-info">
-                                    <i class="fa-regular fa-file-pdf"></i>
-                                    <div>
-                                        <strong style="font-size: 13px; color: var(--text-primary);">Telangana_Events.pdf</strong>
-                                        <div style="font-size: 11px; color: var(--text-muted);">26 Aug 2025, 05:12 PM</div>
-                                    </div>
-                                </div>
-                                <i class="fa-solid fa-chevron-right" style="color: var(--text-muted); font-size: 12px;"></i>
-                            </div>
-
-                            <div class="report-file-card" onclick="downloadExistingReport('HighRisk_Sources.pdf')">
-                                <div class="report-file-info">
-                                    <i class="fa-regular fa-file-pdf"></i>
-                                    <div>
-                                        <strong style="font-size: 13px; color: var(--text-primary);">HighRisk_Sources.pdf</strong>
-                                        <div style="font-size: 11px; color: var(--text-muted);">26 Aug 2025, 11:45 AM</div>
-                                    </div>
-                                </div>
-                                <i class="fa-solid fa-chevron-right" style="color: var(--text-muted); font-size: 12px;"></i>
-                            </div>
-
-                            <div class="report-file-card" onclick="downloadExistingReport('Persistent_Sources.pdf')">
-                                <div class="report-file-info">
-                                    <i class="fa-regular fa-file-pdf"></i>
-                                    <div>
-                                        <strong style="font-size: 13px; color: var(--text-primary);">Persistent_Sources.pdf</strong>
-                                        <div style="font-size: 11px; color: var(--text-muted);">25 Aug 2025, 04:30 PM</div>
-                                    </div>
-                                </div>
-                                <i class="fa-solid fa-chevron-right" style="color: var(--text-muted); font-size: 12px;"></i>
-                            </div>
-
-                            <div class="report-file-card" onclick="downloadExistingReport('Maharashtra_Analysis.pdf')">
-                                <div class="report-file-info">
-                                    <i class="fa-regular fa-file-pdf"></i>
-                                    <div>
-                                        <strong style="font-size: 13px; color: var(--text-primary);">Maharashtra_Analysis.pdf</strong>
-                                        <div style="font-size: 11px; color: var(--text-muted);">23 Aug 2025, 09:11 AM</div>
-                                    </div>
-                                </div>
-                                <i class="fa-solid fa-chevron-right" style="color: var(--text-muted); font-size: 12px;"></i>
+                        <!-- Recent Reports List -->
+                        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 24px; box-shadow: var(--shadow-sm);">
+                            <h3 style="font-size: 16px; margin-bottom: 16px;">Recent Reports Library</h3>
+                            <div class="recent-alerts-list" id="recent-reports-list-container">
+                                <!-- Populated dynamically -->
                             </div>
                         </div>
                     </div>
-                </div>
-            </section>
+                </section>
 
-            <!-- ===============================================================
-                 SCREEN 7: SETTINGS
-                 =============================================================== -->
-            <section id="settings-section" class="view-section">
-                <div class="screen-header-bar">
-                    <h2 class="screen-title">Settings</h2>
-                </div>
-
-                <div class="settings-layout-grid">
-                    <div class="settings-subnav">
-                        <button class="settings-nav-btn active" onclick="showSettingsTab('profile', this)"><i class="fa-regular fa-user"></i> Profile</button>
-                        <button class="settings-nav-btn" onclick="showSettingsTab('preferences', this)"><i class="fa-solid fa-sliders"></i> Preferences</button>
-                        <button class="settings-nav-btn" onclick="showSettingsTab('api-keys', this)"><i class="fa-solid fa-key"></i> API Keys</button>
-                        <button class="settings-nav-btn" onclick="showSettingsTab('notifications', this)"><i class="fa-regular fa-bell"></i> Notifications</button>
-                        <button class="settings-nav-btn" onclick="showSettingsTab('appearance', this)"><i class="fa-solid fa-palette"></i> Appearance</button>
+                <!-- ==============================================================
+                     7. SETTINGS VIEW (CLEANED WITHOUT API KEYS)
+                     ============================================================== -->
+                <section id="settings-section" class="view-section">
+                    <div style="margin-bottom: 20px;">
+                        <h2 style="font-size: 20px; margin-bottom: 4px;">System Settings</h2>
+                        <p style="font-size: 13.5px; color: var(--text-muted);">Manage your profile, preferences, and automated dispatch channels</p>
                     </div>
 
-                    <div class="settings-pane-card" id="settings-content-pane">
-                        <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 20px;">Profile Information</h3>
-                        <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px;">
-                            <div class="user-avatar-circle" style="width: 52px; height: 52px; font-size: 18px;">SS</div>
-                            <div>
-                                <strong style="font-size: 15px; display: block;" id="settings-display-name">Sailaja S.</strong>
-                                <span style="font-size: 12.5px; color: var(--text-muted);" id="settings-display-email">sailaja.s@example.com</span>
-                            </div>
+                    <div style="display: grid; grid-template-columns: 240px 1fr; gap: 24px;">
+                        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px; height: fit-content;">
+                            <button class="nav-link-item active" style="width: 100%; text-align: left; margin-bottom: 4px;" onclick="showSettingsTab('profile', this)">
+                                <i class="fa-regular fa-user"></i> <span>Profile</span>
+                            </button>
+                            <button class="nav-link-item" style="width: 100%; text-align: left; margin-bottom: 4px;" onclick="showSettingsTab('preferences', this)">
+                                <i class="fa-solid fa-sliders"></i> <span>Preferences</span>
+                            </button>
+                            <button class="nav-link-item" style="width: 100%; text-align: left; margin-bottom: 4px;" onclick="showSettingsTab('notifications', this)">
+                                <i class="fa-regular fa-bell"></i> <span>Notifications</span>
+                            </button>
+                            <button class="nav-link-item" style="width: 100%; text-align: left;" onclick="showSettingsTab('appearance', this)">
+                                <i class="fa-solid fa-palette"></i> <span>Appearance</span>
+                            </button>
                         </div>
 
-                        <div class="form-group-item">
-                            <label for="settings-input-name">Name</label>
-                            <input type="text" id="settings-input-name" value="Sailaja S.">
+                        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 28px; box-shadow: var(--shadow-sm);" id="settings-content-pane">
+                            <!-- Populated dynamically via JS -->
                         </div>
-
-                        <div class="form-group-item">
-                            <label for="settings-input-email">Email</label>
-                            <input type="email" id="settings-input-email" value="sailaja.s@example.com">
-                        </div>
-
-                        <button class="btn-apply-filters" style="margin-top: 16px; width: 160px;" onclick="saveProfileSettings()">Update Profile</button>
                     </div>
-                </div>
-            </section>
-
-            <!-- ===============================================================
-                 SCREEN 9: EXPANDED LIVE MAP
-                 =============================================================== -->
-            <section id="live-map-section" class="view-section">
-                <div class="screen-header-bar" style="display: flex; justify-content: space-between; align-items: center;">
-                    <h2 class="screen-title">Live Geospatial Satellite Map</h2>
-                    <span id="live-map-counter-badge" class="sidebar-badge-pill" style="font-size: 12px; padding: 4px 12px; background: #2563eb;">0 SATELLITE DETECTIONS</span>
-                </div>
-                <div style="height: calc(100vh - var(--header-height) - 130px); border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--border-color); position: relative;">
-                    <div id="full-live-map" style="width: 100%; height: 100%; background: #0b1329;"></div>
-                </div>
-            </section>
-
-        </main>
+                </section>
+            </main>
+        </div>
     </div>
 
-    <!-- =======================================================================
-         SCREEN 8: LOGOUT CONFIRMATION MODAL
-         ======================================================================= -->
-    <div class="modal-backdrop-overlay" id="logout-modal" onclick="closeLogoutModalOnBackdrop(event)">
-        <div class="logout-modal-dialog">
-            <div class="logout-modal-icon"><i class="fa-solid fa-arrow-right-from-bracket"></i></div>
-            <h3>Are you sure you want to logout?</h3>
-            <p>You will be signed out of your account.</p>
-            <div class="modal-btn-row">
-                <button class="btn-cancel-modal" onclick="closeLogoutModal()">Cancel</button>
-                <button class="btn-confirm-logout" onclick="confirmUserLogout()">Logout</button>
+    <!-- ==========================================================================
+         EMERGENCY AUTHORITY DISPATCH MODAL
+         ========================================================================== -->
+    <div class="modal-backdrop-overlay" id="authority-dispatch-modal" onclick="closeDispatchModalOnBackdrop(event)">
+        <div class="modal-dialog-box wide">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 38px; height: 38px; border-radius: 8px; background: #fee2e2; color: #ef4444; display: flex; align-items: center; justify-content: center; font-size: 18px;">
+                        <i class="fa-solid fa-bullhorn"></i>
+                    </div>
+                    <div>
+                        <h3 style="font-size: 17px; margin: 0;">Emergency Authority Dispatch</h3>
+                        <span style="font-size: 12.5px; color: var(--text-muted);">Route verified satellite anomaly to designated state responder</span>
+                    </div>
+                </div>
+                <button class="map-control-btn" onclick="closeDispatchModal()" style="width: 30px; height: 30px;"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="filters-form-grid" style="gap: 14px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: var(--bg-hover); padding: 12px; border-radius: var(--radius-sm); font-size: 13px;">
+                    <div><strong>Incident ID:</strong> <span id="dispatch-source-id">IN_OD_001</span></div>
+                    <div><strong>Severity:</strong> <span class="badge-pill badge-critical" id="dispatch-severity">Critical</span></div>
+                    <div><strong>Location:</strong> <span id="dispatch-location">Odisha (20.852, 85.125)</span></div>
+                    <div><strong>Classification:</strong> <span id="dispatch-type" style="font-weight: 700; color: #ef4444;">Industrial</span></div>
+                </div>
+
+                <div class="filter-field-group">
+                    <label>Designated State / National Authority</label>
+                    <select id="dispatch-authority-select">
+                        <!-- Populated based on incident state & type -->
+                    </select>
+                </div>
+
+                <div class="filter-field-group">
+                    <label>Dispatch Channels</label>
+                    <div style="display: flex; gap: 16px; font-size: 13px; margin-top: 4px;">
+                        <label style="display: flex; align-items: center; gap: 6px;"><input type="checkbox" id="dispatch-sms" checked> SMS Emergency Broadcast</label>
+                        <label style="display: flex; align-items: center; gap: 6px;"><input type="checkbox" id="dispatch-email" checked> Official High-Priority Email</label>
+                        <label style="display: flex; align-items: center; gap: 6px;"><input type="checkbox" id="dispatch-portal" checked> State Disaster Portal API</label>
+                    </div>
+                </div>
+
+                <div class="filter-field-group">
+                    <label>Incident Escalation Notes</label>
+                    <textarea id="dispatch-notes" rows="3" style="width: 100%; padding: 10px; background: var(--bg-hover); border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 13px; color: var(--text-primary); resize: vertical;"></textarea>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px;">
+                    <button class="btn-cancel-modal" onclick="closeDispatchModal()">Cancel</button>
+                    <button class="btn-apply-filters" style="width: 180px; background: #ef4444;" onclick="executeAuthorityDispatch()">
+                        <i class="fa-solid fa-paper-plane" style="margin-right: 6px;"></i> Send Dispatch
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- TOAST CONTAINER -->
+    <!-- ==========================================================================
+         REPORT PREVIEW MODAL
+         ========================================================================== -->
+    <div class="modal-backdrop-overlay" id="report-preview-modal" onclick="closeReportModalOnBackdrop(event)">
+        <div class="modal-dialog-box wide">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                <div>
+                    <h3 style="font-size: 18px; margin: 0;" id="report-modal-title">Thermal Intelligence Summary</h3>
+                    <span style="font-size: 12.5px; color: var(--text-muted);" id="report-modal-timestamp">Generated on 27 Aug 2025</span>
+                </div>
+                <button class="map-control-btn" onclick="closeReportModal()" style="width: 30px; height: 30px;"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div id="report-modal-content" style="max-height: 400px; overflow-y: auto; font-size: 13.5px; line-height: 1.6;">
+                <!-- Filled dynamically -->
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; border-top: 1px solid var(--border-color); padding-top: 12px;">
+                <button class="btn-cancel-modal" onclick="closeReportModal()">Close</button>
+                <button class="btn-apply-filters" style="width: 160px;" onclick="downloadActiveModalReport()">
+                    <i class="fa-solid fa-download" style="margin-right: 6px;"></i> Download File
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================================================
+         LOGOUT CONFIRMATION MODAL
+         ========================================================================== -->
+    <div class="modal-backdrop-overlay" id="logout-modal" onclick="closeLogoutModalOnBackdrop(event)">
+        <div class="modal-dialog-box">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <div style="width: 50px; height: 50px; border-radius: 50%; background: #fee2e2; color: #ef4444; display: inline-flex; align-items: center; justify-content: center; font-size: 22px; margin-bottom: 14px;">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                </div>
+                <h3 style="font-size: 18px; margin-bottom: 6px;">Confirm Sign Out</h3>
+                <p style="font-size: 13.5px; color: var(--text-muted); margin: 0;">Are you sure you want to end your session? You will be returned to the sign-in portal.</p>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button class="btn-cancel-modal" style="width: 120px;" onclick="closeLogoutModal()">Cancel</button>
+                <button class="btn-confirm-logout" style="width: 120px;" onclick="confirmUserLogout()">Sign Out</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================================================
+         AUTH OVERLAY / LOGIN PORTAL SCREEN
+         ========================================================================== -->
+    <div class="auth-overlay-view" id="auth-overlay-view">
+        <div class="auth-card-box">
+            <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #ef4444, #f97316); color: #ffffff; display: inline-flex; align-items: center; justify-content: center; font-size: 22px; margin-bottom: 14px;">
+                <i class="fa-solid fa-fire-flame-curved"></i>
+            </div>
+            <h2 style="font-size: 22px; margin-bottom: 4px;">THERMAL-AI Portal</h2>
+            <p style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 24px;">National Space-Borne Thermal Intelligence System</p>
+
+            <div class="filters-form-grid" style="text-align: left;">
+                <div class="filter-field-group">
+                    <label>Official Email Address</label>
+                    <input type="email" id="auth-input-email" value="sailaja.s@example.com">
+                </div>
+                <div class="filter-field-group">
+                    <label>Password</label>
+                    <input type="password" id="auth-input-pass" value="••••••••••••">
+                </div>
+                <button class="btn-apply-filters" style="margin-top: 8px;" onclick="executeUserLogin()">
+                    Sign In to Dashboard
+                </button>
+                <button class="btn-export-outline" style="justify-content: center; margin-top: 6px;" onclick="executeDemoGoogleLogin()">
+                    <i class="fa-brands fa-google" style="color: #ea4335;"></i> Continue with Demo Account (Sailaja S.)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications Container -->
     <div id="toast-container"></div>
 
+    <!-- Pre-compiled Ground Truth Database -->
+    <script src="initial_data.js"></script>
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- PapaParse CSV Library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-    <!-- Ground Truth Database -->
-    <script src="initial_data.js"></script>
-    <!-- Core Application Logic -->
+    <!-- Application Logic -->
     <script src="app.js"></script>
 </body>
 </html>
