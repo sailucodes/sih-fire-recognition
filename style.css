@@ -614,6 +614,13 @@ body {
     color: #ef4444;
 }
 
+.btn-filter-action.live-filter.active {
+    background: #ef4444;
+    border-color: #ef4444;
+    color: #ffffff;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.35);
+}
+
 .btn-filter-action.live-filter:hover {
     background: rgba(239, 68, 68, 0.12);
 }

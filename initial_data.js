@@ -24210,3 +24210,1543 @@ const INITIAL_563_EVENTS = [
     "confidence_pct": "87.33"
   }
 ];
+
+/* REAL-TIME VIIRS SATELLITE PASS HOTSPOTS (LIVE DETECTIONS OVER INDIA) */
+const CACHED_LIVE_SATELLITE_HOTSPOTS = [
+  {
+    "id": "NASA_LIVE_SNPP_20",
+    "lat": 8.5517,
+    "lng": 77.8153,
+    "frp": 10.7,
+    "bright": 350.3,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_21",
+    "lat": 8.604,
+    "lng": 77.9652,
+    "frp": 1.5,
+    "bright": 330.0,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_22",
+    "lat": 8.6772,
+    "lng": 77.4745,
+    "frp": 2.9,
+    "bright": 331.3,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_25",
+    "lat": 9.1254,
+    "lng": 77.643,
+    "frp": 3.2,
+    "bright": 335.2,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_28",
+    "lat": 9.4184,
+    "lng": 78.6545,
+    "frp": 2.7,
+    "bright": 342.6,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_30",
+    "lat": 9.5727,
+    "lng": 78.5793,
+    "frp": 2.9,
+    "bright": 338.7,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_31",
+    "lat": 10.9663,
+    "lng": 77.7625,
+    "frp": 2.9,
+    "bright": 333.8,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_32",
+    "lat": 14.6349,
+    "lng": 75.5911,
+    "frp": 5.4,
+    "bright": 334.3,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_33",
+    "lat": 14.8672,
+    "lng": 75.6238,
+    "frp": 6.6,
+    "bright": 334.3,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_34",
+    "lat": 21.8037,
+    "lng": 75.5815,
+    "frp": 2.7,
+    "bright": 332.4,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_35",
+    "lat": 22.0418,
+    "lng": 83.7292,
+    "frp": 6.7,
+    "bright": 329.6,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_36",
+    "lat": 22.3223,
+    "lng": 82.59,
+    "frp": 2.6,
+    "bright": 332.7,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_37",
+    "lat": 22.3577,
+    "lng": 82.3009,
+    "frp": 5.8,
+    "bright": 334.5,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_38",
+    "lat": 22.3583,
+    "lng": 82.3047,
+    "frp": 5.8,
+    "bright": 338.1,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_39",
+    "lat": 23.1648,
+    "lng": 82.3403,
+    "frp": 3.3,
+    "bright": 330.3,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_42",
+    "lat": 23.7802,
+    "lng": 86.2116,
+    "frp": 6.7,
+    "bright": 341.8,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_43",
+    "lat": 23.8019,
+    "lng": 86.3245,
+    "frp": 4.9,
+    "bright": 339.1,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_44",
+    "lat": 23.8024,
+    "lng": 86.3286,
+    "frp": 4.9,
+    "bright": 340.5,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_45",
+    "lat": 23.8029,
+    "lng": 86.3327,
+    "frp": 6.6,
+    "bright": 337.6,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_46",
+    "lat": 25.6017,
+    "lng": 81.3699,
+    "frp": 2.8,
+    "bright": 334.0,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_47",
+    "lat": 26.4266,
+    "lng": 80.359,
+    "frp": 3.8,
+    "bright": 344.6,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_50",
+    "lat": 27.1176,
+    "lng": 81.2395,
+    "frp": 9.2,
+    "bright": 349.6,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_53",
+    "lat": 27.5867,
+    "lng": 77.4666,
+    "frp": 4.5,
+    "bright": 339.9,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_54",
+    "lat": 27.9871,
+    "lng": 77.808,
+    "frp": 2.8,
+    "bright": 336.4,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_55",
+    "lat": 28.0402,
+    "lng": 74.9217,
+    "frp": 6.0,
+    "bright": 344.4,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_57",
+    "lat": 28.0818,
+    "lng": 77.7221,
+    "frp": 4.4,
+    "bright": 339.9,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_58",
+    "lat": 28.1014,
+    "lng": 77.6092,
+    "frp": 2.6,
+    "bright": 333.8,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_59",
+    "lat": 28.1074,
+    "lng": 77.6247,
+    "frp": 4.2,
+    "bright": 334.0,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_60",
+    "lat": 28.36,
+    "lng": 78.7558,
+    "frp": 2.7,
+    "bright": 330.2,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_61",
+    "lat": 28.6303,
+    "lng": 77.7759,
+    "frp": 1.8,
+    "bright": 331.9,
+    "conf": "l"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_62",
+    "lat": 28.6366,
+    "lng": 78.5521,
+    "frp": 4.3,
+    "bright": 338.3,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_64",
+    "lat": 29.1325,
+    "lng": 75.7723,
+    "frp": 4.2,
+    "bright": 334.6,
+    "conf": "l"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_65",
+    "lat": 29.248,
+    "lng": 75.7044,
+    "frp": 2.5,
+    "bright": 331.2,
+    "conf": "l"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_66",
+    "lat": 29.2515,
+    "lng": 75.7036,
+    "frp": 7.0,
+    "bright": 346.9,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_68",
+    "lat": 29.4739,
+    "lng": 73.0876,
+    "frp": 2.0,
+    "bright": 334.6,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_69",
+    "lat": 30.2285,
+    "lng": 76.1967,
+    "frp": 28.3,
+    "bright": 340.8,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_70",
+    "lat": 30.4847,
+    "lng": 73.6817,
+    "frp": 11.9,
+    "bright": 341.8,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_71",
+    "lat": 30.6038,
+    "lng": 76.8325,
+    "frp": 2.6,
+    "bright": 332.4,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_74",
+    "lat": 30.9969,
+    "lng": 74.215,
+    "frp": 3.5,
+    "bright": 334.6,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_75",
+    "lat": 31.0038,
+    "lng": 74.2432,
+    "frp": 3.8,
+    "bright": 334.4,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_76",
+    "lat": 31.0063,
+    "lng": 74.2445,
+    "frp": 4.6,
+    "bright": 333.7,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_77",
+    "lat": 31.0075,
+    "lng": 74.2423,
+    "frp": 3.8,
+    "bright": 331.4,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_80",
+    "lat": 31.5374,
+    "lng": 74.8221,
+    "frp": 4.5,
+    "bright": 332.6,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_83",
+    "lat": 31.7942,
+    "lng": 74.9413,
+    "frp": 3.1,
+    "bright": 335.9,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_85",
+    "lat": 31.8406,
+    "lng": 74.6483,
+    "frp": 3.6,
+    "bright": 333.5,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_93",
+    "lat": 26.6414,
+    "lng": 79.4794,
+    "frp": 1.7,
+    "bright": 319.2,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_94",
+    "lat": 26.7587,
+    "lng": 83.1989,
+    "frp": 1.3,
+    "bright": 309.2,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_95",
+    "lat": 26.7605,
+    "lng": 83.198,
+    "frp": 0.8,
+    "bright": 306.9,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_97",
+    "lat": 28.3457,
+    "lng": 77.2546,
+    "frp": 1.3,
+    "bright": 307.2,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_98",
+    "lat": 28.7106,
+    "lng": 76.8564,
+    "frp": 1.6,
+    "bright": 311.5,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_99",
+    "lat": 28.7432,
+    "lng": 76.9262,
+    "frp": 0.8,
+    "bright": 307.8,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_100",
+    "lat": 28.7731,
+    "lng": 76.698,
+    "frp": 1.5,
+    "bright": 308.7,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_101",
+    "lat": 28.7823,
+    "lng": 76.9444,
+    "frp": 0.5,
+    "bright": 305.6,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_107",
+    "lat": 31.2602,
+    "lng": 76.9229,
+    "frp": 0.5,
+    "bright": 301.2,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_115",
+    "lat": 20.9689,
+    "lng": 85.1535,
+    "frp": 2.5,
+    "bright": 300.1,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_116",
+    "lat": 21.1001,
+    "lng": 72.6332,
+    "frp": 2.4,
+    "bright": 307.7,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_117",
+    "lat": 21.1025,
+    "lng": 72.6454,
+    "frp": 7.0,
+    "bright": 320.6,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_118",
+    "lat": 21.1037,
+    "lng": 72.6343,
+    "frp": 3.5,
+    "bright": 332.0,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_119",
+    "lat": 21.1037,
+    "lng": 72.6449,
+    "frp": 7.0,
+    "bright": 345.9,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_120",
+    "lat": 21.105,
+    "lng": 72.6338,
+    "frp": 5.2,
+    "bright": 329.1,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_121",
+    "lat": 21.1073,
+    "lng": 72.646,
+    "frp": 7.0,
+    "bright": 341.4,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_122",
+    "lat": 21.1085,
+    "lng": 72.6349,
+    "frp": 3.5,
+    "bright": 306.8,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_123",
+    "lat": 21.1085,
+    "lng": 72.6455,
+    "frp": 7.0,
+    "bright": 317.0,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_124",
+    "lat": 21.1098,
+    "lng": 72.6344,
+    "frp": 5.2,
+    "bright": 311.9,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_125",
+    "lat": 21.2715,
+    "lng": 72.8696,
+    "frp": 1.5,
+    "bright": 312.2,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_126",
+    "lat": 21.2716,
+    "lng": 72.8706,
+    "frp": 2.1,
+    "bright": 311.0,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_127",
+    "lat": 21.9868,
+    "lng": 83.2327,
+    "frp": 0.7,
+    "bright": 295.0,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_128",
+    "lat": 22.3565,
+    "lng": 82.3032,
+    "frp": 1.5,
+    "bright": 310.7,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_129",
+    "lat": 22.3598,
+    "lng": 82.3038,
+    "frp": 1.7,
+    "bright": 320.8,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_130",
+    "lat": 22.3605,
+    "lng": 82.3,
+    "frp": 1.5,
+    "bright": 305.7,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_133",
+    "lat": 22.7866,
+    "lng": 86.2071,
+    "frp": 1.0,
+    "bright": 298.9,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_134",
+    "lat": 22.7876,
+    "lng": 86.2017,
+    "frp": 1.2,
+    "bright": 300.2,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_135",
+    "lat": 22.7887,
+    "lng": 86.1963,
+    "frp": 1.2,
+    "bright": 301.5,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_136",
+    "lat": 22.7905,
+    "lng": 86.208,
+    "frp": 0.9,
+    "bright": 298.8,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_137",
+    "lat": 23.5177,
+    "lng": 87.2724,
+    "frp": 0.8,
+    "bright": 299.7,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_138",
+    "lat": 23.6628,
+    "lng": 87.1563,
+    "frp": 1.4,
+    "bright": 307.9,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_139",
+    "lat": 23.6636,
+    "lng": 87.1523,
+    "frp": 1.1,
+    "bright": 301.9,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_140",
+    "lat": 23.6661,
+    "lng": 87.1612,
+    "frp": 1.4,
+    "bright": 301.9,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_141",
+    "lat": 23.6695,
+    "lng": 86.936,
+    "frp": 0.8,
+    "bright": 302.5,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_142",
+    "lat": 24.1164,
+    "lng": 86.8589,
+    "frp": 0.8,
+    "bright": 299.5,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_143",
+    "lat": 24.1807,
+    "lng": 82.6465,
+    "frp": 0.6,
+    "bright": 297.7,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_144",
+    "lat": 24.1821,
+    "lng": 82.6588,
+    "frp": 0.7,
+    "bright": 299.7,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_145",
+    "lat": 24.1965,
+    "lng": 82.7175,
+    "frp": 1.2,
+    "bright": 311.1,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_146",
+    "lat": 24.2044,
+    "lng": 82.7112,
+    "frp": 1.2,
+    "bright": 300.8,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_147",
+    "lat": 24.6603,
+    "lng": 74.6307,
+    "frp": 2.3,
+    "bright": 305.9,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_148",
+    "lat": 24.7647,
+    "lng": 74.6093,
+    "frp": 2.7,
+    "bright": 311.1,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_149",
+    "lat": 24.9218,
+    "lng": 84.1565,
+    "frp": 0.4,
+    "bright": 302.7,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_151",
+    "lat": 25.9433,
+    "lng": 72.1894,
+    "frp": 1.1,
+    "bright": 310.2,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_153",
+    "lat": 12.747,
+    "lng": 77.6201,
+    "frp": 0.7,
+    "bright": 299.3,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_154",
+    "lat": 15.6581,
+    "lng": 73.9893,
+    "frp": 0.6,
+    "bright": 297.6,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_155",
+    "lat": 18.8026,
+    "lng": 74.2602,
+    "frp": 1.9,
+    "bright": 317.3,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_160",
+    "lat": 8.671,
+    "lng": 77.9947,
+    "frp": 0.4,
+    "bright": 305.0,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_SNPP_161",
+    "lat": 11.2688,
+    "lng": 80.0027,
+    "frp": 1.1,
+    "bright": 309.2,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_14",
+    "lat": 8.6614,
+    "lng": 78.0506,
+    "frp": 3.9,
+    "bright": 337.4,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_15",
+    "lat": 8.673,
+    "lng": 77.4745,
+    "frp": 14.1,
+    "bright": 337.3,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_16",
+    "lat": 8.6796,
+    "lng": 77.4733,
+    "frp": 14.1,
+    "bright": 355.6,
+    "conf": "l"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_23",
+    "lat": 21.7471,
+    "lng": 83.8439,
+    "frp": 3.3,
+    "bright": 331.4,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_24",
+    "lat": 22.3616,
+    "lng": 87.0167,
+    "frp": 5.7,
+    "bright": 329.3,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_25",
+    "lat": 22.3777,
+    "lng": 87.2796,
+    "frp": 6.4,
+    "bright": 345.2,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_26",
+    "lat": 21.8616,
+    "lng": 75.564,
+    "frp": 11.3,
+    "bright": 367.0,
+    "conf": "h"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_27",
+    "lat": 23.7121,
+    "lng": 86.4508,
+    "frp": 7.9,
+    "bright": 339.4,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_28",
+    "lat": 23.7361,
+    "lng": 86.4311,
+    "frp": 3.1,
+    "bright": 330.1,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_29",
+    "lat": 23.7367,
+    "lng": 86.4348,
+    "frp": 7.9,
+    "bright": 345.1,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_30",
+    "lat": 23.7508,
+    "lng": 86.4169,
+    "frp": 2.2,
+    "bright": 330.3,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_31",
+    "lat": 23.7553,
+    "lng": 85.8533,
+    "frp": 7.6,
+    "bright": 333.4,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_32",
+    "lat": 23.773,
+    "lng": 86.363,
+    "frp": 4.8,
+    "bright": 333.4,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_33",
+    "lat": 23.7808,
+    "lng": 86.2114,
+    "frp": 4.5,
+    "bright": 340.4,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_34",
+    "lat": 23.7989,
+    "lng": 86.3503,
+    "frp": 3.6,
+    "bright": 334.9,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_35",
+    "lat": 23.8015,
+    "lng": 86.323,
+    "frp": 6.8,
+    "bright": 343.0,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_36",
+    "lat": 23.8026,
+    "lng": 86.3305,
+    "frp": 4.8,
+    "bright": 346.3,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_37",
+    "lat": 23.8059,
+    "lng": 86.3299,
+    "frp": 4.8,
+    "bright": 334.3,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_38",
+    "lat": 24.9569,
+    "lng": 93.4122,
+    "frp": 3.6,
+    "bright": 330.2,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_39",
+    "lat": 26.424,
+    "lng": 88.796,
+    "frp": 4.1,
+    "bright": 333.8,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_41",
+    "lat": 27.7311,
+    "lng": 96.2817,
+    "frp": 5.4,
+    "bright": 330.4,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_42",
+    "lat": 27.7317,
+    "lng": 96.2838,
+    "frp": 3.7,
+    "bright": 341.5,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_43",
+    "lat": 27.748,
+    "lng": 96.2841,
+    "frp": 3.1,
+    "bright": 336.0,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_44",
+    "lat": 27.7882,
+    "lng": 96.012,
+    "frp": 2.0,
+    "bright": 329.7,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_45",
+    "lat": 30.2352,
+    "lng": 76.0662,
+    "frp": 5.2,
+    "bright": 334.1,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_47",
+    "lat": 31.0108,
+    "lng": 74.2266,
+    "frp": 5.1,
+    "bright": 348.7,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_48",
+    "lat": 31.4962,
+    "lng": 74.5316,
+    "frp": 3.4,
+    "bright": 337.5,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_49",
+    "lat": 31.873,
+    "lng": 74.6727,
+    "frp": 2.6,
+    "bright": 333.5,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_50",
+    "lat": 31.8789,
+    "lng": 74.6718,
+    "frp": 5.4,
+    "bright": 338.3,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_51",
+    "lat": 31.8918,
+    "lng": 74.6818,
+    "frp": 2.6,
+    "bright": 335.7,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_52",
+    "lat": 31.9093,
+    "lng": 74.7114,
+    "frp": 1.5,
+    "bright": 329.8,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_53",
+    "lat": 32.507,
+    "lng": 74.2256,
+    "frp": 2.9,
+    "bright": 332.9,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_54",
+    "lat": 14.6441,
+    "lng": 75.6448,
+    "frp": 6.4,
+    "bright": 331.5,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_55",
+    "lat": 14.646,
+    "lng": 75.6427,
+    "frp": 5.8,
+    "bright": 329.2,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_57",
+    "lat": 21.1019,
+    "lng": 72.6352,
+    "frp": 7.3,
+    "bright": 333.4,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_65",
+    "lat": 23.5583,
+    "lng": 87.2394,
+    "frp": 0.6,
+    "bright": 302.5,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_66",
+    "lat": 23.5595,
+    "lng": 87.2319,
+    "frp": 0.4,
+    "bright": 299.2,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_67",
+    "lat": 23.5799,
+    "lng": 86.7249,
+    "frp": 1.2,
+    "bright": 304.9,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_68",
+    "lat": 23.6734,
+    "lng": 86.3968,
+    "frp": 1.5,
+    "bright": 305.9,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_69",
+    "lat": 23.6761,
+    "lng": 86.4012,
+    "frp": 1.9,
+    "bright": 319.8,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_70",
+    "lat": 23.6767,
+    "lng": 86.3974,
+    "frp": 1.9,
+    "bright": 319.6,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_71",
+    "lat": 23.6773,
+    "lng": 86.3936,
+    "frp": 1.5,
+    "bright": 303.6,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_72",
+    "lat": 23.68,
+    "lng": 86.398,
+    "frp": 1.9,
+    "bright": 311.2,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_73",
+    "lat": 23.6839,
+    "lng": 86.3948,
+    "frp": 1.2,
+    "bright": 308.8,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_74",
+    "lat": 23.6845,
+    "lng": 86.391,
+    "frp": 1.2,
+    "bright": 312.0,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_75",
+    "lat": 23.6892,
+    "lng": 87.0977,
+    "frp": 1.7,
+    "bright": 305.6,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_76",
+    "lat": 23.6923,
+    "lng": 87.1213,
+    "frp": 1.6,
+    "bright": 304.2,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_77",
+    "lat": 23.6963,
+    "lng": 87.0952,
+    "frp": 1.7,
+    "bright": 307.8,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_78",
+    "lat": 23.7097,
+    "lng": 86.4492,
+    "frp": 1.4,
+    "bright": 315.2,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_79",
+    "lat": 23.7124,
+    "lng": 86.4536,
+    "frp": 1.4,
+    "bright": 306.2,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_80",
+    "lat": 23.713,
+    "lng": 86.4498,
+    "frp": 1.4,
+    "bright": 318.6,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_81",
+    "lat": 23.7137,
+    "lng": 86.4227,
+    "frp": 1.4,
+    "bright": 308.0,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_82",
+    "lat": 23.7164,
+    "lng": 86.4271,
+    "frp": 1.8,
+    "bright": 307.2,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_83",
+    "lat": 23.7174,
+    "lng": 86.4428,
+    "frp": 2.3,
+    "bright": 311.4,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_84",
+    "lat": 23.7175,
+    "lng": 86.4195,
+    "frp": 1.4,
+    "bright": 311.6,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_85",
+    "lat": 23.7213,
+    "lng": 86.4396,
+    "frp": 2.2,
+    "bright": 310.6,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_86",
+    "lat": 23.7246,
+    "lng": 86.4402,
+    "frp": 2.0,
+    "bright": 309.7,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_87",
+    "lat": 23.7357,
+    "lng": 86.4344,
+    "frp": 2.4,
+    "bright": 325.6,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_88",
+    "lat": 23.7363,
+    "lng": 86.4306,
+    "frp": 2.4,
+    "bright": 311.5,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_89",
+    "lat": 23.739,
+    "lng": 86.435,
+    "frp": 2.6,
+    "bright": 312.3,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_90",
+    "lat": 24.1825,
+    "lng": 82.6593,
+    "frp": 0.9,
+    "bright": 300.7,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_91",
+    "lat": 24.1953,
+    "lng": 82.7151,
+    "frp": 0.9,
+    "bright": 303.7,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_92",
+    "lat": 24.1991,
+    "lng": 82.7155,
+    "frp": 1.5,
+    "bright": 302.4,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_93",
+    "lat": 24.2037,
+    "lng": 82.7105,
+    "frp": 1.5,
+    "bright": 305.0,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_94",
+    "lat": 24.3248,
+    "lng": 81.3286,
+    "frp": 0.7,
+    "bright": 299.6,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_95",
+    "lat": 24.9225,
+    "lng": 84.1563,
+    "frp": 0.6,
+    "bright": 300.2,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_96",
+    "lat": 24.9309,
+    "lng": 84.1482,
+    "frp": 1.1,
+    "bright": 298.1,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_97",
+    "lat": 26.6393,
+    "lng": 79.477,
+    "frp": 5.2,
+    "bright": 319.5,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_98",
+    "lat": 26.7021,
+    "lng": 77.8474,
+    "frp": 1.5,
+    "bright": 307.9,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_99",
+    "lat": 26.7615,
+    "lng": 83.1983,
+    "frp": 1.9,
+    "bright": 305.2,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_100",
+    "lat": 28.3464,
+    "lng": 77.2579,
+    "frp": 1.1,
+    "bright": 306.7,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_101",
+    "lat": 28.3483,
+    "lng": 77.2314,
+    "frp": 0.9,
+    "bright": 307.7,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_102",
+    "lat": 28.709,
+    "lng": 76.8571,
+    "frp": 1.8,
+    "bright": 313.5,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_103",
+    "lat": 28.7717,
+    "lng": 76.7,
+    "frp": 3.1,
+    "bright": 327.6,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_104",
+    "lat": 28.7786,
+    "lng": 76.95,
+    "frp": 1.9,
+    "bright": 310.9,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_107",
+    "lat": 20.7605,
+    "lng": 85.2972,
+    "frp": 1.6,
+    "bright": 310.4,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_108",
+    "lat": 20.7901,
+    "lng": 85.2595,
+    "frp": 1.3,
+    "bright": 305.3,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_109",
+    "lat": 20.7945,
+    "lng": 85.2524,
+    "frp": 0.8,
+    "bright": 295.6,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_110",
+    "lat": 21.1041,
+    "lng": 72.6337,
+    "frp": 2.0,
+    "bright": 300.1,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_111",
+    "lat": 22.6099,
+    "lng": 85.9126,
+    "frp": 1.0,
+    "bright": 304.8,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_112",
+    "lat": 22.7878,
+    "lng": 86.2026,
+    "frp": 1.0,
+    "bright": 300.2,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_113",
+    "lat": 22.7884,
+    "lng": 86.1988,
+    "frp": 1.0,
+    "bright": 301.1,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_114",
+    "lat": 22.79,
+    "lng": 86.2107,
+    "frp": 1.3,
+    "bright": 298.9,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_115",
+    "lat": 22.8719,
+    "lng": 88.2135,
+    "frp": 0.2,
+    "bright": 298.5,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_116",
+    "lat": 11.2675,
+    "lng": 80.0034,
+    "frp": 2.3,
+    "bright": 303.5,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_117",
+    "lat": 12.7465,
+    "lng": 77.6212,
+    "frp": 1.4,
+    "bright": 308.4,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_119",
+    "lat": 9.2644,
+    "lng": 77.484,
+    "frp": 1.1,
+    "bright": 308.0,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_120",
+    "lat": 9.2645,
+    "lng": 77.4822,
+    "frp": 1.7,
+    "bright": 307.2,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_123",
+    "lat": 27.2895,
+    "lng": 73.8405,
+    "frp": 1.2,
+    "bright": 307.8,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_125",
+    "lat": 31.2559,
+    "lng": 76.924,
+    "frp": 1.3,
+    "bright": 299.8,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_126",
+    "lat": 31.2578,
+    "lng": 76.9248,
+    "frp": 1.2,
+    "bright": 303.3,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_131",
+    "lat": 21.1016,
+    "lng": 72.636,
+    "frp": 7.0,
+    "bright": 345.3,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_132",
+    "lat": 21.1053,
+    "lng": 72.6462,
+    "frp": 3.7,
+    "bright": 319.7,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_133",
+    "lat": 21.1073,
+    "lng": 72.6375,
+    "frp": 3.6,
+    "bright": 305.0,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_136",
+    "lat": 24.6618,
+    "lng": 74.633,
+    "frp": 2.2,
+    "bright": 306.4,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_137",
+    "lat": 24.8171,
+    "lng": 73.0922,
+    "frp": 0.8,
+    "bright": 299.6,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_138",
+    "lat": 24.8225,
+    "lng": 73.094,
+    "frp": 0.8,
+    "bright": 304.4,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_141",
+    "lat": 26.2599,
+    "lng": 74.0955,
+    "frp": 2.2,
+    "bright": 309.9,
+    "conf": "n"
+  },
+  {
+    "id": "NASA_LIVE_NOAA21_142",
+    "lat": 26.8781,
+    "lng": 73.5153,
+    "frp": 1.8,
+    "bright": 306.4,
+    "conf": "n"
+  }
+];

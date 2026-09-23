@@ -114,7 +114,7 @@
                     <div class="stat-card total-card">
                         <div class="stat-icon"><i class="fa-solid fa-satellite-dish"></i></div>
                         <div>
-                            <span class="stat-label" id="lbl-total-sources">TOTAL THERMAL SOURCES</span>
+                            <span class="stat-label" id="lbl-total-sources">TOTAL MONITORED (LIVE)</span>
                             <strong id="total-sources">0</strong>
                         </div>
                     </div>
@@ -189,11 +189,11 @@
                     <div class="filter-row-bottom">
                         <div class="filter-group search-group" style="flex: 1;">
                             <label for="search-input" id="lbl-search-id">Search ID / Region / Coordinates</label>
-                            <input type="text" id="search-input" placeholder="Search by ID (e.g. SOURCE_0001, NASA_LIVE), state, or coordinates...">
+                            <input type="text" id="search-input" placeholder="Search by ID (e.g. NASA_LIVE, PRED), state, or coordinates...">
                         </div>
                         <div class="filter-actions-group">
-                            <button id="live-only-btn" class="btn-filter-action live-filter" title="Show only real-time satellite fires detected today">
-                                <i class="fa-solid fa-satellite"></i> <span>Live NASA</span>
+                            <button id="live-only-btn" class="btn-filter-action live-filter active" title="Currently displaying exclusively real-time satellite fire hotspots. Click to toggle historical archive.">
+                                <i class="fa-solid fa-satellite-dish"></i> <span>Live Satellite (Active)</span>
                             </button>
                             <button id="reset-btn" class="btn-filter-action reset-filter" title="Reset all search and filter conditions">
                                 <i class="fa-solid fa-rotate-right"></i> <span id="lbl-reset-btn">Reset</span>
@@ -207,9 +207,9 @@
                     <div class="panel-header">
                         <div>
                             <span class="panel-kicker">GIS MONITORING</span>
-                            <h2 id="lbl-map-heading">Spatial Distribution & Active Hotspots</h2>
+                            <h2 id="lbl-map-heading">Spatial Distribution & Real-Time Hotspots</h2>
                         </div>
-                        <span id="visible-count" class="badge">0 EVENTS</span>
+                        <span id="visible-count" class="badge">0 LIVE EVENTS</span>
                     </div>
                     <div id="map" class="map-container"></div>
                 </section>

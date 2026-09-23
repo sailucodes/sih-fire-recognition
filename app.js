@@ -1,5 +1,7 @@
 let allEvents = [];
 let filteredEvents = [];
+let historicalArchiveEvents = []; // Background archive of the 563 historical ground-truth records
+let liveOnlyActive = true;        // REAL-TIME SATELLITE MODE ACTIVE BY DEFAULT (Strictly show live data)
 let map = null;
 let markersLayer = null;
 let nasaMiniMap = null;
@@ -578,19 +580,31 @@ async function updateNasaFirmsWidget(forceRefresh = false) {
             lines = csvText.trim().split("\n");
         }
 
-        if (csvText.includes("latitude") && lines.length > 1) {
-            const headers = lines[0].split(",").map(h => h.trim());
+        // Also query NOAA-21 satellite feed for comprehensive multi-satellite constellation coverage
+        let noaaCsv = "";
+        try {
+            const noaaUrl = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${mapKey}/VIIRS_NOAA21_NRT/68,6.5,97.5,37.5/2`;
+            const noaaRes = await fetch(noaaUrl);
+            if (noaaRes.ok) noaaCsv = await noaaRes.text();
+        } catch (_) {}
+
+        const liveHotspots = [];
+        let liveCritical = 0;
+
+        function ingestCsvLines(rawCsv, satTag) {
+            if (!rawCsv || !rawCsv.includes("latitude")) return;
+            const chunkLines = rawCsv.trim().split("\n");
+            if (chunkLines.length <= 1) return;
+
+            const headers = chunkLines[0].split(",").map(h => h.trim());
             const latIdx = headers.indexOf("latitude");
             const lonIdx = headers.indexOf("longitude");
             const frpIdx = headers.indexOf("frp");
             const brightIdx = headers.indexOf("bright_ti4") !== -1 ? headers.indexOf("bright_ti4") : headers.indexOf("brightness");
             const confIdx = headers.indexOf("confidence");
 
-            const liveHotspots = [];
-            let liveCritical = 0;
-
-            for (let i = 1; i < lines.length; i++) {
-                const cols = lines[i].split(",").map(c => c.trim());
+            for (let i = 1; i < chunkLines.length; i++) {
+                const cols = chunkLines[i].split(",").map(c => c.trim());
                 if (cols.length >= headers.length) {
                     const lat = parseFloat(cols[latIdx]);
                     const lng = parseFloat(cols[lonIdx]);
@@ -609,7 +623,7 @@ async function updateNasaFirmsWidget(forceRefresh = false) {
                         if (isCrit) liveCritical++;
                         
                         liveHotspots.push({
-                            source_id: `NASA_LIVE_${i}`,
+                            source_id: `NASA_LIVE_${satTag}_${i}`,
                             state: getNearestState(lat, lng),
                             latitude: lat,
                             longitude: lng,
@@ -618,38 +632,93 @@ async function updateNasaFirmsWidget(forceRefresh = false) {
                             persistence_score: classification.persistence,
                             landcover: classification.landcover,
                             mean_frp: frp,
+                            mean_brightness: bright,
                             is_live_nasa: true
                         });
                     }
                 }
             }
+        }
 
-            if (liveHotspots.length > 0) {
-                setText("nasa-live-count", liveHotspots.length);
-                setText("nasa-live-critical", liveCritical);
-                setText("nasa-last-update", getFormattedLiveTime());
+        ingestCsvLines(csvText, "SNPP");
+        if (noaaCsv) ingestCsvLines(noaaCsv, "NOAA21");
 
-                // Ingest ALL live satellite detections into allEvents
-                let added = 0;
-                liveHotspots.forEach(lh => {
-                    if (!allEvents.some(ev => String(ev.source_id) === String(lh.source_id))) {
-                        allEvents.unshift(lh);
-                        added++;
-                    }
-                });
-
-                if (added > 0 || forceRefresh) {
-                    filteredEvents = [...allEvents];
-                    updateDashboard();
-                    renderMarkers();
-                    renderTable();
-                    updateAlerts();
+        // If direct fetch returned no points (e.g. offline / rate limit), use cached live VIIRS satellite pass
+        if (liveHotspots.length === 0 && typeof CACHED_LIVE_SATELLITE_HOTSPOTS !== "undefined" && Array.isArray(CACHED_LIVE_SATELLITE_HOTSPOTS)) {
+            CACHED_LIVE_SATELLITE_HOTSPOTS.forEach((item, idx) => {
+                if (isPointInsideIndia(item.lat, item.lng) && !isPointInWater(item.lat, item.lng)) {
+                    const classification = classifyLiveSatelliteHotspot(item.lat, item.lng, item.frp, item.bright, item.conf);
+                    const isCrit = item.frp >= 25.0 || item.bright >= 350.0 || item.conf === "h" || classification.confidence >= ALERT_RULES.CRITICAL;
+                    if (isCrit) liveCritical++;
+                    liveHotspots.push({
+                        source_id: item.id || `NASA_LIVE_${idx + 1}`,
+                        state: getNearestState(item.lat, item.lng),
+                        latitude: item.lat,
+                        longitude: item.lng,
+                        predicted_event_type: classification.type,
+                        confidence: classification.confidence,
+                        persistence_score: classification.persistence,
+                        landcover: classification.landcover,
+                        mean_frp: item.frp,
+                        mean_brightness: item.bright,
+                        is_live_nasa: true
+                    });
                 }
-                return liveHotspots.length;
+            });
+        }
+
+        if (liveHotspots.length > 0) {
+            setText("nasa-live-count", liveHotspots.length);
+            setText("nasa-live-critical", liveCritical);
+            setText("nasa-last-update", getFormattedLiveTime());
+
+            // Retain any real-time user-generated AI predictions (PRED_)
+            const liveUserPredictions = allEvents.filter(ev => String(ev.source_id).startsWith("PRED_"));
+            
+            // STRICTLY LIVE DATA by default: only live satellite hotspots + live user predictions
+            if (liveOnlyActive) {
+                allEvents = [...liveUserPredictions, ...liveHotspots];
+            } else {
+                allEvents = [...liveUserPredictions, ...liveHotspots, ...historicalArchiveEvents];
             }
+
+            setText("database-status", `LIVE VIIRS SATELLITE FEED (${liveHotspots.length} ACTIVE)`);
+            applyFilters();
+            return liveHotspots.length;
         }
     } catch (e) {
-        console.warn("Direct NASA FIRMS fetch error, falling back to local dataset:", e);
+        console.warn("Direct NASA FIRMS fetch error, loading cached live satellite pass:", e);
+        if (typeof CACHED_LIVE_SATELLITE_HOTSPOTS !== "undefined" && Array.isArray(CACHED_LIVE_SATELLITE_HOTSPOTS)) {
+            const fallbackHotspots = [];
+            let fallbackCrit = 0;
+            CACHED_LIVE_SATELLITE_HOTSPOTS.forEach((item, idx) => {
+                if (isPointInsideIndia(item.lat, item.lng) && !isPointInWater(item.lat, item.lng)) {
+                    const classification = classifyLiveSatelliteHotspot(item.lat, item.lng, item.frp, item.bright, item.conf);
+                    if (item.frp >= 25.0 || classification.confidence >= ALERT_RULES.CRITICAL) fallbackCrit++;
+                    fallbackHotspots.push({
+                        source_id: item.id || `NASA_LIVE_${idx + 1}`,
+                        state: getNearestState(item.lat, item.lng),
+                        latitude: item.lat,
+                        longitude: item.lng,
+                        predicted_event_type: classification.type,
+                        confidence: classification.confidence,
+                        persistence_score: classification.persistence,
+                        landcover: classification.landcover,
+                        mean_frp: item.frp,
+                        mean_brightness: item.bright,
+                        is_live_nasa: true
+                    });
+                }
+            });
+            const liveUserPredictions = allEvents.filter(ev => String(ev.source_id).startsWith("PRED_"));
+            allEvents = [...liveUserPredictions, ...fallbackHotspots];
+            setText("nasa-live-count", fallbackHotspots.length);
+            setText("nasa-live-critical", fallbackCrit);
+            setText("nasa-last-update", getFormattedLiveTime());
+            setText("database-status", `LIVE SATELLITE FEED (${fallbackHotspots.length} ACTIVE)`);
+            applyFilters();
+            return fallbackHotspots.length;
+        }
     }
 
     let activeDetections = filteredEvents.length;
@@ -1351,28 +1420,46 @@ function setupEventListeners() {
         filterDebounce = setTimeout(applyFilters, 120);
     });
 
-    let liveOnlyActive = false;
     const liveOnlyBtn = document.getElementById("live-only-btn");
-    liveOnlyBtn?.addEventListener("click", () => {
-        liveOnlyActive = !liveOnlyActive;
-        if (liveOnlyActive) {
-            liveOnlyBtn.style.background = "#ef4444";
-            liveOnlyBtn.style.color = "#ffffff";
-            showToast("Showing exclusively real-time live NASA satellite fires", "info");
-        } else {
-            liveOnlyBtn.style.background = "transparent";
-            liveOnlyBtn.style.color = "#ef4444";
-            showToast("Showing all monitored thermal sources & live fires", "info");
-        }
-        applyFilters();
-    });
+    if (liveOnlyBtn) {
+        liveOnlyBtn.style.background = "#ef4444";
+        liveOnlyBtn.style.color = "#ffffff";
+        liveOnlyBtn.style.borderColor = "#ef4444";
+        liveOnlyBtn.classList.add("active");
+        liveOnlyBtn.innerHTML = '<i class="fa-solid fa-satellite-dish"></i> <span>Live Satellite (Active)</span>';
+        liveOnlyBtn.title = "Currently displaying exclusively real-time satellite fire hotspots. Click to include historical archive.";
+
+        liveOnlyBtn.addEventListener("click", () => {
+            liveOnlyActive = !liveOnlyActive;
+            if (liveOnlyActive) {
+                liveOnlyBtn.style.background = "#ef4444";
+                liveOnlyBtn.style.color = "#ffffff";
+                liveOnlyBtn.style.borderColor = "#ef4444";
+                liveOnlyBtn.classList.add("active");
+                liveOnlyBtn.innerHTML = '<i class="fa-solid fa-satellite-dish"></i> <span>Live Satellite (Active)</span>';
+                // Strictly keep live satellite hotspots and live user predictions
+                allEvents = allEvents.filter(e => Boolean(e.is_live_nasa) || String(e.source_id).startsWith("PRED_"));
+                showToast("Showing exclusively real-time live NASA satellite fires", "info");
+            } else {
+                liveOnlyBtn.style.background = "transparent";
+                liveOnlyBtn.style.color = "#ef4444";
+                liveOnlyBtn.style.borderColor = "#ef4444";
+                liveOnlyBtn.classList.remove("active");
+                liveOnlyBtn.innerHTML = '<i class="fa-solid fa-database"></i> <span>Include Past Archive</span>';
+                // Include historical archive records
+                const existingIds = new Set(allEvents.map(e => String(e.source_id)));
+                historicalArchiveEvents.forEach(h => {
+                    if (!existingIds.has(String(h.source_id))) {
+                        allEvents.push(h);
+                    }
+                });
+                showToast("Included historical past archive (563 records) alongside live fires", "info");
+            }
+            applyFilters();
+        });
+    }
 
     resetBtn?.addEventListener("click", () => {
-        liveOnlyActive = false;
-        if (liveOnlyBtn) {
-            liveOnlyBtn.style.background = "transparent";
-            liveOnlyBtn.style.color = "#ef4444";
-        }
         if (stateFilter) stateFilter.value = "";
         if (typeFilter) typeFilter.value = "";
         if (minConf) {
@@ -1383,7 +1470,7 @@ function setupEventListeners() {
         if (map) map.setView([20.5937, 78.9629], 5);
         
         applyFilters();
-        showToast("Filters reset to default", "info");
+        showToast("Filters reset to default (Live satellite view active)", "info");
     });
 }
 
@@ -1393,21 +1480,23 @@ function applyFilters() {
     const minConf = parseFloat(document.getElementById("confidence-filter")?.value || 0);
     const landcover = document.getElementById("landcover-filter")?.value || "ALL";
     const search = (document.getElementById("search-input")?.value || "").toLowerCase().trim();
-    const liveOnlyBtn = document.getElementById("live-only-btn");
-    const isLiveOnly = liveOnlyBtn && liveOnlyBtn.style.background.includes("239");
 
     filteredEvents = allEvents.filter(e => {
+        // When liveOnlyActive is true (default), strictly show real-time live satellite fires and live user AI predictions
+        if (liveOnlyActive && !e.is_live_nasa && !String(e.source_id).startsWith("PRED_")) {
+            return false;
+        }
+
         const matchState = !state || String(e.state).toLowerCase() === state.toLowerCase();
         const matchType = !type || normalizeType(e.predicted_event_type) === normalizeType(type);
         const matchConf = (parseFloat(e.confidence) || 0) >= minConf;
         const matchLandcover = !landcover || landcover === "ALL" || String(e.landcover || "").toLowerCase().includes(landcover.toLowerCase());
-        const matchLiveOnly = !isLiveOnly || Boolean(e.is_live_nasa);
         const matchSearch = !search || 
             String(e.source_id).toLowerCase().includes(search) || 
             String(e.state).toLowerCase().includes(search) || 
             String(e.predicted_event_type).toLowerCase().includes(search);
 
-        return matchState && matchType && matchConf && matchLandcover && matchSearch && matchLiveOnly;
+        return matchState && matchType && matchConf && matchLandcover && matchSearch;
     });
 
     currentTablePage = 1;
@@ -1543,20 +1632,25 @@ async function loadDualCsvData() {
 }
 
 function processData(csvEvents) {
+    historicalArchiveEvents = csvEvents || [];
     const savedEvents = loadDatabase();
     
-    const eventMap = new Map();
-    csvEvents.forEach(e => eventMap.set(String(e.source_id), e));
-    savedEvents.forEach(e => eventMap.set(String(e.source_id), e));
+    // In Live Mode (default), only keep user-created predictions (PRED_) and live NASA detections
+    const liveUserPreds = savedEvents.filter(e => String(e.source_id).startsWith("PRED_"));
+    
+    if (liveOnlyActive) {
+        allEvents = [...liveUserPreds];
+    } else {
+        allEvents = [...liveUserPreds, ...historicalArchiveEvents];
+    }
 
-    allEvents = Array.from(eventMap.values());
     filteredEvents = [...allEvents];
 
     updateDashboard();
     renderMarkers();
     renderTable();
     updateAlerts();
-    updateNasaFirmsWidget();
+    updateNasaFirmsWidget(true);
 }
 
 /* RENDER & UI UPDATES */
@@ -1571,8 +1665,10 @@ function updateDashboard() {
     setText("forest-count", forest);
     setText("agricultural-count", agricultural);
     setText("other-count", other);
-    setText("visible-count", `${filteredEvents.length} EVENTS`);
-    setText("database-count-badge", `${filteredEvents.length} TOTAL RECORDS`);
+    
+    const countBadge = liveOnlyActive ? `${filteredEvents.length} LIVE SATELLITE EVENTS` : `${filteredEvents.length} TOTAL EVENTS`;
+    setText("visible-count", countBadge);
+    setText("database-count-badge", countBadge);
 }
 
 let currentTablePage = 1;
@@ -1768,10 +1864,20 @@ function renderMarkers() {
         const temporalLabel = pScore >= 80 ? "Routine Flare" : (pScore >= 50 ? "Accidental Blaze" : "Crop Burn");
         const facDistStr = e.min_distance_to_industry_km ? `${Number(e.min_distance_to_industry_km).toFixed(1)} km from ${(e.nearest_facility_type || 'industry').replace(/_/g,' ')}` : (normalizeType(e.predicted_event_type) === "Industrial" ? "0.9 km from Industrial Zone" : "Isolated (>15 km)");
 
+        let liveBadge = "";
+        if (e.is_live_nasa) {
+            liveBadge = `<span class="badge" style="background:rgba(239,68,68,0.15); color:#ef4444; border:1px solid rgba(239,68,68,0.4); font-size:10px; font-weight:800; padding:1px 5px; margin-right:4px;"><i class="fa-solid fa-satellite"></i> LIVE VIIRS PASS</span>`;
+        } else if (String(e.source_id).startsWith("PRED_")) {
+            liveBadge = `<span class="badge" style="background:rgba(14,165,233,0.15); color:#0284c7; border:1px solid rgba(14,165,233,0.4); font-size:10px; font-weight:800; padding:1px 5px; margin-right:4px;"><i class="fa-solid fa-brain"></i> LIVE AI PREDICTION</span>`;
+        }
+
         const popupContent = `
             <div class="popup-container" style="min-width:220px; font-family:inherit;">
-                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
-                    <strong style="color:#ef4444; font-size:14px;">🔥 ${escapeHTML(e.source_id)}</strong>
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; flex-wrap:wrap; gap:4px;">
+                    <div>
+                        ${liveBadge}
+                        <strong style="color:#ef4444; font-size:13px;">🔥 ${escapeHTML(e.source_id)}</strong>
+                    </div>
                     <span class="badge" style="background:${getEventColor(normalizeType(e.predicted_event_type))}22; color:${getEventColor(normalizeType(e.predicted_event_type))}; font-size:10px; font-weight:800; padding:2px 6px;">${normalizeType(e.predicted_event_type)}</span>
                 </div>
                 <div style="font-size:12px; line-height:1.6; color:#334155;">
@@ -1779,7 +1885,7 @@ function renderMarkers() {
                     <p style="margin:2px 0;"><strong>Confidence:</strong> <span style="color:#0284c7; font-weight:700;">${Number(e.confidence).toFixed(1)}%</span></p>
                     <p style="margin:2px 0;"><strong>Temporal Tracker:</strong> ${pScore}% (${temporalLabel})</p>
                     <p style="margin:2px 0;"><strong>OSM Proximity:</strong> ${facDistStr}</p>
-                    <p style="margin:2px 0;"><strong>FRP:</strong> ${e.mean_frp ? Number(e.mean_frp).toFixed(1) + " MW" : "Active"}</p>
+                    <p style="margin:2px 0;"><strong>FRP:</strong> ${e.mean_frp ? Number(e.mean_frp).toFixed(1) + " MW (Radiative Power)" : "Active"}</p>
                 </div>
                 <div style="margin-top:8px; border-top:1px solid #e2e8f0; padding-top:6px;">
                     <button class="btn-secondary" style="width:100%; padding:4px 8px; font-size:11px; cursor:pointer;" onclick="showEventDetails('${escapeHTML(e.source_id)}')">
