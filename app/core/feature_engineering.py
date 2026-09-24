@@ -13,7 +13,14 @@ LANDCOVER_MAP = {
     95: ("Mangroves", 1.0, 1.0, 0.0),
 }
 
-def infer_landcover(lat: float, lon: float, nearest_facility_dist_km: float, explicit_class: str = None) -> Dict[str, Any]:
+def infer_landcover(lat: float, lon: float, nearest_facility_dist_km: float = 50.0, explicit_class: str = None) -> Dict[str, Any]:
+    """
+    Map landcover information for a geospatial coordinate.
+    If explicit landcover classification is provided (e.g. from ESA WorldCover 10m / Copernicus 100m),
+    maps to the standard Copernicus Global Land Service schema.
+    If no explicit satellite landcover raster is present, labels as 'Unclassified' without
+    forcing artificial distance-based proxies (which previously forced all points > 3km to Cropland).
+    """
     if explicit_class:
         for code, (c_name, ind_r, for_r, ag_r) in LANDCOVER_MAP.items():
             if c_name.lower() in explicit_class.lower():
@@ -24,31 +31,22 @@ def infer_landcover(lat: float, lon: float, nearest_facility_dist_km: float, exp
                     "forest_land_ratio": for_r,
                     "agricultural_land_ratio": ag_r
                 }
-                
-    if nearest_facility_dist_km <= 1.0:
         return {
-            "landcover_code": 50,
-            "landcover_class": "Built-up",
-            "industrial_land_ratio": 1.0,
-            "forest_land_ratio": 0.0,
-            "agricultural_land_ratio": 0.0
-        }
-    elif nearest_facility_dist_km <= 3.0:
-        return {
-            "landcover_code": 60,
-            "landcover_class": "Bare / sparse vegetation",
-            "industrial_land_ratio": 1.0,
-            "forest_land_ratio": 0.0,
-            "agricultural_land_ratio": 0.0
-        }
-    else:
-        return {
-            "landcover_code": 40,
-            "landcover_class": "Cropland",
+            "landcover_code": 0,
+            "landcover_class": explicit_class,
             "industrial_land_ratio": 0.0,
             "forest_land_ratio": 0.0,
-            "agricultural_land_ratio": 1.0
+            "agricultural_land_ratio": 0.0
         }
+
+    # No explicit landcover raster supplied: Return Unclassified without artificial bias
+    return {
+        "landcover_code": 0,
+        "landcover_class": "Unclassified",
+        "industrial_land_ratio": 0.0,
+        "forest_land_ratio": 0.0,
+        "agricultural_land_ratio": 0.0
+    }
 
 def extract_features_for_point(
     lat: float,

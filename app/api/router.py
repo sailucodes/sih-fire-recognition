@@ -17,7 +17,7 @@ from app.core.feature_engineering import extract_features_for_point
 from app.core.ml_model import ml_engine
 from app.core.anomaly_detector import evaluate_thermal_risk
 from app.core.clustering import cluster_firms_hotspots
-from app.core.spatial_engine import deduce_indian_state
+from app.core.spatial_engine import deduce_indian_state, is_inside_india
 
 class APIRouter:
     def handle_request(self, method: str, path: str, query_params: Dict[str, List[str]], body_data: bytes) -> Tuple[int, Dict[str, str], bytes]:
@@ -461,11 +461,21 @@ class APIRouter:
         country = query_params.get("country", ["IND"])[0]
         days = int(query_params.get("days", [1])[0])
         api_key = query_params.get("key", [None])[0] or query_params.get("map_key", [None])[0]
+        
+        # Support custom date / time range
+        from_param = query_params.get("from", [None])[0] or query_params.get("start", [None])[0] or query_params.get("start_datetime", [None])[0] or query_params.get("from_date", [None])[0]
+        to_param = query_params.get("to", [None])[0] or query_params.get("end", [None])[0] or query_params.get("end_datetime", [None])[0] or query_params.get("to_date", [None])[0]
 
         import time
         t0 = time.time()
         try:
-            raw_hotspots = firms_service.fetch_live_hotspots(country_code=country, days=days, api_key=api_key)
+            raw_hotspots = firms_service.fetch_live_hotspots(
+                country_code=country,
+                days=days,
+                start_datetime=from_param,
+                end_datetime=to_param,
+                api_key=api_key
+            )
         except Exception as e:
             return 400, headers, json.dumps({
                 "status": "error",
@@ -477,6 +487,15 @@ class APIRouter:
 
         t1 = time.time()
         clustered_sources = cluster_firms_hotspots(raw_hotspots, eps_km=1.5)
+
+        # Defensive post-clustering verification: discard any cluster centroid not strictly inside India
+        strictly_indian_clusters = []
+        for c in clustered_sources:
+            if is_inside_india(c["latitude"], c["longitude"]):
+                strictly_indian_clusters.append(c)
+            else:
+                print(f"[SHIELD] Dropped cluster centroid outside India: {c['latitude']}, {c['longitude']}")
+        clustered_sources = strictly_indian_clusters
         t_cluster = time.time() - t1
 
         facilities = osm_service.get_all_facilities()
@@ -563,21 +582,35 @@ class APIRouter:
             if s.get("is_persistent"):
                 persistent_count += 1
 
+        diag = firms_service.last_diagnostics or {}
         acq_dates = [h.get("acq_date") for h in raw_hotspots if h.get("acq_date")]
-        start_date = min(acq_dates) if acq_dates else time.strftime("%Y-%m-%d")
-        end_date = max(acq_dates) if acq_dates else time.strftime("%Y-%m-%d")
-        calendar_days = len(set(acq_dates)) if acq_dates else 1
+        start_date = diag.get("start_datetime") or (min(acq_dates) if acq_dates else time.strftime("%Y-%m-%d"))
+        end_date = diag.get("end_datetime") or (max(acq_dates) if acq_dates else time.strftime("%Y-%m-%d"))
+        calendar_days = diag.get("calendar_days_covered") or (len(set(acq_dates)) if acq_dates else 1)
         t_total = time.time() - t0
 
         return 200, headers, json.dumps({
             "status": "success",
-            "message": f"Successfully ingested {len(raw_hotspots)} NASA FIRMS hotspots, clustered into {len(synced_sources)} persistent/dynamic thermal sources.",
+            "message": f"Successfully ingested {len(raw_hotspots)} Indian NASA FIRMS hotspots, clustered into {len(synced_sources)} persistent/dynamic thermal sources.",
             "source": f"NASA FIRMS VIIRS NRT ({country})",
-            "observation_window_days": days,
+            "observation_window_days": calendar_days,
             "observation_window": {
                 "start_date": start_date,
                 "end_date": end_date,
                 "calendar_days_covered": calendar_days
+            },
+            "diagnostics": {
+                "raw_firms_count": diag.get("raw_firms_count", len(raw_hotspots)),
+                "inside_india_count": diag.get("inside_india_count", len(raw_hotspots)),
+                "outside_india_removed": diag.get("outside_india_removed", 0),
+                "outside_time_window_count": diag.get("outside_time_window_count", 0),
+                "clustered_indian_sources": len(synced_sources)
+            },
+            "timing_ms": {
+                "firms_fetch": round(t_fetch * 1000, 1),
+                "clustering": round(t_cluster * 1000, 1),
+                "feature_extraction_and_ml": round(t_ml * 1000, 1),
+                "total": round(t_total * 1000, 1)
             },
             "processing_time_sec": {
                 "firms_fetch": round(t_fetch, 2),

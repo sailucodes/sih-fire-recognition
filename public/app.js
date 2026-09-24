@@ -75,6 +75,7 @@ let filteredEvents = [];
 let historicalArchiveEvents = [];
 let map = null;
 let markersLayer = null;
+let canvasRenderer = null;
 let tempClickMarker = null;
 let inspectBeaconMarker = null;
 let baseTileStandard = null;
@@ -180,13 +181,19 @@ document.addEventListener("DOMContentLoaded", async function () {
     // Retrieve saved period selection from localStorage, default to Live Pass (1 day)
     const savedPeriod = localStorage.getItem("thermal_selected_period") || "Live Satellite Pass (Today)";
     const savedDays = parseInt(localStorage.getItem("thermal_selected_days") || "1", 10);
+    const customFrom = localStorage.getItem("thermal_custom_from");
+    const customTo = localStorage.getItem("thermal_custom_to");
 
     const dateText = document.getElementById("header-date-text");
     if (dateText) dateText.innerText = savedPeriod;
 
     // Load active dataset directly from backend FIRMS sync pipeline
     try {
-        await syncBackendFirms(savedDays, false);
+        if (savedPeriod.startsWith("Custom") && customFrom && customTo) {
+            await syncBackendFirms({ from: customFrom, to: customTo, label: savedPeriod }, false);
+        } else {
+            await syncBackendFirms(savedDays, false);
+        }
     } catch (e) {
         console.warn("[Startup] Initial backend sync failed:", e);
     }
@@ -274,6 +281,7 @@ function initSmoothLeafletMap() {
         attribution: '© OpenStreetMap, © CARTO'
     });
 
+    canvasRenderer = L.canvas({ padding: 0.5 });
     markersLayer = L.layerGroup().addTo(map);
     setTimeout(() => { if (map) map.invalidateSize(); }, 250);
 
@@ -457,7 +465,103 @@ document.addEventListener("click", function (e) {
     }
 });
 
+window.openCustomRangeModal = function () {
+    const drop = document.getElementById("date-preset-dropdown");
+    if (drop) drop.classList.remove("active");
+
+    const modal = document.getElementById("custom-range-modal");
+    if (!modal) return;
+
+    const fromInput = document.getElementById("custom-range-from");
+    const toInput = document.getElementById("custom-range-to");
+
+    const now = new Date();
+    const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+
+    const pad = (n) => String(n).padStart(2, '0');
+    const formatForInput = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+    if (fromInput && !fromInput.value) fromInput.value = formatForInput(threeDaysAgo);
+    if (toInput && !toInput.value) toInput.value = formatForInput(now);
+
+    modal.classList.add("active");
+};
+
+window.closeCustomRangeModal = function () {
+    const modal = document.getElementById("custom-range-modal");
+    if (modal) modal.classList.remove("active");
+};
+
+window.closeCustomRangeModalOnBackdrop = function (e) {
+    if (e.target && e.target.id === "custom-range-modal") {
+        closeCustomRangeModal();
+    }
+};
+
+window.setCustomQuickRange = function (days) {
+    const fromInput = document.getElementById("custom-range-from");
+    const toInput = document.getElementById("custom-range-to");
+    const now = new Date();
+    const past = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+
+    const pad = (n) => String(n).padStart(2, '0');
+    const formatForInput = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+    if (fromInput) fromInput.value = formatForInput(past);
+    if (toInput) toInput.value = formatForInput(now);
+};
+
+window.applyCustomDateRange = async function () {
+    const fromInput = document.getElementById("custom-range-from");
+    const toInput = document.getElementById("custom-range-to");
+
+    if (!fromInput || !toInput || !fromInput.value || !toInput.value) {
+        showToast("Please enter both start and end date/time.", "warning");
+        return;
+    }
+
+    const fromDate = new Date(fromInput.value);
+    const toDate = new Date(toInput.value);
+
+    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
+        showToast("Invalid date/time format.", "error");
+        return;
+    }
+
+    if (fromDate > toDate) {
+        showToast("Start date/time cannot be later than end date/time.", "warning");
+        return;
+    }
+
+    closeCustomRangeModal();
+
+    const fromStr = fromInput.value.replace("T", " ");
+    const toStr = toInput.value.replace("T", " ");
+    const label = `Custom: ${fromStr} to ${toStr}`;
+
+    const dateText = document.getElementById("header-date-text");
+    if (dateText) dateText.innerText = label;
+
+    localStorage.setItem("thermal_selected_period", label);
+    localStorage.setItem("thermal_custom_from", fromInput.value);
+    localStorage.setItem("thermal_custom_to", toInput.value);
+
+    showToast(`Querying NASA FIRMS telemetry (${fromStr} to ${toStr})...`, "info");
+
+    try {
+        const count = await syncBackendFirms({ from: fromInput.value, to: toInput.value, label }, false);
+        showToast(`Loaded ${count} Indian thermal sources within custom window!`, "success");
+    } catch (err) {
+        console.error("Custom range sync failed:", err);
+    }
+};
+
 window.selectDatePreset = async function (presetName) {
+    if (presetName === 'Custom Range') {
+        openCustomRangeModal();
+        return;
+    }
+
     const dateText = document.getElementById("header-date-text");
     if (dateText) dateText.innerText = presetName;
 
@@ -476,6 +580,8 @@ window.selectDatePreset = async function (presetName) {
     // Persist to localStorage so page refresh preserves user's chosen view
     localStorage.setItem("thermal_selected_period", presetName);
     localStorage.setItem("thermal_selected_days", String(days));
+    localStorage.removeItem("thermal_custom_from");
+    localStorage.removeItem("thermal_custom_to");
 
     showToast(`Loading satellite data for: ${presetName} (fetching NASA FIRMS ${days}-day telemetry via AI pipeline)...`, "info");
 
@@ -543,6 +649,8 @@ window.manualSyncNasa = async function () {
 
     localStorage.setItem("thermal_selected_period", presetName);
     localStorage.setItem("thermal_selected_days", "1");
+    localStorage.removeItem("thermal_custom_from");
+    localStorage.removeItem("thermal_custom_to");
 
     try {
         const count = await syncBackendFirms(1, true);
@@ -557,21 +665,36 @@ window.manualSyncNasa = async function () {
 };
 
 let activeSyncPromise = null;
-let activeSyncDays = null;
+let activeSyncKey = null;
 let currentSyncAbortController = null;
 
-function syncBackendFirms(days = 1, isManual = false) {
-    const targetDays = parseInt(days || 1, 10);
+function syncBackendFirms(options = 1, isManual = false) {
+    let targetDays = 1;
+    let fromParam = null;
+    let toParam = null;
+    let customLabel = null;
 
-    // 1. Single-Flight Guard: If a sync for the exact same days value is already in-flight, return the existing promise
-    if (activeSyncPromise && activeSyncDays === targetDays) {
-        console.log(`[SingleFlight] In-flight sync for ${targetDays} days already running. Reusing existing request.`);
+    if (typeof options === "object" && options !== null) {
+        targetDays = options.days ? parseInt(options.days, 10) : null;
+        fromParam = options.from || null;
+        toParam = options.to || null;
+        customLabel = options.label || (fromParam ? `Custom Range` : `Past 1 Days`);
+    } else {
+        targetDays = parseInt(options || 1, 10);
+        customLabel = targetDays === 1 ? "Live Satellite Pass (Today)" : `Past ${targetDays} Days`;
+    }
+
+    const flightKey = fromParam ? `range_${fromParam}_${toParam}` : `days_${targetDays}`;
+
+    // 1. Single-Flight Guard: If a sync for the exact same query is already in-flight, return the existing promise
+    if (activeSyncPromise && activeSyncKey === flightKey) {
+        console.log(`[SingleFlight] In-flight sync for ${flightKey} already running. Reusing existing request.`);
         return activeSyncPromise;
     }
 
-    // 2. Abort obsolete requests only if the selected period actually changes
-    if (currentSyncAbortController && activeSyncDays !== targetDays) {
-        console.log(`[SingleFlight] Aborting previous sync (${activeSyncDays} days) for new period (${targetDays} days).`);
+    // 2. Abort obsolete requests only if the selected query actually changes
+    if (currentSyncAbortController && activeSyncKey !== flightKey) {
+        console.log(`[SingleFlight] Aborting previous sync (${activeSyncKey}) for new query (${flightKey}).`);
         try {
             currentSyncAbortController.abort();
         } catch (_) {}
@@ -580,7 +703,7 @@ function syncBackendFirms(days = 1, isManual = false) {
 
     currentSyncAbortController = new AbortController();
     const signal = currentSyncAbortController.signal;
-    activeSyncDays = targetDays;
+    activeSyncKey = flightKey;
 
     const icon = document.getElementById("sync-icon");
     if (icon) icon.classList.add("fa-spin");
@@ -589,10 +712,15 @@ function syncBackendFirms(days = 1, isManual = false) {
     const timeStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + ", " +
                     now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
 
-    setText("nasa-last-update", "Last synced: " + timeStr + (targetDays > 1 ? ` (${targetDays}d window)` : ""));
+    setText("nasa-last-update", "Last synced: " + timeStr + (fromParam ? ` (${fromParam.split('T')[0]} to ${(toParam||'').split('T')[0]})` : (targetDays > 1 ? ` (${targetDays}d window)` : "")));
 
     const apiBase = getApiBase();
-    const url = `${apiBase}/api/v1/firms/sync?days=${targetDays}`;
+    let url = `${apiBase}/api/v1/firms/sync`;
+    if (fromParam) {
+        url += `?from=${encodeURIComponent(fromParam)}&to=${encodeURIComponent(toParam || '')}`;
+    } else {
+        url += `?days=${targetDays}`;
+    }
 
     activeSyncPromise = (async () => {
         try {
@@ -658,35 +786,19 @@ function syncBackendFirms(days = 1, isManual = false) {
             eventsCurrentPage = 1;
             updateDashboard();
 
-            const label = targetDays === 1 ? "Live Satellite Pass (Today)" : `Past ${targetDays} Days`;
-            showToast(`Loaded ${label}: ${allEvents.length} real thermal sources classified by AI!`, "success");
+            showToast(`Loaded ${customLabel}: ${allEvents.length} real thermal sources classified by AI!`, "success");
             return allEvents.length;
         } catch (err) {
             if (err.name === "AbortError") {
-                console.log(`[SingleFlight] Sync for ${targetDays} days aborted.`);
+                console.log(`[SingleFlight] Sync for ${flightKey} aborted.`);
                 return 0;
             }
             console.error("[Live Sync] Backend sync error:", err);
             showToast(`Backend connection failed: ${err.message}`, "error");
-
-            // Never fake or load 563 ground truth on sync failure
-            if (allEvents.length === 0) {
-                setText("stat-total-sources", "--");
-                const alertsList = document.getElementById("recent-alerts-dashboard-list");
-                if (alertsList) {
-                    alertsList.innerHTML = `<div style="text-align: center; color: var(--danger-color); padding: 20px; font-size: 13px;"><i class="fa-solid fa-triangle-exclamation"></i> Telemetry sync failed (${escapeHTML(err.message)}). Ensure backend server is running.</div>`;
-                }
-            }
             throw err;
         } finally {
-            if (activeSyncDays === targetDays) {
-                activeSyncPromise = null;
-                activeSyncDays = null;
-                currentSyncAbortController = null;
-            }
-            if (icon) {
-                setTimeout(() => icon.classList.remove("fa-spin"), 600);
-            }
+            activeSyncPromise = null;
+            if (icon) icon.classList.remove("fa-spin");
         }
     })();
 
@@ -737,6 +849,35 @@ function updateStatCards() {
     setText("sidebar-alert-badge", alertCount.toString());
 }
 
+function getEventPopupContent(ev) {
+    const type = normalizeType(ev.predicted_event_type);
+    const color = getEventColor(type);
+    const risk = getEventRiskLevel(ev);
+    return `
+        <div style="font-family: 'Inter', sans-serif; font-size: 13px; line-height: 1.5; color: #1e293b; min-width: 230px; padding: 2px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                <strong style="font-size: 14px; color: #0f172a;">${escapeHTML(ev.source_id)}</strong>
+                <span style="background: ${color}20; color: ${color}; font-weight: 700; font-size: 11px; padding: 2px 7px; border-radius: 4px;">${escapeHTML(ev.predicted_event_type)}</span>
+            </div>
+            <div style="margin-bottom: 4px;"><strong>Region:</strong> ${escapeHTML(ev.state)}</div>
+            <div style="margin-bottom: 4px;"><strong>Coordinates:</strong> ${ev.latitude.toFixed(4)}, ${ev.longitude.toFixed(4)}</div>
+            <div style="margin-bottom: 4px;"><strong>AI Confidence:</strong> ${ev.confidence}%</div>
+            <div style="margin-bottom: 4px;"><strong>Thermal FRP:</strong> ${ev.mean_frp} MW</div>
+            <div style="margin-bottom: 6px;"><strong>Landcover:</strong> ${escapeHTML(ev.landcover || 'Built-up')}</div>
+            <div style="margin-bottom: 8px;"><strong>Severity Level:</strong> <span class="badge-pill badge-${risk.toLowerCase()}">${risk}</span></div>
+            
+            <div style="display: flex; gap: 6px; margin-top: 8px;">
+                <button class="btn-apply-filters" style="flex: 1; font-size: 11px; height: 28px; padding: 0 6px; background: #ef4444;" onclick="openDispatchModal('${escapeHTML(ev.source_id)}')">
+                    <i class="fa-solid fa-bullhorn"></i> Alert Authority
+                </button>
+                <button class="btn-export-outline" style="font-size: 11px; height: 28px; padding: 0 8px;" onclick="copyEventCoordinates(${ev.latitude}, ${ev.longitude})">
+                    Copy
+                </button>
+            </div>
+        </div>
+    `;
+}
+
 function renderMapMarkers() {
     if (!markersLayer) return;
     markersLayer.clearLayers();
@@ -751,7 +892,6 @@ function renderMapMarkers() {
         const type = normalizeType(ev.predicted_event_type);
         const color = getEventColor(type);
         const radius = ev.mean_frp ? Math.min(9, Math.max(5, Math.round(ev.mean_frp / 6))) : 6;
-        const risk = getEventRiskLevel(ev);
         const isIndustrial = type === "Industrial";
 
         let m;
@@ -765,7 +905,9 @@ function renderMapMarkers() {
             });
             m = L.marker([ev.latitude, ev.longitude], { icon: pulseIcon });
         } else {
+            // High-performance Canvas renderer: prevents thousands of SVG DOM nodes & UI stutter
             m = L.circleMarker([ev.latitude, ev.longitude], {
+                renderer: canvasRenderer,
                 radius: radius,
                 fillColor: color,
                 color: "#ffffff",
@@ -775,31 +917,8 @@ function renderMapMarkers() {
             });
         }
 
-        const popupContent = `
-            <div style="font-family: 'Inter', sans-serif; font-size: 13px; line-height: 1.5; color: #1e293b; min-width: 230px; padding: 2px;">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-                    <strong style="font-size: 14px; color: #0f172a;">${escapeHTML(ev.source_id)}</strong>
-                    <span style="background: ${color}20; color: ${color}; font-weight: 700; font-size: 11px; padding: 2px 7px; border-radius: 4px;">${escapeHTML(ev.predicted_event_type)}</span>
-                </div>
-                <div style="margin-bottom: 4px;"><strong>Region:</strong> ${escapeHTML(ev.state)}</div>
-                <div style="margin-bottom: 4px;"><strong>Coordinates:</strong> ${ev.latitude.toFixed(4)}, ${ev.longitude.toFixed(4)}</div>
-                <div style="margin-bottom: 4px;"><strong>AI Confidence:</strong> ${ev.confidence}%</div>
-                <div style="margin-bottom: 4px;"><strong>Thermal FRP:</strong> ${ev.mean_frp} MW</div>
-                <div style="margin-bottom: 6px;"><strong>Landcover:</strong> ${escapeHTML(ev.landcover || 'Built-up')}</div>
-                <div style="margin-bottom: 8px;"><strong>Severity Level:</strong> <span class="badge-pill badge-${risk.toLowerCase()}">${risk}</span></div>
-                
-                <div style="display: flex; gap: 6px; margin-top: 8px;">
-                    <button class="btn-apply-filters" style="flex: 1; font-size: 11px; height: 28px; padding: 0 6px; background: #ef4444;" onclick="openDispatchModal('${escapeHTML(ev.source_id)}')">
-                        <i class="fa-solid fa-bullhorn"></i> Alert Authority
-                    </button>
-                    <button class="btn-export-outline" style="font-size: 11px; height: 28px; padding: 0 8px;" onclick="copyEventCoordinates(${ev.latitude}, ${ev.longitude})">
-                        Copy
-                    </button>
-                </div>
-            </div>
-        `;
-
-        m.bindPopup(popupContent);
+        // Lazy popup rendering: HTML string evaluated only on click
+        m.bindPopup(() => getEventPopupContent(ev));
         markersLayer.addLayer(m);
     });
 }

@@ -1,4 +1,6 @@
 import math
+import json
+from pathlib import Path
 from typing import List, Dict, Any, Tuple, Optional
 
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -95,6 +97,62 @@ def is_point_in_bbox(lat: float, lon: float, min_lat: float, min_lon: float, max
     """Check if point is inside bounding box."""
     return min_lat <= lat <= max_lat and min_lon <= lon <= max_lon
 
+class IndiaTerritoryFilter:
+    """
+    Authoritative India national boundary polygon filter.
+    Uses Shapely prepared geometry on data/india_boundary.geojson for sub-millisecond point-in-polygon checks.
+    """
+    _instance = None
+    _prepared_geom = None
+    _loaded = False
+
+    @classmethod
+    def get_instance(cls):
+        if cls._instance is None:
+            cls._instance = cls()
+            cls._instance._init_boundary()
+        return cls._instance
+
+    def _init_boundary(self):
+        try:
+            from shapely.geometry import shape
+            from shapely.prepared import prep
+            base_dir = Path(__file__).resolve().parent.parent.parent
+            geojson_path = base_dir / "data" / "india_boundary.geojson"
+            if geojson_path.exists():
+                with open(geojson_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if "features" in data and len(data["features"]) > 0:
+                    geom = shape(data["features"][0]["geometry"])
+                else:
+                    geom = shape(data)
+                self._prepared_geom = prep(geom)
+                self._loaded = True
+                print(f"[OK] Initialized India Territory Boundary Filter ({geojson_path.name})")
+            else:
+                print(f"[WARN] India boundary geojson not found at {geojson_path}")
+        except Exception as e:
+            print(f"[WARN] Failed to load India boundary filter: {e}")
+
+    def is_inside(self, lat: float, lon: float) -> bool:
+        if not self._loaded or self._prepared_geom is None:
+            # Fallback coarse check if boundary geometry is uninitialized
+            return (6.5 <= lat <= 37.5) and (68.0 <= lon <= 97.5)
+        try:
+            from shapely.geometry import Point
+            # GeoJSON coordinates are in [longitude, latitude] order
+            return bool(self._prepared_geom.contains(Point(lon, lat)))
+        except Exception:
+            return (6.5 <= lat <= 37.5) and (68.0 <= lon <= 97.5)
+
+def is_inside_india(lat: float, lon: float) -> bool:
+    """
+    Check whether coordinates fall strictly within India's official territorial boundary.
+    Returns False for points in Pakistan, Nepal, Bhutan, Bangladesh, Myanmar, Sri Lanka,
+    and open oceanic waters outside Indian maritime territory.
+    """
+    return IndiaTerritoryFilter.get_instance().is_inside(lat, lon)
+
 INDIAN_STATE_CENTROIDS = {
     "Andhra Pradesh": (15.9129, 79.7400),
     "Arunachal Pradesh": (28.2180, 94.7278),
@@ -128,7 +186,10 @@ INDIAN_STATE_CENTROIDS = {
     "Jammu and Kashmir": (33.7782, 76.5762),
     "Ladakh": (34.1526, 77.5771),
     "Chandigarh": (30.7333, 76.7794),
-    "Puducherry": (11.9416, 79.8083)
+    "Puducherry": (11.9416, 79.8083),
+    "Andaman and Nicobar Islands": (11.6234, 92.7265),
+    "Lakshadweep": (10.5667, 72.6417),
+    "Dadra and Nagar Haveli and Daman and Diu": (20.4283, 72.8397)
 }
 
 def is_in_water(lat: float, lon: float) -> bool:
@@ -159,20 +220,11 @@ def is_in_water(lat: float, lon: float) -> bool:
 def deduce_indian_state(lat: float, lon: float) -> str:
     """Accurately identify the nearest Indian state or union territory from coordinates."""
     try:
-        if is_in_water(lat, lon):
-            return "Offshore Waters (Marine Body)"
-        if 5.8 <= lat <= 9.9 and 79.5 <= lon <= 82.0:
-            return "Sri Lanka (Non-Indian Region)"
-        if (lat > 28.05 and 88.0 <= lon <= 89.0) or (lat > 32.0 and lon > 78.5) or (lat > 28.5 and lon >= 92.0):
-            return "China / Tibet (Non-Indian Region)"
-        if (23.5 <= lat < 28.0 and lon < 70.2) or (28.0 <= lat < 30.5 and lon < 72.2) or (30.5 <= lat < 35.5 and lon < 74.0):
-            return "Pakistan (Non-Indian Region)"
-        if 21.6 <= lat <= 25.5 and 88.8 <= lon <= 92.6:
-            return "Bangladesh (Non-Indian Region)"
-        if 26.3 <= lat <= 30.5 and 80.0 <= lon <= 88.2:
-            return "Nepal (Non-Indian Region)"
-        if 26.7 <= lat <= 28.3 and 88.8 <= lon <= 92.1:
-            return "Bhutan (Non-Indian Region)"
+        # Check strict territorial containment first
+        if not is_inside_india(lat, lon):
+            if is_in_water(lat, lon):
+                return "Offshore Waters (Marine Body)"
+            return "Non-Indian Region"
 
         best_state = "National"
         min_dist = float("inf")

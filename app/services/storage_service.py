@@ -4,7 +4,7 @@ import pandas as pd
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from collections import defaultdict
-from app.core.spatial_engine import is_point_in_bbox, haversine_distance
+from app.core.spatial_engine import is_point_in_bbox, haversine_distance, is_inside_india, deduce_indian_state
 from app.core.anomaly_detector import evaluate_thermal_risk
 from app.services.osm_service import osm_service
 from app.db.database import db_manager
@@ -66,19 +66,10 @@ STATE_CENTROIDS = {
 STATES_LIST = ALL_INDIAN_STATES
 
 def detect_state_for_coordinates(lat: float, lon: float) -> str:
-    # Check bounding boxes first
-    for s_name, bbox in STATE_CENTROIDS.items():
-        if bbox["lat_min"] <= lat <= bbox["lat_max"] and bbox["lng_min"] <= lon <= bbox["lng_max"]:
-            return s_name
-    # Fallback to nearest centroid
-    best_state = "Odisha"
-    min_d = 999999.0
-    for s_name, bbox in STATE_CENTROIDS.items():
-        d = ((lat - bbox["lat"])**2 + (lon - bbox["lng"])**2)**0.5
-        if d < min_d:
-            min_d = d
-            best_state = s_name
-    return best_state
+    """Accurately identify the Indian state, ensuring coordinates fall inside India's borders."""
+    if not is_inside_india(lat, lon):
+        return "Non-Indian Region"
+    return deduce_indian_state(lat, lon)
 
 class ThermalStorageService:
     def __init__(self):

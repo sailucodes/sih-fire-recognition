@@ -1,18 +1,53 @@
 import os
 import requests
 import datetime
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
+from app.core.spatial_engine import is_inside_india
+
+def parse_flexible_datetime(val: str, default_time: str = "00:00") -> datetime.datetime:
+    """Parse date or datetime string in various standard formats (ISO, space-separated)."""
+    s = str(val).strip().replace("Z", "").replace("T", " ")
+    parts = s.split()
+    if len(parts) == 1:
+        date_part = parts[0]
+        time_part = default_time
+    else:
+        date_part = parts[0]
+        time_part = parts[1]
+    
+    # Ensure time has hour and minute
+    time_sub = time_part.split(":")
+    h = time_sub[0].zfill(2)
+    m = time_sub[1].zfill(2) if len(time_sub) > 1 else "00"
+    s_clean = f"{date_part} {h}:{m}"
+    
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+        try:
+            return datetime.datetime.strptime(s_clean, fmt)
+        except ValueError:
+            continue
+    return datetime.datetime.fromisoformat(val)
 
 class NASAFIRMSService:
     def __init__(self, api_key: Optional[str] = None):
         # Support both NASA_FIRMS_MAP_KEY and NASA_FIRMS_API_KEY environment variables
         self.api_key = api_key or os.environ.get("NASA_FIRMS_MAP_KEY") or os.environ.get("NASA_FIRMS_API_KEY")
-        self._cache: Dict[str, Tuple[float, List[Dict[str, Any]]]] = {}
+        self._cache: Dict[str, Tuple[float, List[Dict[str, Any]], Dict[str, Any]]] = {}
+        self.last_diagnostics: Dict[str, Any] = {}
 
-    def fetch_live_hotspots(self, country_code: str = "IND", days: int = 1, api_key: Optional[str] = None, force_refresh: bool = False) -> List[Dict[str, Any]]:
+    def fetch_live_hotspots(
+        self,
+        country_code: str = "IND",
+        days: int = 1,
+        start_datetime: Optional[str] = None,
+        end_datetime: Optional[str] = None,
+        api_key: Optional[str] = None,
+        force_refresh: bool = False
+    ) -> List[Dict[str, Any]]:
         """
         Fetch real-time and historical active fire anomalies from NASA FIRMS VIIRS.
-        Supports single-day, 7-day, and 30-day historical intervals via date chunking.
+        Supports 1-day, 7-day, 30-day presets as well as custom date/time ranges.
+        Applies strict India territorial boundary filtering BEFORE returning hotspots.
         Deduplicates records across multi-chunk queries and provides short-term caching.
         """
         key = api_key or self.api_key or os.environ.get("NASA_FIRMS_MAP_KEY") or os.environ.get("NASA_FIRMS_API_KEY") or "5aefcf72ba6e780e0e43e3e841af34cb"
@@ -24,24 +59,43 @@ class NASAFIRMSService:
             )
 
         clean_key = key.strip()
-        requested_days = max(1, int(days))
+        now = datetime.datetime.now()
+        today = now.date()
+
+        # Parse date and time boundaries
+        is_custom_range = bool(start_datetime)
+        if is_custom_range:
+            start_dt = parse_flexible_datetime(start_datetime, default_time="00:00")
+            end_dt = parse_flexible_datetime(end_datetime, default_time="23:59") if end_datetime else now
+            if start_dt > end_dt:
+                raise ValueError("start_datetime must be before or equal to end_datetime.")
+            start_date = start_dt.date()
+            end_date = min(today, end_dt.date())
+            days_span = max(1, (end_date - start_date).days + 1)
+            requested_days = days_span
+        else:
+            requested_days = max(1, int(days))
+            start_date = today - datetime.timedelta(days=requested_days - 1)
+            end_date = today
+            start_dt = datetime.datetime.combine(start_date, datetime.time.min)
+            end_dt = datetime.datetime.combine(end_date, datetime.time.max)
 
         # Check cache (valid for 5 minutes)
-        cache_key = f"{country_code}_{requested_days}"
-        now_ts = datetime.datetime.now().timestamp()
+        cache_key = f"{country_code}_{requested_days}_{start_dt.isoformat()}_{end_dt.isoformat()}"
+        now_ts = now.timestamp()
         if not force_refresh and cache_key in self._cache:
-            cache_ts, cached_data = self._cache[cache_key]
+            cache_ts, cached_data, cached_diag = self._cache[cache_key]
             if now_ts - cache_ts < 300:
-                print(f"[FIRMS] Returning {len(cached_data)} cached hotspots for {requested_days} days (age: {int(now_ts - cache_ts)}s)")
+                print(f"[FIRMS] Returning {len(cached_data)} cached hotspots for {cache_key} (age: {int(now_ts - cache_ts)}s)")
+                self.last_diagnostics = cached_diag
                 return cached_data
 
         # Default bounding box for India: West: 68.0, South: 6.5, East: 97.5, North: 37.5
         bbox = "68,6.5,97.5,37.5"
-        today = datetime.date.today()
         raw_csv_texts = []
 
-        if requested_days <= 5:
-            # Single chunk request (NASA allows up to 5 days without date parameter)
+        if not is_custom_range and requested_days <= 5:
+            # Single chunk request for preset 1..5 days
             endpoints = [
                 f"https://firms.modaps.eosdis.nasa.gov/api/area/csv/{clean_key}/VIIRS_SNPP_NRT/{bbox}/{requested_days}",
                 f"https://firms.modaps.eosdis.nasa.gov/api/area/csv/{clean_key}/VIIRS_NOAA21_NRT/{bbox}/{requested_days}"
@@ -64,13 +118,12 @@ class NASAFIRMSService:
                 raise RuntimeError(last_err or "Unable to retrieve hotspot data from NASA FIRMS.")
             raw_csv_texts.append(resp.text)
         else:
-            # Multi-chunk request for 7 days, 30 days, etc.
-            # NASA FIRMS Near Real-Time allows chunks of 1..5 days anchored by start date:
+            # Multi-chunk request for 7 days, 30 days, or custom date range
+            # NASA FIRMS allows chunks of 1..5 days anchored by start date:
             # /api/area/csv/[KEY]/[SOURCE]/[BBOX]/[CHUNK_DAYS]/[START_DATE]
-            start_date = today - datetime.timedelta(days=requested_days - 1)
             curr = start_date
-            while curr <= today:
-                days_left = (today - curr).days + 1
+            while curr <= end_date:
+                days_left = (end_date - curr).days + 1
                 chunk_days = min(5, days_left)
                 url = f"https://firms.modaps.eosdis.nasa.gov/api/area/csv/{clean_key}/VIIRS_SNPP_NRT/{bbox}/{chunk_days}/{curr}"
                 try:
@@ -88,9 +141,13 @@ class NASAFIRMSService:
         if not raw_csv_texts:
             raise RuntimeError("Unable to retrieve historical hotspot data from NASA FIRMS.")
 
-        # Parse and deduplicate all CSV chunks
+        # Parse, time-filter, deduplicate, and apply strict India territorial boundary
         seen_keys = set()
         results = []
+        raw_firms_count = 0
+        inside_india_count = 0
+        outside_india_removed = 0
+        outside_time_window_count = 0
 
         for csv_text in raw_csv_texts:
             lines = csv_text.strip().split("\n")
@@ -106,11 +163,30 @@ class NASAFIRMSService:
                         lon = float(d.get("longitude", 0))
                         acq_date = d.get("acq_date", today.isoformat())
                         acq_time = d.get("acq_time", "1200")
+                        raw_firms_count += 1
+
+                        # Timestamp filtering for exact time window
+                        time_str = str(acq_time).strip().zfill(4)
+                        try:
+                            det_dt = datetime.datetime.strptime(f"{acq_date} {time_str[:2]}:{time_str[2:]}", "%Y-%m-%d %H:%M")
+                            if det_dt < start_dt or det_dt > end_dt:
+                                outside_time_window_count += 1
+                                continue
+                        except Exception:
+                            pass
+
+                        # Deduplicate across multiple query chunks
                         dedup_key = (round(lat, 4), round(lon, 4), acq_date, acq_time)
                         if dedup_key in seen_keys:
                             continue
                         seen_keys.add(dedup_key)
 
+                        # Strict India territorial boundary check BEFORE clustering or returning
+                        if not is_inside_india(lat, lon):
+                            outside_india_removed += 1
+                            continue
+
+                        inside_india_count += 1
                         results.append({
                             "latitude": lat,
                             "longitude": lon,
@@ -125,8 +201,19 @@ class NASAFIRMSService:
                     except (ValueError, TypeError):
                         continue
 
-        # Save to cache
-        self._cache[cache_key] = (now_ts, results)
+        # Save diagnostics and cache
+        diagnostics = {
+            "raw_firms_count": raw_firms_count,
+            "inside_india_count": inside_india_count,
+            "outside_india_removed": outside_india_removed,
+            "outside_time_window_count": outside_time_window_count,
+            "start_datetime": start_dt.isoformat(),
+            "end_datetime": end_dt.isoformat(),
+            "calendar_days_covered": requested_days
+        }
+        self.last_diagnostics = diagnostics
+        self._cache[cache_key] = (now_ts, results, diagnostics)
+        print(f"[FIRMS] Sync complete: {raw_firms_count} raw NASA detections -> {inside_india_count} inside India ({outside_india_removed} foreign/offshore discarded)")
         return results
 
     def _generate_simulated_firms_data(self) -> List[Dict[str, Any]]:
