@@ -1,5 +1,36 @@
+import logging
+from pathlib import Path
+import numpy as np
 from typing import Dict, Any, List
 from app.core.spatial_engine import find_nearest_facilities
+
+logger = logging.getLogger(__name__)
+
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+GRID_PATH = BASE_DIR / "data" / "india_landcover_1km.npy"
+
+LAT_MIN = 6.0
+LAT_MAX = 38.0
+LON_MIN = 68.0
+LON_MAX = 98.0
+RES = 0.01
+
+_LULC_GRID = None
+
+def _get_lulc_grid():
+    global _LULC_GRID
+    if _LULC_GRID is None:
+        if GRID_PATH.exists():
+            try:
+                _LULC_GRID = np.load(GRID_PATH)
+                logger.info(f"Loaded offline India LULC grid from {GRID_PATH} (shape: {_LULC_GRID.shape})")
+            except Exception as e:
+                logger.error(f"Failed to load India LULC grid from {GRID_PATH}: {e}")
+                _LULC_GRID = False
+        else:
+            logger.warning(f"India LULC grid not found at {GRID_PATH}")
+            _LULC_GRID = False
+    return _LULC_GRID if _LULC_GRID is not False else None
 
 LANDCOVER_MAP = {
     10: ("Tree cover", 0.0, 1.0, 0.0),
@@ -7,19 +38,19 @@ LANDCOVER_MAP = {
     30: ("Grassland", 0.0, 0.0, 0.0),
     40: ("Cropland", 0.0, 0.0, 1.0),
     50: ("Built-up", 1.0, 0.0, 0.0),
-    60: ("Bare / sparse vegetation", 1.0, 0.0, 0.0),
+    60: ("Bare / sparse vegetation", 0.0, 0.0, 0.0),
     80: ("Permanent water bodies", 0.0, 0.0, 0.0),
     90: ("Herbaceous wetland", 0.0, 0.0, 0.0),
-    95: ("Mangroves", 1.0, 1.0, 0.0),
+    95: ("Mangroves", 0.0, 1.0, 0.0),
 }
 
 def infer_landcover(lat: float, lon: float, nearest_facility_dist_km: float = 50.0, explicit_class: str = None) -> Dict[str, Any]:
     """
     Map landcover information for a geospatial coordinate.
-    If explicit landcover classification is provided (e.g. from ESA WorldCover 10m / Copernicus 100m),
-    maps to the standard Copernicus Global Land Service schema.
-    If no explicit satellite landcover raster is present, labels as 'Unclassified' without
-    forcing artificial distance-based proxies (which previously forced all points > 3km to Cropland).
+    1. If explicit landcover classification is provided, maps to the Copernicus schema.
+    2. Otherwise, queries the offline high-resolution India LULC 1km grid (india_landcover_1km.npy).
+    3. If coordinates are out-of-grid, invalid, or outside coverage, falls back to 'Unclassified'
+       with appropriate logging, rather than silently injecting misleading categories.
     """
     if explicit_class:
         for code, (c_name, ind_r, for_r, ag_r) in LANDCOVER_MAP.items():
@@ -39,7 +70,35 @@ def infer_landcover(lat: float, lon: float, nearest_facility_dist_km: float = 50
             "agricultural_land_ratio": 0.0
         }
 
-    # No explicit landcover raster supplied: Return Unclassified without artificial bias
+    # Offline LULC Grid Lookup
+    grid = _get_lulc_grid()
+    if grid is not None:
+        try:
+            lat_f = float(lat)
+            lon_f = float(lon)
+            if LAT_MIN <= lat_f < LAT_MAX and LON_MIN <= lon_f < LON_MAX:
+                row = int((lat_f - LAT_MIN) / RES)
+                col = int((lon_f - LON_MIN) / RES)
+                row = max(0, min(grid.shape[0] - 1, row))
+                col = max(0, min(grid.shape[1] - 1, col))
+                code = int(grid[row, col])
+                if code in LANDCOVER_MAP and code > 0:
+                    c_name, ind_r, for_r, ag_r = LANDCOVER_MAP[code]
+                    return {
+                        "landcover_code": code,
+                        "landcover_class": c_name,
+                        "industrial_land_ratio": ind_r,
+                        "forest_land_ratio": for_r,
+                        "agricultural_land_ratio": ag_r
+                    }
+                else:
+                    logger.debug(f"[LULC] Coordinate ({lat_f}, {lon_f}) has code {code} (outside classified territory/water). Returning Unclassified.")
+            else:
+                logger.warning(f"[LULC] Coordinate ({lat_f}, {lon_f}) out of India grid bounds ({LAT_MIN}-{LAT_MAX}, {LON_MIN}-{LON_MAX}).")
+        except (ValueError, TypeError) as ex:
+            logger.error(f"[LULC] Invalid coordinate ({lat}, {lon}): {ex}")
+
+    # Fallback for unavailable or unclassified coordinates
     return {
         "landcover_code": 0,
         "landcover_class": "Unclassified",

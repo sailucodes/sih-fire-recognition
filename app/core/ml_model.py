@@ -129,7 +129,7 @@ class EventClassifierEngine:
                 mean_ind = float(features_dict.get("mean_distance_industry") or features_dict.get("mean_distance_to_industry_km") or min_ind)
                 fac_1k = float(features_dict.get("mean_industrial_facilities_1km") or 0.0)
                 fac_5k = float(features_dict.get("mean_industrial_facilities_5km") or 0.0)
-                ind_ratio = float(features_dict.get("industrial_land_ratio") or (0.8 if min_ind < 1.5 else 0.0))
+                ind_ratio = float(features_dict.get("industrial_land_ratio") if features_dict.get("industrial_land_ratio") is not None else (0.8 if min_ind < 1.5 else 0.0))
 
                 pers_df = pd.DataFrame([{
                     "mean_frp": m_frp,
@@ -143,10 +143,9 @@ class EventClassifierEngine:
                     "industrial_land_ratio": ind_ratio
                 }])
 
-                pers_pred = int(self.persistence_model.predict(pers_df)[0])
                 pers_probs = self.persistence_model.predict_proba(pers_df)[0]
-                is_persistent = bool(pers_pred == 1)
                 persistence_prob = round(float(pers_probs[1]) * 100, 1)
+                is_persistent = bool(persistence_prob >= 30.0)
             except Exception as pe:
                 print(f"Stage-2 persistence inference exception: {pe}")
 
@@ -258,7 +257,7 @@ class EventClassifierEngine:
                     mean_ind = float(f.get("mean_distance_industry") or f.get("mean_distance_to_industry_km") or min_ind)
                     fac_1k = float(f.get("mean_industrial_facilities_1km") or 0.0)
                     fac_5k = float(f.get("mean_industrial_facilities_5km") or 0.0)
-                    ind_ratio = float(f.get("industrial_land_ratio") or (0.8 if min_ind < 1.5 else 0.0))
+                    ind_ratio = float(f.get("industrial_land_ratio") if f.get("industrial_land_ratio") is not None else (0.8 if min_ind < 1.5 else 0.0))
                     stage2_rows.append({
                         "mean_frp": m_frp,
                         "max_frp": mx_frp,
@@ -271,11 +270,10 @@ class EventClassifierEngine:
                         "industrial_land_ratio": ind_ratio
                     })
                 pers_df = pd.DataFrame(stage2_rows)
-                pers_preds = self.persistence_model.predict(pers_df)
                 pers_probs_matrix = self.persistence_model.predict_proba(pers_df)
                 for i in range(n):
-                    is_persistents[i] = bool(int(pers_preds[i]) == 1)
                     pers_scores[i] = round(float(pers_probs_matrix[i][1]) * 100, 1)
+                    is_persistents[i] = bool(pers_scores[i] >= 30.0)
             except Exception as pe:
                 print(f"Batch Stage-2 persistence inference exception: {pe}")
 
