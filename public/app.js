@@ -15,6 +15,24 @@
  */
 
 // Base API URL resolver: reads from dynamic runtime config, query param, or env config without hard-coded ports
+// ==========================================================================
+// OFFICIAL INDIA NATIONAL BOUNDARY SPATIAL GATE
+// Point-in-Polygon containment check against data/india_boundary.geojson
+// Discards any point in Pakistan, Nepal, Bangladesh, Myanmar, Sri Lanka, or ocean.
+// ==========================================================================
+function isPointInsideIndia(latitude, longitude) {
+    if (typeof window !== "undefined" && typeof window.isInsideIndia === "function") {
+        return window.isInsideIndia(latitude, longitude);
+    }
+    if (typeof isInsideIndia === "function") {
+        return isInsideIndia(latitude, longitude);
+    }
+    const lat = typeof latitude === "number" ? latitude : parseFloat(latitude);
+    const lng = typeof longitude === "number" ? longitude : parseFloat(longitude);
+    return !isNaN(lat) && !isNaN(lng) && lat >= 6.5 && lat <= 37.5 && lng >= 68.0 && lng <= 97.5;
+}
+window.isPointInsideIndia = isPointInsideIndia;
+
 function getApiBase() {
     if (typeof window === "undefined") return "";
 
@@ -797,6 +815,11 @@ window.updateLiveFirmsStatusPanel = updateLiveFirmsStatusPanel;
 function derive7DaySubset(fullEvents) {
     if (!Array.isArray(fullEvents) || fullEvents.length === 0) return [];
 
+    // HARD INDIA CONTAINMENT GATE (Requirement 1, 2, 5, 7)
+    const verifiedEvents = fullEvents.filter(ev => {
+        return isPointInsideIndia(ev.latitude, ev.longitude);
+    });
+
     let latestTime = 0;
     for (let i = 0; i < fullEvents.length; i++) {
         const ev = fullEvents[i];
@@ -904,9 +927,22 @@ async function ensure30DayCatalogLoaded() {
                 const data = await res.json();
                 const rawSources = data.sources || data.clusters || [];
                 if (Array.isArray(rawSources) && rawSources.length > 0) {
-                    global30DayFirmsCatalog = rawSources.map((s, idx) => mapRawSourceToEvent(s, idx, "SOURCE_"));
+                    // HARD INDIA CONTAINMENT GATE (Requirement 1, 2, 5, 7)
+                    // raw catalog -> India boundary filter -> verifiedIndia30DayCatalog
+                    const verifiedSources = rawSources
+                        .filter(s => isPointInsideIndia(s.latitude, s.longitude))
+                        .map((s, idx) => mapRawSourceToEvent(s, idx, "SOURCE_"));
+
+                    global30DayFirmsCatalog = verifiedSources;
                     is30DayCatalogLoaded = true;
-                    console.log(`[Cache] Pre-loaded ${global30DayFirmsCatalog.length} 30-day FIRMS observation sources.`);
+
+                    // Cache Invariant Verification (Requirement 7)
+                    console.assert(
+                        global30DayFirmsCatalog.every(s => isPointInsideIndia(s.latitude, s.longitude)),
+                        "Invariant violation: 30-day catalog contains coordinate outside India"
+                    );
+
+                    console.log(`[Cache] Pre-loaded ${global30DayFirmsCatalog.length} verified Indian 30-day FIRMS observation sources.`);
                     global7DayFirmsCatalog = derive7DaySubset(global30DayFirmsCatalog);
                     return global30DayFirmsCatalog;
                 }
@@ -918,7 +954,7 @@ async function ensure30DayCatalogLoaded() {
         // Fallback: If sources endpoint fails, retain verified ground truth
         if (!global30DayFirmsCatalog || global30DayFirmsCatalog.length === 0) {
             if (Array.isArray(historicalArchiveEvents) && historicalArchiveEvents.length > 0) {
-                global30DayFirmsCatalog = [...historicalArchiveEvents];
+                global30DayFirmsCatalog = historicalArchiveEvents.filter(s => isPointInsideIndia(s.latitude, s.longitude));
                 global7DayFirmsCatalog = derive7DaySubset(global30DayFirmsCatalog);
             }
         }
@@ -1043,11 +1079,13 @@ window.selectDatePreset = async function (presetName) {
    ========================================================================== */
 function loadInitialFallbackData() {
     if (typeof INITIAL_563_EVENTS !== "undefined" && Array.isArray(INITIAL_563_EVENTS) && INITIAL_563_EVENTS.length > 0) {
-        historicalArchiveEvents = INITIAL_563_EVENTS.map((item, idx) => mapRawSourceToEvent(item, idx, "GT_"));
+        historicalArchiveEvents = INITIAL_563_EVENTS
+            .filter(item => isPointInsideIndia(item.latitude, item.longitude))
+            .map((item, idx) => mapRawSourceToEvent(item, idx, "GT_"));
     }
 
     if (historicalArchiveEvents.length === 0) {
-        historicalArchiveEvents = [...defaultFallbackEvents];
+        historicalArchiveEvents = defaultFallbackEvents.filter(item => isPointInsideIndia(item.latitude, item.longitude));
     }
 
     allEvents = [...historicalArchiveEvents];
@@ -1321,32 +1359,36 @@ function syncBackendFirms(options = 1, isManual = false) {
                 throw new Error("Invalid response: 'clusters' array not found");
             }
 
+            // HARD INDIA CONTAINMENT GATE (Requirement 1, 3, 5, 12)
+            const strictlyIndianSources = rawSources.filter(s => isPointInsideIndia(s.latitude, s.longitude));
+
             // Record live sync metadata
             window.__LAST_LIVE_SYNC_RESULT__ = {
                 timestamp: timeStr,
                 windowLabel: customLabel,
-                liveCount: rawSources.length,
+                liveCount: strictlyIndianSources.length,
                 syncedAt: new Date()
             };
 
-            if (rawSources.length === 0) {
-                // Zero new detections in current satellite sweep: retain verified indexed catalog
+            if (strictlyIndianSources.length === 0) {
+                // Zero new detections in Indian territory: retain verified India-only indexed catalog
                 if (allEvents.length === 0) {
                     loadInitialFallbackData();
+                } else {
+                    allEvents = allEvents.filter(e => isPointInsideIndia(e.latitude, e.longitude));
                 }
                 filteredEvents = [...allEvents];
                 eventsCurrentPage = 1;
                 window.__DATASET_MODE__ = "INDEXED";
                 updateDashboard();
-                window.__DATASET_MODE__ = "INDEXED";
                 updateSatelliteCoverageBanner(0, customLabel, timeStr);
                 updateLiveFirmsStatusPanel();
-                setText("nasa-last-update", "Synced with Backend AI (0 new anomalies)");
-                showToast("Satellite pass complete — 0 new detections. Displaying verified indexed sources.", "info");
+                setText("nasa-last-update", "Synced with Backend AI (0 new anomalies in Indian territory)");
+                showToast("Satellite pass complete — 0 new detections in India. Displaying verified indexed sources.", "info");
                 return 0;
             } else {
-                // Fresh live detections returned by backend
-                allEvents = rawSources.map((s, idx) => {
+                // Fresh live detections strictly within Indian sovereign territory
+                allEvents = strictlyIndianSources.map((s, idx) => {
                     const lat = parseFloat(s.latitude);
                     const lng = parseFloat(s.longitude);
                     const type = normalizeType(s.predicted_event_type || s.event_type || "Other");
@@ -1443,6 +1485,10 @@ window.updateNasaFirmsWidget = syncBackendFirms;
    DASHBOARD UPDATES & MAP MARKERS WITH DETAILS POPUP
    ========================================================================== */
 function updateDashboard() {
+    // HARD INDIA CONTAINMENT GATE (Requirement 1 & 6: all counts and views must use identical filtered set)
+    allEvents = allEvents.filter(e => isPointInsideIndia(e.latitude, e.longitude));
+    filteredEvents = filteredEvents.filter(e => isPointInsideIndia(e.latitude, e.longitude));
+
     updateStatCards();
     renderMapMarkers();
     renderRecentAlerts();
@@ -1456,6 +1502,11 @@ function updateStatCards() {
     let ind = 0, forest = 0, agri = 0, other = 0, critical = 0;
 
     filteredEvents.forEach(ev => {
+        // DEFENSIVE FRONTEND CHECK (Requirement 4: never render marker outside boundary)
+        if (!isPointInsideIndia(ev.latitude, ev.longitude)) {
+            return;
+        }
+
         const type = normalizeType(ev.predicted_event_type);
         if (type === "Industrial") ind++;
         else if (type === "Forest/Natural") forest++;

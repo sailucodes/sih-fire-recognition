@@ -83,6 +83,10 @@ class ThermalStorageService:
         if db_count > 0:
             db_sources = db_manager.list_all_sources()
             for s in db_sources:
+                lat = float(s.get("latitude", 0.0))
+                lon = float(s.get("longitude", 0.0))
+                if not is_inside_india(lat, lon):
+                    continue
                 s["is_persistent"] = bool(s.get("is_persistent", 0))
                 s["is_flare_anomaly"] = bool(s.get("is_flare_anomaly", 0))
                 s_id = s["source_id"]
@@ -131,6 +135,8 @@ class ThermalStorageService:
             s_id = str(row.get("source_id", f"SOURCE_{idx + 1:04d}")).strip()
             lat = float(row.get("latitude", 0.0))
             lon = float(row.get("longitude", 0.0))
+            if not is_inside_india(lat, lon):
+                continue
             event_type = str(row.get("event_type", "Other"))
             pred_event_type = str(row.get("predicted_event_type", event_type))
             
@@ -257,6 +263,8 @@ class ThermalStorageService:
     ) -> List[Dict[str, Any]]:
         results = []
         for s in self.sources.values():
+            if not is_inside_india(float(s["latitude"]), float(s["longitude"])):
+                continue
             if state and state.upper() != "ALL" and s["state"].lower() != state.lower():
                 continue
             if event_type and event_type.upper() != "ALL" and s["predicted_event_type"].lower() != event_type.lower():
