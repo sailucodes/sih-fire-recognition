@@ -233,6 +233,7 @@ function checkStartupAuthentication() {
 
 document.addEventListener("DOMContentLoaded", async function () {
     try { checkStartupAuthentication(); } catch (e) { console.warn("[Startup] Auth error:", e); }
+    try { applyLanguageTranslations(currentLanguage); } catch (e) { console.warn("[Startup] Language init error:", e); }
     try { restoreThemePreference(); } catch (e) { console.warn("[Startup] Theme error:", e); }
     try { populateRegionFilter(); } catch (e) { console.warn("[Startup] Region error:", e); }
     try { initSmoothLeafletMap(); } catch (e) { console.warn("[Startup] Map error:", e); }
@@ -556,6 +557,354 @@ window.switchView = function (viewId) {
 };
 
 /* ==========================================================================
+   MULTILINGUAL LOCALIZATION & LANGUAGE PICKER (EN, HI, TE, TA, MR)
+   ========================================================================== */
+const SUPPORTED_LANGUAGES = {
+    "en-US": { name: "English", native: "English", flag: "🇬🇧" },
+    "hi-IN": { name: "Hindi", native: "हिन्दी", flag: "🇮🇳" },
+    "te-IN": { name: "Telugu", native: "తెలుగు", flag: "🇮🇳" },
+    "ta-IN": { name: "Tamil", native: "தமிழ்", flag: "🇮🇳" },
+    "mr-IN": { name: "Marathi", native: "मराठी", flag: "🇮🇳" }
+};
+
+const UI_I18N = {
+    "en-US": {
+        navDash: "Dashboard",
+        navPredict: "AI Predictor",
+        navEvents: "Events",
+        navAnalytics: "Analytics",
+        navAlerts: "Alerts",
+        navReports: "Reports",
+        navSettings: "Settings",
+        navLogout: "Logout",
+        searchPlaceholder: "Search location, source ID, coordinates...",
+        liveDataSync: "Live Data Sync",
+        todayPass: "Live Satellite Pass (Today)",
+        past7Days: "Past 7 Days (Indexed FIRMS Data)",
+        past30Days: "Past 30 Days (Full Observation Archive)",
+        priorityAlerts: "Active Priority Alerts",
+        viewAllAlerts: "View All Alerts in Console",
+        kpiTotal: "Total Indexed Sources",
+        kpiInd: "Industrial",
+        kpiForest: "Forest / Natural",
+        kpiAgri: "Agricultural",
+        kpiOther: "Other",
+        kpiCritical: "Critical Alerts",
+        firmsScope: "Showing latest available FIRMS data",
+        firmsObsTime: "Last successful observation:",
+        refreshLive: "Refresh Live",
+        filtersTitle: "Filters",
+        resetFilters: "Reset",
+        filterRegion: "Region / State",
+        filterType: "Classification Type",
+        filterLandcover: "Landcover Type",
+        filterConfidence: "Model Confidence",
+        filterAllTypes: "All Types",
+        filterAllLandcover: "All Landcover",
+        filterAllConf: "All Confidence Levels",
+        actionInspect: "Inspect",
+        actionAlert: "Alert Authority",
+        actionDispatch: "Confirm & Dispatch",
+        actionExportCsv: "Export CSV",
+        actionDownloadReport: "Download Report",
+        dispatchTitle: "Emergency Authority Dispatch",
+        dispatchSubtitle: "Route verified satellite anomaly to designated state responder",
+        recentAlertsTitle: "Active Priority Alerts",
+        settingsTitle: "System Settings",
+        settingsSubtitle: "Manage operator profile, system preferences, notification routing, and display theme",
+        tabProfile: "Profile",
+        tabPreferences: "Preferences",
+        tabNotifications: "Notifications",
+        tabAppearance: "Appearance",
+        prefLangLabel: "Interface Display Language",
+        prefLangDesc: "Language applied across all GIS dashboards, reports, and alerts",
+        savePrefs: "Save Preferences"
+    },
+    "hi-IN": {
+        navDash: "डैशबोर्ड",
+        navPredict: "एआई प्रेडिक्टर",
+        navEvents: "इवेंट्स डेटाबेस",
+        navAnalytics: "एनालिटिक्स",
+        navAlerts: "अलर्ट्स",
+        navReports: "रिपोर्ट्स",
+        navSettings: "सेटिंग्स",
+        navLogout: "लॉगआउट",
+        searchPlaceholder: "स्थान, स्रोत आईडी, निर्देशांक खोजें...",
+        liveDataSync: "लाइव डेटा सिंक",
+        todayPass: "लाइव उपग्रह पास (आज)",
+        past7Days: "पिछले 7 दिन (फर्म्स डेटा)",
+        past30Days: "पिछले 30 दिन (पूर्ण अवलोकन पुरालेख)",
+        priorityAlerts: "सक्रिय प्राथमिकता अलर्ट",
+        viewAllAlerts: "कंसोल में सभी अलर्ट देखें",
+        kpiTotal: "कुल अनुक्रमित स्रोत",
+        kpiInd: "औद्योगिक आग",
+        kpiForest: "जंगल / दावानल",
+        kpiAgri: "कृषि पराली दहन",
+        kpiOther: "अन्य / सामान्य",
+        kpiCritical: "गंभीर आपातकालीन अलर्ट",
+        firmsScope: "नवीनतम उपलब्ध FIRMS डेटा प्रदर्शित",
+        firmsObsTime: "अंतिम सफल अवलोकन:",
+        refreshLive: "लाइव रीफ्रेश करें",
+        filtersTitle: "फ़िल्टर",
+        resetFilters: "रीसेट",
+        filterRegion: "क्षेत्र / राज्य",
+        filterType: "वर्गीकरण प्रकार",
+        filterLandcover: "भूमि आवरण का प्रकार",
+        filterConfidence: "मॉडल विश्वास",
+        filterAllTypes: "सभी प्रकार",
+        filterAllLandcover: "सभी भूमि आवरण",
+        filterAllConf: "सभी स्तर",
+        actionInspect: "निरीक्षण करें",
+        actionAlert: "अधिकारी को अलर्ट करें",
+        actionDispatch: "पुष्टि करें और भेजें",
+        actionExportCsv: "सीएसवी निर्यात",
+        actionDownloadReport: "रिपोर्ट डाउनलोड",
+        dispatchTitle: "आपातकालीन प्राधिकरण प्रेषण",
+        dispatchSubtitle: "नामित राज्य प्रतिक्रिया दल को उपग्रह अलर्ट भेजें",
+        recentAlertsTitle: "सक्रिय प्राथमिकता अलर्ट",
+        settingsTitle: "सिस्टम सेटिंग्स",
+        settingsSubtitle: "ऑपरेटर प्रोफ़ाइल, प्राथमिकताएं और भाषा प्रबंधित करें",
+        tabProfile: "प्रोफ़ाइल",
+        tabPreferences: "प्राथमिकताएं",
+        tabNotifications: "सूचनाएं",
+        tabAppearance: "दिखावट",
+        prefLangLabel: "इंटरफ़ेस प्रदर्शन भाषा",
+        prefLangDesc: "सभी जीआईएस डैशबोर्ड, रिपोर्ट और अलर्ट पर लागू भाषा",
+        savePrefs: "प्राथमिकताएं सहेजें"
+    },
+    "te-IN": {
+        navDash: "డాష్‌బోర్డ్",
+        navPredict: "AI ప్రిడిక్టర్",
+        navEvents: "ఈవెంట్‌లు",
+        navAnalytics: "అనలిటిక్స్",
+        navAlerts: "హెచ్చరికలు",
+        navReports: "నివేదికలు",
+        navSettings: "సెట్టింగ్‌లు",
+        navLogout: "లాగ్అవుట్",
+        searchPlaceholder: "లొకేషన్, సోర్స్ ID, అక్షాంశాలను శోధించండి...",
+        liveDataSync: "లైవ్ డేటా సింక్",
+        todayPass: "లైవ్ శాటిలైట్ పాస్ (ఈరోజు)",
+        past7Days: "గత 7 రోజులు (FIRMS డేటా)",
+        past30Days: "గత 30 రోజులు (పూర్తి ఆర్కైవ్)",
+        priorityAlerts: "క్రియాశీల ప్రాధాన్యత హెచ్చరికలు",
+        viewAllAlerts: "కన్సోల్‌లో అన్ని హెచ్చరికలను చూడండి",
+        kpiTotal: "మొత్తం ఇండెక్స్డ్ వనరులు",
+        kpiInd: "పారిశ్రామిక మంటలు",
+        kpiForest: "అడవి / దావానలాలు",
+        kpiAgri: "వ్యవసాయ మంటలు",
+        kpiOther: "ఇతర / పర్యవేక్షణ",
+        kpiCritical: "తీవ్రమైన హెచ్చరికలు",
+        firmsScope: "తాజా అందుబాటులో ఉన్న FIRMS డేటా",
+        firmsObsTime: "చివరి విజయవంతమైన పరిశీలన:",
+        refreshLive: "లైవ్ రిఫ్రెష్",
+        filtersTitle: "ఫిల్టర్లు",
+        resetFilters: "రీసెట్",
+        filterRegion: "ప్రాంతం / రాష్ట్రం",
+        filterType: "వర్గీకరణ రకం",
+        filterLandcover: "భూమి కవరేజ్ రకం",
+        filterConfidence: "మోడల్ విశ్వసనీయత",
+        filterAllTypes: "అన్ని రకాలు",
+        filterAllLandcover: "అన్ని భూ కవరేజ్",
+        filterAllConf: "అన్ని స్థాయిలు",
+        actionInspect: "పరిశీలించండి",
+        actionAlert: "అధికారులను అప్రమత్తం చేయండి",
+        actionDispatch: "నిర్ధారించి పంపండి",
+        actionExportCsv: "CSV డౌన్‌లోడ్",
+        actionDownloadReport: "నివేదిక డౌన్‌లోడ్",
+        dispatchTitle: "అత్యవసర అధికార పంపకం",
+        dispatchSubtitle: "నిర్దేశిత రాష్ట్ర ప్రతిస్పందన విభాగానికి ఉపగ్రహ సమాచారాన్ని పంపండి",
+        recentAlertsTitle: "యాక్టివ్ ప్రాధాన్యత హెచ్చరికలు",
+        settingsTitle: "సిస్టమ్ సెట్టింగ్‌లు",
+        settingsSubtitle: "ఆపరేటర్ ప్రొఫైల్, ప్రాధాన్యతలు మరియు భాషను నిర్వహించండి",
+        tabProfile: "ప్రొఫైల్",
+        tabPreferences: "ప్రాధాన్యతలు",
+        tabNotifications: "నోటిఫికేషన్‌లు",
+        tabAppearance: "రూపురేఖలు",
+        prefLangLabel: "ఇంటర్‌ఫేస్ భాష",
+        prefLangDesc: "GIS డాష్‌బోర్డ్‌లు, నివేదికలు మరియు హెచ్చరికలలో ఉపయోగించబడే భాష",
+        savePrefs: "ప్రాధాన్యతలను సేవ్ చేయండి"
+    },
+    "ta-IN": {
+        navDash: "டாஷ்போர்டு",
+        navPredict: "AI கணிப்பாளர்",
+        navEvents: "நிகழ்வுகள்",
+        navAnalytics: "பகுப்பாய்வு",
+        navAlerts: "எச்சரிக்கைகள்",
+        navReports: "அறிக்கைகள்",
+        navSettings: "அமைப்புகள்",
+        navLogout: "வெளியேறு",
+        searchPlaceholder: "இடம், மூல ஐடி, ஆயங்களை தேடுங்கள்...",
+        liveDataSync: "நேரலை தரவு ஒத்திசைவு",
+        todayPass: "நேரலை செயற்கைக்கோள் பாஸ் (இன்று)",
+        past7Days: "கடந்த 7 நாட்கள் (FIRMS தரவு)",
+        past30Days: "கடந்த 30 நாட்கள் (முழு காப்பகம்)",
+        priorityAlerts: "செயலில் உள்ள முக்கிய எச்சரிக்கைகள்",
+        viewAllAlerts: "அனைத்து எச்சரிக்கைகளையும் காண்க",
+        kpiTotal: "மொத்த குறியீட்டு ஆதாரங்கள்",
+        kpiInd: "தொழில்துறை தீ",
+        kpiForest: "காட்டுத்தீ / இயற்கை",
+        kpiAgri: "விவசாயக் கழிவு தீ",
+        kpiOther: "பிற / கண்காணிக்கப்பட்டது",
+        kpiCritical: "அவசர எச்சரிக்கைகள்",
+        firmsScope: "சமீபத்திய FIRMS தரவு காட்டப்படுகிறது",
+        firmsObsTime: "கடைசி கண்காணிப்பு நேரம்:",
+        refreshLive: "நேரலை புதுப்பி",
+        filtersTitle: "வடிப்பான்கள்",
+        resetFilters: "மீட்டமை",
+        filterRegion: "மண்டலம் / மாநிலம்",
+        filterType: "வகைப்பாடு",
+        filterLandcover: "நிலப்பரப்பு வகை",
+        filterConfidence: "மாதிரி நம்பிக்கை",
+        filterAllTypes: "அனைத்து வகைகள்",
+        filterAllLandcover: "அனைத்து நிலப்பரப்பு",
+        filterAllConf: "அனைத்து நிலைகள்",
+        actionInspect: "ஆய்வு செய்",
+        actionAlert: "அதிகாரியை எச்சரி",
+        actionDispatch: "உறுதிசெய்து அனுப்பு",
+        actionExportCsv: "CSV ஏற்றுமதி",
+        actionDownloadReport: "அறிக்கையை பதிவிறக்கு",
+        dispatchTitle: "அவசர அதிகாரி அனுப்பல்",
+        dispatchSubtitle: "சரிபார்க்கப்பட்ட செயற்கைக்கோள் எச்சரிக்கையை அனுப்பவும்",
+        recentAlertsTitle: "செயலில் உள்ள முக்கிய எச்சரிக்கைகள்",
+        settingsTitle: "அமைப்பு அமைப்புகள்",
+        settingsSubtitle: "சுயவிவரம், விருப்பத்தேர்வுகள் மற்றும் மொழியை நிர்வகிக்கவும்",
+        tabProfile: "சுயவிவரம்",
+        tabPreferences: "விருப்பத்தேர்வுகள்",
+        tabNotifications: "அறிவிப்புகள்",
+        tabAppearance: "தோற்றம்",
+        prefLangLabel: "இடைமுக காட்சி மொழி",
+        prefLangDesc: "டாஷ்போர்டுகள் மற்றும் எச்சரிக்கைகளில் பயன்படுத்தப்படும் மொழி",
+        savePrefs: "விருப்பங்களைச் சேமி"
+    },
+    "mr-IN": {
+        navDash: "डॅशबोर्ड",
+        navPredict: "एआय प्रेडिक्टर",
+        navEvents: "इव्हेंट्स डेटाबेस",
+        navAnalytics: "विश्लेषण",
+        navAlerts: "इशारे",
+        navReports: "अहवाल",
+        navSettings: "सेटिंग्ज",
+        navLogout: "लॉगआउट",
+        searchPlaceholder: "स्थान, स्त्रोत आयडी, समन्वय शोधा...",
+        liveDataSync: "थेट डेटा सिंक",
+        todayPass: "थेट उपग्रह पास (आज)",
+        past7Days: "मागील 7 दिवस (FIRMS डेटा)",
+        past30Days: "मागील 30 दिवस (पूर्ण अभिलेख)",
+        priorityAlerts: "सक्रिय प्राधान्य इशारे",
+        viewAllAlerts: "कन्सोलमध्ये सर्व इशारे पहा",
+        kpiTotal: "एकूण अनुक्रमित स्त्रोत",
+        kpiInd: "औद्योगिक आग",
+        kpiForest: "जंगलातील वणवा",
+        kpiAgri: "शेतीतील आग",
+        kpiOther: "इतर / निरीक्षण",
+        kpiCritical: "तातडीचे इशारे",
+        firmsScope: "नवीनतम उपलब्ध FIRMS डेटा दर्शवत आहे",
+        firmsObsTime: "शेवटची यशस्वी नोंद:",
+        refreshLive: "थेट रीफ्रेश करा",
+        filtersTitle: "फिल्टर्स",
+        resetFilters: "रीसेट",
+        filterRegion: "प्रदेश / राज्य",
+        filterType: "वर्गीकरण प्रकार",
+        filterLandcover: "जमिनीचा प्रकार",
+        filterConfidence: "मॉडेल विश्वास",
+        filterAllTypes: "सर्व प्रकार",
+        filterAllLandcover: "सर्व जमीन प्रकार",
+        filterAllConf: "सर्व पातळ्या",
+        actionInspect: "तपासा",
+        actionAlert: "अधिकाऱ्यांना कळवा",
+        actionDispatch: "पुष्टी करा आणि पाठवा",
+        actionExportCsv: "CSV निर्यात",
+        actionDownloadReport: "अहवाल डाउनलोड",
+        dispatchTitle: "आपत्कालीन प्राधिकरण प्रेषण",
+        dispatchSubtitle: "नियुक्त राज्य आपत्कालीन दलाला उपग्रह इशारा पाठवा",
+        recentAlertsTitle: "सक्रिय प्राधान्य इशारे",
+        settingsTitle: "प्रणाली सेटिंग्ज",
+        settingsSubtitle: "ऑपरेटर प्रोफाइल, प्राधान्ये आणि भाषा व्यवस्थापित करा",
+        tabProfile: "प्रोफाइल",
+        tabPreferences: "प्राधान्ये",
+        tabNotifications: "सूचना",
+        tabAppearance: "दिसणे",
+        prefLangLabel: "इंटरफेस भाषा",
+        prefLangDesc: "जीआयएस डॅशबोर्ड, अहवाल आणि इशाऱ्यांसाठी वापरलेली भाषा",
+        savePrefs: "प्राधान्ये जतन करा"
+    }
+};
+
+let currentLanguage = localStorage.getItem("fast_language") || "en-US";
+
+window.toggleLangDropdown = function (event) {
+    if (event) event.stopPropagation();
+    const drop = document.getElementById("header-lang-dropdown");
+    if (drop) drop.classList.toggle("active");
+    const dateDrop = document.getElementById("date-preset-dropdown");
+    if (dateDrop) dateDrop.classList.remove("active");
+    const alertDrop = document.getElementById("header-alert-dropdown");
+    if (alertDrop) alertDrop.classList.remove("active");
+};
+
+window.closeLangDropdown = function () {
+    const drop = document.getElementById("header-lang-dropdown");
+    if (drop) drop.classList.remove("active");
+};
+
+window.selectLanguage = function (langCode) {
+    if (!SUPPORTED_LANGUAGES[langCode]) langCode = "en-US";
+    currentLanguage = langCode;
+    localStorage.setItem("fast_language", langCode);
+
+    const langMeta = SUPPORTED_LANGUAGES[langCode];
+    const headerText = document.getElementById("header-lang-text");
+    if (headerText) {
+        headerText.innerHTML = `${langMeta.flag} ${langMeta.native}`;
+    }
+
+    document.querySelectorAll(".lang-dropdown-option").forEach(opt => opt.classList.remove("selected"));
+    const optPrefix = langCode.split("-")[0];
+    const selectedOpt = document.getElementById(`lang-opt-${optPrefix}`);
+    if (selectedOpt) selectedOpt.classList.add("selected");
+
+    window.closeLangDropdown();
+    applyLanguageTranslations(langCode);
+
+    const prefLangSelect = document.getElementById("pref-interface-language");
+    if (prefLangSelect && prefLangSelect.value !== langCode) {
+        prefLangSelect.value = langCode;
+    }
+
+    showToast(`Language switched to ${langMeta.native} (${langMeta.name})`, "success");
+};
+
+function applyLanguageTranslations(langCode) {
+    const t = UI_I18N[langCode] || UI_I18N["en-US"];
+
+    document.querySelectorAll("[data-i18n]").forEach(el => {
+        const key = el.getAttribute("data-i18n");
+        if (t[key]) el.textContent = t[key];
+    });
+
+    document.querySelectorAll("[data-i18n-placeholder]").forEach(el => {
+        const key = el.getAttribute("data-i18n-placeholder");
+        if (t[key]) el.setAttribute("placeholder", t[key]);
+    });
+
+    const refreshBtn = document.getElementById("btn-firms-refresh");
+    if (refreshBtn) {
+        const span = refreshBtn.querySelector("span");
+        if (span && t["refreshLive"]) span.textContent = t["refreshLive"];
+    }
+
+    const firmsScope = document.getElementById("firms-data-scope-label");
+    if (firmsScope && t["firmsScope"]) firmsScope.textContent = t["firmsScope"];
+
+    const langMeta = SUPPORTED_LANGUAGES[langCode];
+    const headerText = document.getElementById("header-lang-text");
+    if (headerText && langMeta) {
+        headerText.innerHTML = `${langMeta.flag} ${langMeta.native}`;
+    }
+}
+window.applyLanguageTranslations = applyLanguageTranslations;
+
+/* ==========================================================================
    DATE PICKER DROPDOWN & PRESET SELECTION
    ========================================================================== */
 window.toggleDatePresetDropdown = function () {
@@ -567,6 +916,13 @@ window.toggleDatePresetDropdown = function () {
 document.addEventListener("click", function (e) {
     const drop = document.getElementById("date-preset-dropdown");
     const btn = document.getElementById("header-date-picker");
+
+    // Close Language Dropdown
+    const langDrop = document.getElementById("header-lang-dropdown");
+    const langBtn = document.getElementById("header-lang-picker");
+    if (langDrop && langBtn && !langBtn.contains(e.target) && !langDrop.contains(e.target)) {
+        langDrop.classList.remove("active");
+    }
     if (drop && btn && !btn.contains(e.target) && !drop.contains(e.target)) {
         drop.classList.remove("active");
     }

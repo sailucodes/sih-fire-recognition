@@ -300,6 +300,75 @@ h1, h2, h3, h4, h5 {
     color: var(--primary-color);
 }
 
+/* Multilingual Language Picker Button & Dropdown */
+.lang-picker-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 38px;
+    padding: 0 12px;
+    background-color: var(--bg-hover);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    user-select: none;
+}
+
+.lang-picker-btn:hover {
+    background-color: var(--bg-active);
+    color: var(--primary-color);
+}
+
+.lang-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 200px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    padding: 6px 0;
+    z-index: 1200;
+    display: none;
+}
+
+.lang-dropdown-menu.active {
+    display: block;
+}
+
+.lang-dropdown-option {
+    padding: 9px 16px;
+    font-size: 13px;
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: background 0.15s, color 0.15s;
+}
+
+.lang-dropdown-option:hover {
+    background: var(--bg-hover);
+    color: var(--primary-color);
+}
+
+.lang-dropdown-option.selected {
+    font-weight: 700;
+    color: var(--primary-color);
+    background: var(--primary-light);
+}
+
+.lang-flag {
+    font-size: 15px;
+    line-height: 1;
+}
+
 /* Dark Mode Toggle Button */
 .theme-toggle-btn {
     width: 38px;
