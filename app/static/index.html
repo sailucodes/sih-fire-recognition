@@ -290,7 +290,7 @@
                             </div>
                         </div>
                         <div class="satellite-banner-actions">
-                            <button class="satellite-banner-btn" onclick="syncBackendFirms(7)">
+                            <button class="satellite-banner-btn" onclick="syncBackendFirms(7, true)">
                                 <i class="fa-solid fa-rotate"></i> Sync 7-Day Window
                             </button>
                         </div>
@@ -302,34 +302,33 @@
                         <div class="map-column-container" id="map-col-wrapper">
                             <div id="map"></div>
 
-                            <!-- Compact Floating Layer Selector Dropdown -->
-                            <div class="compact-layer-control" id="compact-layer-control">
-                                <button class="compact-layer-btn" id="compact-layer-btn" onclick="toggleCompactLayerMenu(event)" title="Select Basemap Layer">
+                            <!-- Floating Map Controls (Right Side) -->
+                            <div class="floating-map-controls">
+                                <button class="map-control-btn" id="map-layer-btn" onclick="toggleMapLayerMenu(event)" title="Basemap Layers">
                                     <i class="fa-solid fa-layer-group"></i>
-                                    <span id="compact-layer-label">Standard Map</span>
-                                    <i class="fa-solid fa-chevron-down compact-chevron"></i>
                                 </button>
-                                <div class="compact-layer-menu" id="compact-layer-menu">
-                                    <div class="compact-layer-option active" id="compact-opt-standard" onclick="selectCompactBaseLayer('standard')">
-                                        <i class="fa-solid fa-map"></i> Standard Map
+                                <button class="map-control-btn" onclick="mapZoomIn()" title="Zoom In"><i class="fa-solid fa-plus"></i></button>
+                                <button class="map-control-btn" onclick="mapZoomOut()" title="Zoom Out"><i class="fa-solid fa-minus"></i></button>
+                                <button class="map-control-btn" onclick="mapResetView()" title="Locate / Reset View"><i class="fa-solid fa-crosshairs"></i></button>
+
+                                <!-- Compact Floating Layer Menu with checkmarks -->
+                                <div class="floating-layer-menu" id="floating-layer-menu" onclick="event.stopPropagation()">
+                                    <div class="layer-menu-item active" id="layer-opt-standard" onclick="setMapBaseLayer('standard')">
+                                        <span class="layer-item-check"><i class="fa-solid fa-check"></i></span>
+                                        <span class="layer-item-name">Standard Map</span>
                                     </div>
-                                    <div class="compact-layer-option" id="compact-opt-satellite" onclick="selectCompactBaseLayer('satellite')">
-                                        <i class="fa-solid fa-satellite"></i> Satellite
+                                    <div class="layer-menu-item" id="layer-opt-satellite" onclick="setMapBaseLayer('satellite')">
+                                        <span class="layer-item-check"><i class="fa-solid fa-check"></i></span>
+                                        <span class="layer-item-name">Satellite</span>
                                     </div>
-                                    <div class="compact-layer-option" id="compact-opt-dark" onclick="selectCompactBaseLayer('dark')">
-                                        <i class="fa-solid fa-moon"></i> Dark GIS
+                                    <div class="layer-menu-item" id="layer-opt-dark" onclick="setMapBaseLayer('dark')">
+                                        <span class="layer-item-check"><i class="fa-solid fa-check"></i></span>
+                                        <span class="layer-item-name">Dark GIS</span>
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Floating Zoom & Reset Map Controls -->
-                            <div class="floating-map-controls">
-                                <button class="map-control-btn" onclick="mapZoomIn()" title="Zoom In"><i class="fa-solid fa-plus"></i></button>
-                                <button class="map-control-btn" onclick="mapZoomOut()" title="Zoom Out"><i class="fa-solid fa-minus"></i></button>
-                                <button class="map-control-btn" onclick="mapResetView()" title="Locate / Reset View"><i class="fa-solid fa-crosshairs"></i></button>
-                            </div>
-
-                            <!-- Compact Floating Classification Legend -->
+                            <!-- Compact Floating Classification Legend (Bottom Left) -->
                             <div class="floating-map-legend compact-map-legend">
                                 <div class="compact-legend-items">
                                     <div class="compact-legend-chip"><span class="legend-color-dot industrial"></span> Industrial</div>
@@ -660,7 +659,7 @@
                 </section>
 
                 <!-- ==============================================================
-                     6. REPORTS VIEW
+                     6. REPORTS VIEW (F.A.S.T. INTELLIGENCE CONSOLE)
                      ============================================================== -->
                 <section id="reports-section" class="view-section">
                     <div style="margin-bottom: 20px;">
@@ -668,42 +667,126 @@
                         <p style="font-size: 13.5px; color: var(--text-muted);">Generate, view, and export compliance and emergency briefing documents</p>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
-                        <!-- Report Generator Form -->
-                        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 24px; box-shadow: var(--shadow-sm);">
-                            <h3 style="font-size: 16px; margin-bottom: 16px;">Generate New Report</h3>
-                            <div class="filters-form-grid">
-                                <div class="filter-field-group">
-                                    <label>Report Scope / Type</label>
-                                    <select id="report-type-select">
+                    <div class="reports-console-grid">
+                        <!-- Left: Report Generation Console -->
+                        <div class="report-console-card">
+                            <div class="report-console-header">
+                                <i class="fa-solid fa-file-shield" style="color: var(--primary-color);"></i>
+                                <span>REPORT GENERATION</span>
+                            </div>
+
+                            <div class="report-console-form">
+                                <div class="report-field-row">
+                                    <label class="report-field-label">Report type</label>
+                                    <select id="report-type-select" class="report-select-input">
+                                        <option value="Incident Report">Incident Report</option>
                                         <option value="National Thermal Overview">National Thermal Overview</option>
                                         <option value="Industrial High-Persistence Audit">Industrial High-Persistence Audit</option>
                                         <option value="Forest Fire Early Warning Summary">Forest Fire Early Warning Summary</option>
                                         <option value="Agricultural Crop Residue Assessment">Agricultural Crop Residue Assessment</option>
                                     </select>
                                 </div>
-                                <div class="filter-field-group">
-                                    <label>Date Range</label>
-                                    <input type="text" id="report-date-range" value="27 Aug 2025 - 27 Aug 2025">
+
+                                <div class="report-field-row">
+                                    <label class="report-field-label">Date range</label>
+                                    <div class="report-date-inputs">
+                                        <input type="datetime-local" id="report-date-from" class="report-date-input">
+                                        <span style="color: var(--text-muted);">&rarr;</span>
+                                        <input type="datetime-local" id="report-date-to" class="report-date-input">
+                                    </div>
                                 </div>
-                                <div class="filter-field-group">
-                                    <label>Format</label>
-                                    <select id="report-format-select">
-                                        <option value="PDF">Interactive PDF Report</option>
-                                        <option value="CSV">Comma Separated Values (CSV)</option>
+
+                                <div class="report-field-row">
+                                    <label class="report-field-label">Classification</label>
+                                    <select id="report-class-select" class="report-select-input">
+                                        <option value="all">All Types</option>
+                                        <option value="Industrial">Industrial</option>
+                                        <option value="Forest / Natural">Forest / Natural</option>
+                                        <option value="Agricultural">Agricultural</option>
+                                        <option value="Other">Other</option>
                                     </select>
                                 </div>
-                                <button class="btn-apply-filters" style="margin-top: 10px;" onclick="generateAndOpenReport()">
-                                    <i class="fa-solid fa-file-circle-check" style="margin-right: 6px;"></i> Generate & View Report
+
+                                <div class="report-field-row">
+                                    <label class="report-field-label">Region</label>
+                                    <select id="report-region-select" class="report-select-input">
+                                        <option value="all">All India</option>
+                                    </select>
+                                </div>
+
+                                <div class="report-field-row">
+                                    <label class="report-field-label">Include:</label>
+                                    <div class="report-checkbox-group">
+                                        <label class="report-checkbox-label"><input type="checkbox" id="rep-inc-class" checked> <span>Event classification</span></label>
+                                        <label class="report-checkbox-label"><input type="checkbox" id="rep-inc-landcover" checked> <span>Landcover</span></label>
+                                        <label class="report-checkbox-label"><input type="checkbox" id="rep-inc-proximity" checked> <span>Industrial proximity</span></label>
+                                        <label class="report-checkbox-label"><input type="checkbox" id="rep-inc-persistence" checked> <span>Persistence</span></label>
+                                        <label class="report-checkbox-label"><input type="checkbox" id="rep-inc-snapshot" checked> <span>Map snapshot</span></label>
+                                    </div>
+                                </div>
+
+                                <button class="btn-generate-report" onclick="generateIncidentIntelligenceReport()">
+                                    <i class="fa-solid fa-file-lines" style="margin-right: 6px;"></i> Generate Report
                                 </button>
                             </div>
                         </div>
 
-                        <!-- Recent Reports List -->
-                        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 24px; box-shadow: var(--shadow-sm);">
-                            <h3 style="font-size: 16px; margin-bottom: 16px;">Recent Reports Library</h3>
-                            <div class="recent-alerts-list" id="recent-reports-list-container">
-                                <!-- Populated dynamically -->
+                        <!-- Right: Generated Report Intelligence Card -->
+                        <div class="report-preview-card" id="report-intelligence-card">
+                            <div class="report-preview-branding">
+                                <div class="report-preview-logo">
+                                    <i class="fa-solid fa-fire-flame-curved" style="color: #ef4444; font-size: 20px;"></i>
+                                    <div>
+                                        <strong style="font-size: 15px; display: block; color: var(--text-primary);">F.A.S.T.</strong>
+                                        <span style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Fire Alert & Safety Technology</span>
+                                    </div>
+                                </div>
+                                <span class="report-status-badge" id="report-status-pill">OFFICIAL BRIEF</span>
+                            </div>
+
+                            <div class="report-preview-title-box">
+                                <h3 class="report-preview-heading">THERMAL EVENT INTELLIGENCE REPORT</h3>
+                                <span class="report-preview-sub" id="rep-card-generated-time">Generated on Live Telemetry Catalog</span>
+                            </div>
+
+                            <div class="report-summary-metrics-grid">
+                                <div class="report-metric-tile">
+                                    <span class="report-tile-label">Period</span>
+                                    <strong class="report-tile-val" id="rep-card-period">Live 24h Window</strong>
+                                </div>
+                                <div class="report-metric-tile">
+                                    <span class="report-tile-label">Sources Analyzed</span>
+                                    <strong class="report-tile-val" id="rep-card-sources">563</strong>
+                                </div>
+                                <div class="report-metric-tile">
+                                    <span class="report-tile-label">Industrial Events</span>
+                                    <strong class="report-tile-val" id="rep-card-ind" style="color: #ef4444;">126</strong>
+                                </div>
+                                <div class="report-metric-tile">
+                                    <span class="report-tile-label">Forest / Natural</span>
+                                    <strong class="report-tile-val" id="rep-card-forest" style="color: #10b981;">287</strong>
+                                </div>
+                                <div class="report-metric-tile">
+                                    <span class="report-tile-label">Agricultural</span>
+                                    <strong class="report-tile-val" id="rep-card-agri" style="color: #eab308;">128</strong>
+                                </div>
+                                <div class="report-metric-tile">
+                                    <span class="report-tile-label">Other</span>
+                                    <strong class="report-tile-val" id="rep-card-other" style="color: #8b5cf6;">22</strong>
+                                </div>
+                                <div class="report-metric-tile" style="grid-column: span 2;">
+                                    <span class="report-tile-label">Persistent Sources</span>
+                                    <strong class="report-tile-val" id="rep-card-persistent">193 Verified Emitters</strong>
+                                </div>
+                            </div>
+
+                            <div class="report-preview-actions">
+                                <button class="btn-export-outline" onclick="downloadActiveReport('CSV')">
+                                    <i class="fa-solid fa-file-csv" style="color: #10b981;"></i> Export CSV
+                                </button>
+                                <button class="btn-apply-filters" onclick="downloadActiveReport('PDF')" style="width: auto; padding: 0 16px;">
+                                    <i class="fa-solid fa-file-pdf"></i> Download PDF Brief
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -744,7 +827,7 @@
     </div>
 
     <!-- ==========================================================================
-         EMERGENCY AUTHORITY DISPATCH MODAL
+         EMERGENCY AUTHORITY DISPATCH CONSOLE MODAL
          ========================================================================== -->
     <div class="modal-backdrop-overlay" id="authority-dispatch-modal" onclick="closeDispatchModalOnBackdrop(event)">
         <div class="modal-dialog-box wide dispatch-dialog-card">
@@ -875,7 +958,7 @@
     <div class="auth-overlay-view" id="auth-overlay-view">
         <div class="auth-card-box">
             <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #ef4444, #f97316); color: #ffffff; display: inline-flex; align-items: center; justify-content: center; font-size: 22px; margin-bottom: 14px;">
-                <i class="fa-solid fa-fire-flame-curved"></i>
+                <i class="fa-solid fa-satellite"></i>
             </div>
             <h2 style="font-size: 22px; margin-bottom: 4px;">F.A.S.T. Console</h2>
             <p style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 24px;">Fire Alert & Safety Technology — Indian Sovereign Thermal Intelligence Grid</p>

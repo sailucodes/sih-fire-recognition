@@ -1339,464 +1339,97 @@ body.dark-mode .floating-map-legend {
     }
 }
 
+
 /* ==========================================================================
-   F.A.S.T. M3 UX POLISH ENHANCEMENTS
+   F.A.S.T. ENHANCEMENTS: COMPACT LAYER MENU, ALERTS, REPORTS, & BANNER
    ========================================================================== */
 
-/* Satellite Coverage Status Banner */
-.satellite-coverage-banner {
-    margin-bottom: 14px;
-    padding: 12px 18px;
-    background: var(--bg-surface);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-sm);
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    transition: all 0.25s ease;
-}
-
-.satellite-coverage-banner.zero-sync {
-    background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(59, 130, 246, 0.05) 100%);
-    border-left: 4px solid #f59e0b;
-}
-
-.satellite-coverage-banner.live-active {
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(37, 99, 235, 0.05) 100%);
-    border-left: 4px solid #10b981;
-}
-
-.coverage-banner-left {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    flex: 1;
-    min-width: 260px;
-}
-
-.coverage-banner-headline {
-    font-size: 13.5px;
-    font-weight: 700;
-    color: var(--text-primary);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.coverage-banner-sub {
-    font-size: 12px;
-    color: var(--text-muted);
-    line-height: 1.4;
-}
-
-.coverage-banner-metrics {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-secondary);
-    flex-wrap: wrap;
-}
-
-.coverage-metric-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
-    background: var(--bg-hover);
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border-color);
-}
-
-/* Header Alert Dropdown / Panel */
-.alert-dropdown-panel {
+/* 1. Compact Floating Map Layer Menu (Right Side, beside Map Control Buttons) */
+.floating-layer-menu {
     position: absolute;
-    top: calc(100% + 10px);
-    right: 0;
-    width: 380px;
-    max-width: 90vw;
+    top: 0;
+    right: calc(100% + 8px);
+    width: 145px;
     background: var(--bg-surface);
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg);
-    z-index: 2200;
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-md);
     display: none;
     flex-direction: column;
-    overflow: hidden;
-    animation: modalPop 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    padding: 4px;
+    z-index: 1010;
 }
 
-.alert-dropdown-panel.active {
+.floating-layer-menu.active {
     display: flex;
 }
 
-.alert-dropdown-header {
-    padding: 14px 16px;
-    border-bottom: 1px solid var(--border-color);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: var(--bg-surface);
-}
-
-.alert-dropdown-title {
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--text-primary);
+.layer-menu-item {
     display: flex;
     align-items: center;
     gap: 8px;
-}
-
-.alert-dropdown-badge {
-    background: #fee2e2;
-    color: #ef4444;
-    font-size: 11px;
-    font-weight: 700;
-    padding: 1px 7px;
-    border-radius: 9999px;
-}
-
-body.dark-mode .alert-dropdown-badge {
-    background: rgba(239, 68, 68, 0.25);
-}
-
-.alert-dropdown-list {
-    max-height: 340px;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-}
-
-.alert-dropdown-item {
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--border-color);
+    padding: 7px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-primary);
+    border-radius: 4px;
     cursor: pointer;
     transition: background 0.15s ease;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    text-align: left;
 }
 
-.alert-dropdown-item:hover {
+.layer-menu-item:hover {
     background: var(--bg-hover);
 }
 
-.alert-dropdown-item:last-child {
-    border-bottom: none;
-}
-
-.alert-item-top {
+.layer-menu-item .layer-item-check {
+    width: 14px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    font-size: 12px;
-}
-
-.alert-item-title {
-    font-weight: 700;
-    color: var(--text-primary);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.alert-item-time {
+    justify-content: center;
     font-size: 11px;
-    color: var(--text-muted);
-}
-
-.alert-item-body {
-    font-size: 12px;
-    color: var(--text-secondary);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.alert-item-footer {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 11px;
-    color: var(--text-muted);
-}
-
-.alert-dropdown-empty {
-    padding: 32px 16px;
-    text-align: center;
-    color: var(--text-muted);
-    font-size: 13px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-}
-
-.alert-dropdown-footer {
-    padding: 10px 16px;
-    border-top: 1px solid var(--border-color);
-    background: var(--bg-hover);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.btn-view-all-alerts {
-    background: transparent;
-    border: none;
     color: var(--primary-color);
-    font-size: 12.5px;
+    visibility: hidden;
+}
+
+.layer-menu-item.active .layer-item-check {
+    visibility: visible;
+}
+
+.layer-menu-item.active {
     font-weight: 700;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.btn-view-all-alerts:hover {
-    text-decoration: underline;
-}
-
-/* Compact Floating Map Layer Selector */
-.compact-layer-control {
-    position: absolute;
-    top: 16px;
-    left: 16px;
-    z-index: 400;
-}
-
-.compact-layer-btn {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    height: 34px;
-    padding: 0 12px;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(8px);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-md);
-    font-size: 12.5px;
-    font-weight: 700;
-    color: var(--text-primary);
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-body.dark-mode .compact-layer-btn {
-    background: rgba(17, 26, 46, 0.95);
-    color: var(--text-primary);
-}
-
-.compact-layer-btn:hover {
-    background: var(--bg-surface);
-    border-color: var(--primary-color);
-}
-
-.compact-layer-menu {
-    position: absolute;
-    top: calc(100% + 6px);
-    left: 0;
-    width: 160px;
-    background: var(--bg-surface);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-lg);
-    padding: 6px 0;
-    display: none;
-    flex-direction: column;
-    z-index: 1200;
-}
-
-.compact-layer-menu.active {
-    display: flex;
-}
-
-.compact-layer-opt {
-    padding: 8px 14px;
-    font-size: 12.5px;
-    font-weight: 600;
-    color: var(--text-secondary);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    transition: background 0.15s;
-}
-
-.compact-layer-opt:hover {
-    background: var(--bg-hover);
     color: var(--primary-color);
 }
 
-.compact-layer-opt.active {
-    background: var(--primary-light);
-    color: var(--primary-color);
-    font-weight: 700;
-}
-
-/* Compact Floating Classification Legend */
+/* 2. Compact Classification Legend (Bottom Left) */
 .compact-map-legend {
-    position: absolute;
-    bottom: 16px;
-    right: 16px;
-    z-index: 400;
-    background: rgba(255, 255, 255, 0.95);
+    background: rgba(255, 255, 255, 0.92);
     backdrop-filter: blur(8px);
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    padding: 8px 12px;
-    box-shadow: var(--shadow-md);
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+    border-radius: var(--radius-full);
+    padding: 5px 12px;
+    box-shadow: var(--shadow-sm);
 }
 
 body.dark-mode .compact-map-legend {
-    background: rgba(17, 26, 46, 0.95);
+    background: rgba(30, 41, 59, 0.92);
 }
 
 .compact-legend-items {
     display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
+    align-items: center;
+    gap: 12px;
 }
 
-.compact-legend-item {
+.compact-legend-chip {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
     font-size: 11.5px;
     font-weight: 600;
-    color: var(--text-secondary);
-}
-
-/* Redesigned Compact Dispatch Dialog */
-.compact-dispatch-dialog {
-    background-color: var(--bg-surface);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg);
-    width: 480px;
-    max-width: 95vw;
-    padding: 20px 22px;
-    position: relative;
-    animation: modalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-}
-
-.dispatch-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding-bottom: 12px;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.dispatch-header-title {
-    font-size: 16px;
-    font-weight: 800;
-    color: var(--text-primary);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.dispatch-telemetry-card {
-    background: var(--bg-hover);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    padding: 12px 14px;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px 14px;
-    font-size: 12.5px;
-}
-
-.dispatch-telemetry-item {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.dispatch-telemetry-label {
-    font-size: 10.5px;
-    font-weight: 700;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    letter-spacing: 0.04em;
-}
-
-.dispatch-telemetry-val {
-    font-weight: 700;
     color: var(--text-primary);
 }
 
-.channel-chip-group {
-    display: flex;
-    gap: 8px;
-    margin-top: 4px;
-}
-
-.channel-chip {
-    padding: 6px 14px;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
-    background: var(--bg-hover);
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: all 0.15s;
-    user-select: none;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.channel-chip.selected {
-    background: var(--primary-light);
-    border-color: var(--primary-color);
-    color: var(--primary-color);
-    font-weight: 700;
-}
-
-.dispatch-action-footer {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 10px;
-    padding-top: 8px;
-}
-
-.live-pass-indicator {
-    font-size: 11px;
-    font-weight: 700;
-    padding: 2px 8px;
-    border-radius: 9999px;
-    background: #e0f2fe;
-    color: #0369a1;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    margin-top: 4px;
-}
-
-body.dark-mode .live-pass-indicator {
-    background: rgba(3, 105, 161, 0.25);
-    color: #38bdf8;
-}
-
-
-/* Aliases and layout rules for Header Alert Dropdown & Dispatch Dialog Card */
+/* 3. Header Alert Dropdown */
 .header-alert-dropdown {
     position: absolute;
     top: calc(100% + 10px);
@@ -1818,6 +1451,222 @@ body.dark-mode .live-pass-indicator {
     display: flex;
 }
 
+.alert-dropdown-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg-surface);
+}
+
+.alert-dropdown-title {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+}
+
+.alert-dropdown-count {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    background: #fee2e2;
+    color: #ef4444;
+}
+
+.alert-dropdown-list {
+    max-height: 380px;
+    overflow-y: auto;
+}
+
+.alert-dropdown-item {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-light);
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.alert-dropdown-item:hover {
+    background: var(--bg-hover);
+}
+
+.alert-item-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+
+.alert-item-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.alert-item-time {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.alert-item-body {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+.alert-item-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.alert-dropdown-empty {
+    padding: 32px 16px;
+    text-align: center;
+    color: var(--text-muted);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.alert-dropdown-footer {
+    padding: 10px 16px;
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-hover);
+    text-align: center;
+}
+
+.alert-dropdown-view-all-btn {
+    background: none;
+    border: none;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--primary-color);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+}
+
+/* 4. Satellite Coverage Status Banner */
+.satellite-coverage-banner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    border-radius: var(--radius-md);
+    margin-bottom: 16px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-surface);
+}
+
+.satellite-coverage-banner.zero-sync {
+    background: #fffbeb;
+    border-color: #fde68a;
+}
+
+body.dark-mode .satellite-coverage-banner.zero-sync {
+    background: #2d2410;
+    border-color: #78350f;
+}
+
+.satellite-banner-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    background: #fef3c7;
+    color: #d97706;
+    flex-shrink: 0;
+}
+
+.satellite-banner-content {
+    flex: 1;
+}
+
+.satellite-banner-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.satellite-banner-badge {
+    font-size: 10px;
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: var(--radius-full);
+    background: #d97706;
+    color: #ffffff;
+    letter-spacing: 0.5px;
+}
+
+.satellite-banner-desc {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+}
+
+.satellite-banner-actions {
+    flex-shrink: 0;
+}
+
+.satellite-banner-btn {
+    padding: 7px 14px;
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s ease;
+}
+
+.satellite-banner-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--text-muted);
+}
+
+/* 5. Live Pass Indicator Pill */
+.live-pass-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: var(--radius-full);
+    background: #f1f5f9;
+    color: #475569;
+    letter-spacing: 0.5px;
+}
+
+body.dark-mode .live-pass-indicator {
+    background: #334155;
+    color: #94a3b8;
+}
+
+/* 6. Emergency Dispatch Console Card */
 .dispatch-dialog-card {
     background-color: var(--bg-surface);
     border: 1px solid var(--border-color);
@@ -1831,6 +1680,44 @@ body.dark-mode .live-pass-indicator {
     display: flex;
     flex-direction: column;
     gap: 14px;
+}
+
+.dispatch-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.dispatch-header-title-box {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.dispatch-icon-badge {
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    background: #fee2e2;
+    color: #ef4444;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+}
+
+.dispatch-title {
+    font-size: 16px;
+    font-weight: 800;
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.dispatch-subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
 }
 
 .dispatch-summary-grid {
@@ -1931,4 +1818,211 @@ body.dark-mode .live-pass-indicator {
 
 .btn-dispatch-submit:hover {
     background: #dc2626;
+}
+
+/* 7. Professional Reports Console */
+.reports-console-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+
+@media (max-width: 900px) {
+    .reports-console-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.report-console-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 22px;
+    box-shadow: var(--shadow-sm);
+}
+
+.report-console-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    color: var(--text-primary);
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 16px;
+}
+
+.report-console-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.report-field-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.report-field-label {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.report-select-input {
+    width: 100%;
+    padding: 8px 12px;
+    background: var(--bg-hover);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    color: var(--text-primary);
+    font-family: inherit;
+}
+
+.report-date-inputs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.report-date-input {
+    flex: 1;
+    padding: 8px 10px;
+    background: var(--bg-hover);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    color: var(--text-primary);
+    font-family: inherit;
+}
+
+.report-checkbox-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 12px;
+    background: var(--bg-hover);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+}
+
+.report-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.btn-generate-report {
+    width: 100%;
+    padding: 10px;
+    background: var(--primary-color);
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 13px;
+    border-radius: var(--radius-sm);
+    border: none;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 6px;
+}
+
+.btn-generate-report:hover {
+    background: #1d4ed8;
+}
+
+.report-preview-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 22px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+}
+
+.report-preview-branding {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 16px;
+}
+
+.report-preview-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.report-status-badge {
+    font-size: 10.5px;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    background: #dbeafe;
+    color: var(--primary-color);
+    letter-spacing: 0.5px;
+}
+
+.report-preview-title-box {
+    margin-bottom: 16px;
+}
+
+.report-preview-heading {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin: 0 0 4px 0;
+    letter-spacing: 0.5px;
+}
+
+.report-preview-sub {
+    font-size: 11.5px;
+    color: var(--text-muted);
+}
+
+.report-summary-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.report-metric-tile {
+    background: var(--bg-hover);
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.report-tile-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.report-tile-val {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.report-preview-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: auto;
 }
