@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AeroThermal Sentinel | Space-Borne Thermal & Emission Intelligence</title>
+    <title>F.A.S.T. | Fire Alert & Safety Technology</title>
     <!-- Inter Font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -24,11 +24,11 @@
             <div class="header-left-col">
                 <div class="header-brand" onclick="switchView('dashboard-section')">
                     <div class="brand-icon-box">
-                        <i class="fa-solid fa-satellite"></i>
+                        <i class="fa-solid fa-fire-flame-curved"></i>
                     </div>
                     <div>
-                        <span class="brand-title">AeroThermal Sentinel</span>
-                        <span class="brand-sub">Space-Borne Thermal & Emission Intelligence</span>
+                        <span class="brand-title">F.A.S.T.</span>
+                        <span class="brand-sub">Fire Alert & Safety Technology</span>
                     </div>
                 </div>
                 <div class="header-search-bar">
@@ -65,10 +65,25 @@
                     <i class="fa-solid fa-moon" id="theme-toggle-icon"></i>
                 </button>
 
-                <!-- Notifications Bell -->
-                <div class="notif-bell-btn" id="header-notif-btn" title="View Active Alerts" onclick="switchView('alerts-section')">
+                <!-- Notifications Bell with Interactive Alert Dropdown -->
+                <div class="notif-bell-btn" id="header-notif-btn" title="View Priority Alerts" onclick="toggleAlertDropdown(event)">
                     <i class="fa-regular fa-bell"></i>
-                    <span class="notif-badge-bubble" id="header-notif-count">24</span>
+                    <span class="notif-badge-bubble" id="header-notif-count">0</span>
+
+                    <div id="header-alert-dropdown" class="header-alert-dropdown" onclick="event.stopPropagation()">
+                        <div class="alert-dropdown-header">
+                            <span class="alert-dropdown-title"><i class="fa-solid fa-triangle-exclamation" style="color: #ef4444; margin-right: 6px;"></i> Active Priority Alerts</span>
+                            <span class="alert-dropdown-count"><span id="alert-dropdown-header-count">0</span> Alerts</span>
+                        </div>
+                        <div class="alert-dropdown-list" id="alert-dropdown-list">
+                            <!-- Populated dynamically -->
+                        </div>
+                        <div class="alert-dropdown-footer">
+                            <button class="alert-dropdown-view-all-btn" onclick="closeAlertDropdown(); switchView('alerts-section')">
+                                View All Alerts in Console <i class="fa-solid fa-arrow-right" style="margin-left: 6px;"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- User Profile -->
@@ -135,11 +150,13 @@
                     <div class="stats-cards-grid">
                         <div class="stat-widget-card total-sources">
                             <div class="stat-card-header">
-                                <span class="stat-card-title">Total Sources</span>
+                                <span class="stat-card-title">Total Indexed Sources</span>
                                 <div class="stat-icon-wrapper"><i class="fa-solid fa-globe"></i></div>
                             </div>
                             <strong class="stat-card-value" id="stat-total-sources">--</strong>
-                            <span class="stat-trend-pill positive"><i class="fa-solid fa-arrow-trend-up"></i> +12.4% vs last week</span>
+                            <div id="stat-live-pass-indicator" style="margin-top: 4px;">
+                                <span class="live-pass-indicator"><i class="fa-solid fa-circle" style="font-size:8px; opacity:0.6;"></i> LIVE PASS: 0 NEW DETECTIONS</span>
+                            </div>
                                                         <div class="stat-sparkline-box">
                                 <svg width="100%" height="32" viewBox="0 0 100 32" preserveAspectRatio="none">
                                     <defs>
@@ -177,7 +194,7 @@
 
                         <div class="stat-widget-card forest-fire">
                             <div class="stat-card-header">
-                                <span class="stat-card-title">Forest Fire</span>
+                                <span class="stat-card-title">Forest / Natural</span>
                                 <div class="stat-icon-wrapper"><i class="fa-solid fa-tree"></i></div>
                             </div>
                             <strong class="stat-card-value" id="stat-forest">--</strong>
@@ -260,17 +277,49 @@
                         </div>
                     </div>
 
+                    <!-- Satellite Coverage Status Banner (Active on 0-detection live passes) -->
+                    <div id="satellite-coverage-banner" class="satellite-coverage-banner" style="display: none;">
+                        <div class="satellite-banner-icon"><i class="fa-solid fa-satellite-dish"></i></div>
+                        <div class="satellite-banner-content">
+                            <div class="satellite-banner-title">
+                                <span id="satellite-banner-title-text">Satellite Pass Complete — No Active Anomalies Detected</span>
+                                <span class="satellite-banner-badge" id="satellite-banner-badge">SATELLITE PASS VERIFIED</span>
+                            </div>
+                            <div class="satellite-banner-desc" id="satellite-banner-desc">
+                                The latest NASA FIRMS satellite sweep detected 0 new thermal anomalies across India. All <strong>563 previously indexed sources</strong> remain active for continuous spatial and temporal monitoring.
+                            </div>
+                        </div>
+                        <div class="satellite-banner-actions">
+                            <button class="satellite-banner-btn" onclick="syncBackendFirms(7)">
+                                <i class="fa-solid fa-rotate"></i> Sync 7-Day Window
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- Split GIS Map & Filters/Alerts Side Panel with Resizer -->
                     <div class="dashboard-main-split" id="dashboard-split-container">
                         <!-- Left: Interactive Leaflet GIS Map -->
                         <div class="map-column-container" id="map-col-wrapper">
                             <div id="map"></div>
 
-                            <!-- Floating Basemap Layer Switcher (Default: Clean High-Detail Standard Map) -->
-                            <div class="floating-layer-switcher">
-                                <button class="layer-pill-btn active" id="layer-standard-btn" onclick="setMapBaseLayer('standard')">Standard Map</button>
-                                <button class="layer-pill-btn" id="layer-satellite-btn" onclick="setMapBaseLayer('satellite')">Satellite</button>
-                                <button class="layer-pill-btn" id="layer-dark-btn" onclick="setMapBaseLayer('dark')">Dark GIS</button>
+                            <!-- Compact Floating Layer Selector Dropdown -->
+                            <div class="compact-layer-control" id="compact-layer-control">
+                                <button class="compact-layer-btn" id="compact-layer-btn" onclick="toggleCompactLayerMenu(event)" title="Select Basemap Layer">
+                                    <i class="fa-solid fa-layer-group"></i>
+                                    <span id="compact-layer-label">Standard Map</span>
+                                    <i class="fa-solid fa-chevron-down compact-chevron"></i>
+                                </button>
+                                <div class="compact-layer-menu" id="compact-layer-menu">
+                                    <div class="compact-layer-option active" id="compact-opt-standard" onclick="selectCompactBaseLayer('standard')">
+                                        <i class="fa-solid fa-map"></i> Standard Map
+                                    </div>
+                                    <div class="compact-layer-option" id="compact-opt-satellite" onclick="selectCompactBaseLayer('satellite')">
+                                        <i class="fa-solid fa-satellite"></i> Satellite
+                                    </div>
+                                    <div class="compact-layer-option" id="compact-opt-dark" onclick="selectCompactBaseLayer('dark')">
+                                        <i class="fa-solid fa-moon"></i> Dark GIS
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- Floating Zoom & Reset Map Controls -->
@@ -280,14 +329,13 @@
                                 <button class="map-control-btn" onclick="mapResetView()" title="Locate / Reset View"><i class="fa-solid fa-crosshairs"></i></button>
                             </div>
 
-                            <!-- Floating Classification Legend -->
-                            <div class="floating-map-legend">
-                                <div class="legend-title">Classification Legend</div>
-                                <div class="legend-items-list">
-                                    <div class="legend-item"><span class="legend-color-dot industrial"></span> Industrial</div>
-                                    <div class="legend-item"><span class="legend-color-dot forest"></span> Forest / Natural</div>
-                                    <div class="legend-item"><span class="legend-color-dot agricultural"></span> Agricultural</div>
-                                    <div class="legend-item"><span class="legend-color-dot other"></span> Other / Unknown</div>
+                            <!-- Compact Floating Classification Legend -->
+                            <div class="floating-map-legend compact-map-legend">
+                                <div class="compact-legend-items">
+                                    <div class="compact-legend-chip"><span class="legend-color-dot industrial"></span> Industrial</div>
+                                    <div class="compact-legend-chip"><span class="legend-color-dot forest"></span> Forest / Natural</div>
+                                    <div class="compact-legend-chip"><span class="legend-color-dot agricultural"></span> Agricultural</div>
+                                    <div class="compact-legend-chip"><span class="legend-color-dot other"></span> Other</div>
                                 </div>
                             </div>
                         </div>
@@ -699,53 +747,77 @@
          EMERGENCY AUTHORITY DISPATCH MODAL
          ========================================================================== -->
     <div class="modal-backdrop-overlay" id="authority-dispatch-modal" onclick="closeDispatchModalOnBackdrop(event)">
-        <div class="modal-dialog-box wide">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <div style="width: 38px; height: 38px; border-radius: 8px; background: #fee2e2; color: #ef4444; display: flex; align-items: center; justify-content: center; font-size: 18px;">
+        <div class="modal-dialog-box wide dispatch-dialog-card">
+            <div class="dispatch-header">
+                <div class="dispatch-header-title-box">
+                    <div class="dispatch-icon-badge">
                         <i class="fa-solid fa-bullhorn"></i>
                     </div>
                     <div>
-                        <h3 style="font-size: 17px; margin: 0;">Emergency Authority Dispatch</h3>
-                        <span style="font-size: 12.5px; color: var(--text-muted);">Route verified satellite anomaly to designated state responder</span>
+                        <h3 class="dispatch-title">Emergency Authority Dispatch</h3>
+                        <span class="dispatch-subtitle">Route verified satellite anomaly to designated state responder</span>
                     </div>
                 </div>
-                <button class="map-control-btn" onclick="closeDispatchModal()" style="width: 30px; height: 30px;"><i class="fa-solid fa-xmark"></i></button>
+                <button class="map-control-btn" onclick="closeDispatchModal()" style="width: 30px; height: 30px;" title="Close"><i class="fa-solid fa-xmark"></i></button>
             </div>
 
-            <div class="filters-form-grid" style="gap: 14px;">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: var(--bg-hover); padding: 12px; border-radius: var(--radius-sm); font-size: 13px;">
-                    <div><strong>Incident ID:</strong> <span id="dispatch-source-id">IN_OD_001</span></div>
-                    <div><strong>Severity:</strong> <span class="badge-pill badge-critical" id="dispatch-severity">Critical</span></div>
-                    <div><strong>Location:</strong> <span id="dispatch-location">Odisha (20.852, 85.125)</span></div>
-                    <div><strong>Classification:</strong> <span id="dispatch-type" style="font-weight: 700; color: #ef4444;">Industrial</span></div>
+            <div class="dispatch-body">
+                <!-- Anomaly Overview Grid -->
+                <div class="dispatch-summary-grid">
+                    <div class="dispatch-meta-cell">
+                        <span class="dispatch-meta-label">Incident ID</span>
+                        <strong class="dispatch-meta-val" id="dispatch-source-id">SOURCE_0001</strong>
+                    </div>
+                    <div class="dispatch-meta-cell">
+                        <span class="dispatch-meta-label">Severity</span>
+                        <span class="badge-pill badge-critical" id="dispatch-severity">Critical</span>
+                    </div>
+                    <div class="dispatch-meta-cell">
+                        <span class="dispatch-meta-label">Classification</span>
+                        <strong class="dispatch-meta-val" id="dispatch-type" style="color: #ef4444;">Industrial</strong>
+                    </div>
+                    <div class="dispatch-meta-cell">
+                        <span class="dispatch-meta-label">State / Region</span>
+                        <strong class="dispatch-meta-val" id="dispatch-state">Odisha</strong>
+                    </div>
+                    <div class="dispatch-meta-cell">
+                        <span class="dispatch-meta-label">Coordinates</span>
+                        <span class="dispatch-meta-val" id="dispatch-coords">20.8520, 85.1250</span>
+                    </div>
+                    <div class="dispatch-meta-cell">
+                        <span class="dispatch-meta-label">AI Confidence / FRP</span>
+                        <span class="dispatch-meta-val"><span id="dispatch-conf">92%</span> &bull; <span id="dispatch-frp">45.2 MW</span></span>
+                    </div>
                 </div>
 
-                <div class="filter-field-group">
-                    <label>Designated State / National Authority</label>
-                    <select id="dispatch-authority-select">
-                        <!-- Populated based on incident state & type -->
+                <!-- Designated Authority Select -->
+                <div class="dispatch-field-group">
+                    <label class="dispatch-field-label"><i class="fa-solid fa-building-shield" style="color: var(--primary-color);"></i> Designated State / National Authority</label>
+                    <select id="dispatch-authority-select" class="dispatch-select-input">
+                        <!-- Populated dynamically based on state & classification -->
                     </select>
                 </div>
 
-                <div class="filter-field-group">
-                    <label>Dispatch Channels</label>
-                    <div style="display: flex; gap: 16px; font-size: 13px; margin-top: 4px;">
-                        <label style="display: flex; align-items: center; gap: 6px;"><input type="checkbox" id="dispatch-sms" checked> SMS Emergency Broadcast</label>
-                        <label style="display: flex; align-items: center; gap: 6px;"><input type="checkbox" id="dispatch-email" checked> Official High-Priority Email</label>
-                        <label style="display: flex; align-items: center; gap: 6px;"><input type="checkbox" id="dispatch-portal" checked> State Disaster Portal API</label>
+                <!-- Dispatch Channels -->
+                <div class="dispatch-field-group">
+                    <label class="dispatch-field-label"><i class="fa-solid fa-tower-broadcast" style="color: var(--primary-color);"></i> Dispatch Channels</label>
+                    <div class="dispatch-channels-row">
+                        <label class="dispatch-channel-chip"><input type="checkbox" id="dispatch-sms" checked> <span>SMS Alert</span></label>
+                        <label class="dispatch-channel-chip"><input type="checkbox" id="dispatch-email" checked> <span>Official Email</span></label>
+                        <label class="dispatch-channel-chip"><input type="checkbox" id="dispatch-portal" checked> <span>State Portal API</span></label>
                     </div>
                 </div>
 
-                <div class="filter-field-group">
-                    <label>Incident Escalation Notes</label>
-                    <textarea id="dispatch-notes" rows="3" style="width: 100%; padding: 10px; background: var(--bg-hover); border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 13px; color: var(--text-primary); resize: vertical;"></textarea>
+                <!-- Escalation Notes -->
+                <div class="dispatch-field-group">
+                    <label class="dispatch-field-label"><i class="fa-solid fa-comment-dots" style="color: var(--primary-color);"></i> Incident Escalation Notes</label>
+                    <textarea id="dispatch-notes" rows="3" class="dispatch-notes-input" placeholder="Enter incident escalation directives..."></textarea>
                 </div>
 
-                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px;">
+                <div class="dispatch-actions-footer">
                     <button class="btn-cancel-modal" onclick="closeDispatchModal()">Cancel</button>
-                    <button class="btn-apply-filters" style="width: 180px; background: #ef4444;" onclick="executeAuthorityDispatch()">
-                        <i class="fa-solid fa-paper-plane" style="margin-right: 6px;"></i> Send Dispatch
+                    <button class="btn-dispatch-submit" onclick="executeAuthorityDispatch()">
+                        <i class="fa-solid fa-paper-plane" style="margin-right: 6px;"></i> Record Dispatch
                     </button>
                 </div>
             </div>
@@ -803,10 +875,10 @@
     <div class="auth-overlay-view" id="auth-overlay-view">
         <div class="auth-card-box">
             <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #ef4444, #f97316); color: #ffffff; display: inline-flex; align-items: center; justify-content: center; font-size: 22px; margin-bottom: 14px;">
-                <i class="fa-solid fa-satellite"></i>
+                <i class="fa-solid fa-fire-flame-curved"></i>
             </div>
-            <h2 style="font-size: 22px; margin-bottom: 4px;">AeroThermal Sentinel Portal</h2>
-            <p style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 24px;">National Space-Borne Thermal Intelligence System</p>
+            <h2 style="font-size: 22px; margin-bottom: 4px;">F.A.S.T. Console</h2>
+            <p style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 24px;">Fire Alert & Safety Technology — Indian Sovereign Thermal Intelligence Grid</p>
 
             <div class="filters-form-grid" style="text-align: left;">
                 <div class="filter-field-group">
