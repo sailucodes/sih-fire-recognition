@@ -54,9 +54,9 @@
                     <i class="fa-solid fa-chevron-down" style="font-size: 11px; margin-left: 4px; color: var(--text-muted);"></i>
                     <!-- Date Presets Dropdown -->
                     <div class="date-preset-dropdown" id="date-preset-dropdown" onclick="event.stopPropagation()">
-                        <div class="date-preset-option" onclick="selectDatePreset('Live Satellite Pass (Today)')"><i class="fa-solid fa-satellite" style="color: #2563eb; margin-right: 6px;"></i> Live Pass (Today)</div>
-                        <div class="date-preset-option" onclick="selectDatePreset('Past 7 Days')"><i class="fa-solid fa-calendar-week" style="color: #10b981; margin-right: 6px;"></i> Past 7 Days (Telemetry)</div>
-                        <div class="date-preset-option" onclick="selectDatePreset('Past 30 Days')"><i class="fa-solid fa-calendar-days" style="color: #8b5cf6; margin-right: 6px;"></i> Past 30 Days (Full Telemetry)</div>
+                        <div class="date-preset-option" onclick="selectDatePreset('Live Satellite Pass (Today)')"><i class="fa-solid fa-satellite" style="color: #2563eb; margin-right: 6px;"></i> Live Satellite Pass (Today)</div>
+                        <div class="date-preset-option" onclick="selectDatePreset('Past 7 Days')"><i class="fa-solid fa-calendar-week" style="color: #10b981; margin-right: 6px;"></i> Past 7 Days (Indexed FIRMS Data)</div>
+                        <div class="date-preset-option" onclick="selectDatePreset('Past 30 Days')"><i class="fa-solid fa-calendar-days" style="color: #8b5cf6; margin-right: 6px;"></i> Past 30 Days (Full Observation Archive)</div>
                     </div>
                 </div>
 
@@ -277,56 +277,45 @@
                         </div>
                     </div>
 
-                    <!-- Satellite Coverage Status Banner (Active on 0-detection live passes) -->
-                    <div id="satellite-coverage-banner" class="satellite-coverage-banner" style="display: none;">
-                        <div class="satellite-banner-icon"><i class="fa-solid fa-satellite-dish"></i></div>
-                        <div class="satellite-banner-content">
-                            <div class="satellite-banner-title">
-                                <span id="satellite-banner-title-text">Satellite Pass Complete — No Active Anomalies Detected</span>
-                                <span class="satellite-banner-badge" id="satellite-banner-badge">SATELLITE PASS VERIFIED</span>
+                                        <!-- ==============================================================
+                         LIVE FIRMS STATUS PANEL (COMPACT PROFESSIONAL HUD)
+                         ============================================================== -->
+                    <div class="firms-live-status-panel" id="firms-live-status-panel">
+                        <div class="firms-status-brand-col">
+                            <div class="firms-status-emblem">
+                                <i class="fa-solid fa-satellite"></i>
                             </div>
-                            <div class="satellite-banner-desc" id="satellite-banner-desc">
-                                The latest NASA FIRMS satellite sweep detected 0 new thermal anomalies across India. All <strong>563 previously indexed sources</strong> remain active for continuous spatial and temporal monitoring.
+                            <div class="firms-status-brand-info">
+                                <div class="firms-status-brand-title">
+                                    <span>F.A.S.T.</span>
+                                    <span class="firms-status-source-tag">NASA FIRMS</span>
+                                </div>
+                                <div class="firms-status-brand-sub">Fire Alert & Safety Technology</div>
                             </div>
                         </div>
-                        <div class="satellite-banner-actions">
-                            <button class="satellite-banner-btn" onclick="syncBackendFirms(7, true)">
-                                <i class="fa-solid fa-rotate"></i> Sync 7-Day Window
+
+                        <div class="firms-status-metric-col">
+                            <div class="firms-pass-badge-box">
+                                <span class="firms-pass-badge zero" id="firms-pass-badge">
+                                    <i class="fa-solid fa-circle-dot" id="firms-pass-icon"></i>
+                                    <span id="firms-pass-text">LIVE PASS: 0 NEW DETECTIONS</span>
+                                </span>
+                            </div>
+                            <div class="firms-status-detail-line">
+                                <span id="firms-data-scope-label">Showing latest available FIRMS data</span>
+                                <span class="firms-dot-sep">&bull;</span>
+                                <span id="firms-obs-time-label">Last successful observation: <strong id="firms-obs-time-text">Calculating...</strong></span>
+                            </div>
+                        </div>
+
+                        <div class="firms-status-action-col">
+                            <span class="firms-period-badge" id="firms-current-window-badge">Past 7 Days</span>
+                            <button class="btn-firms-refresh" id="btn-firms-refresh" onclick="manualSyncNasa()" title="Trigger NASA FIRMS satellite sweep">
+                                <i class="fa-solid fa-rotate" id="firms-refresh-spin"></i>
+                                <span>Refresh Live</span>
                             </button>
                         </div>
                     </div>
-
-                    <!-- Split GIS Map & Filters/Alerts Side Panel with Resizer -->
-                    <div class="dashboard-main-split" id="dashboard-split-container">
-                        <!-- Left: Interactive Leaflet GIS Map -->
-                        <div class="map-column-container" id="map-col-wrapper">
-                            <div id="map"></div>
-
-                            <!-- Floating Map Controls (Right Side) -->
-                            <div class="floating-map-controls">
-                                <button class="map-control-btn" id="map-layer-btn" onclick="toggleMapLayerMenu(event)" title="Basemap Layers">
-                                    <i class="fa-solid fa-layer-group"></i>
-                                </button>
-                                <button class="map-control-btn" onclick="mapZoomIn()" title="Zoom In"><i class="fa-solid fa-plus"></i></button>
-                                <button class="map-control-btn" onclick="mapZoomOut()" title="Zoom Out"><i class="fa-solid fa-minus"></i></button>
-                                <button class="map-control-btn" onclick="mapResetView()" title="Locate / Reset View"><i class="fa-solid fa-crosshairs"></i></button>
-
-                                <!-- Compact Floating Layer Menu with checkmarks -->
-                                <div class="floating-layer-menu" id="floating-layer-menu" onclick="event.stopPropagation()">
-                                    <div class="layer-menu-item active" id="layer-opt-standard" onclick="setMapBaseLayer('standard')">
-                                        <span class="layer-item-check"><i class="fa-solid fa-check"></i></span>
-                                        <span class="layer-item-name">Standard Map</span>
-                                    </div>
-                                    <div class="layer-menu-item" id="layer-opt-satellite" onclick="setMapBaseLayer('satellite')">
-                                        <span class="layer-item-check"><i class="fa-solid fa-check"></i></span>
-                                        <span class="layer-item-name">Satellite</span>
-                                    </div>
-                                    <div class="layer-menu-item" id="layer-opt-dark" onclick="setMapBaseLayer('dark')">
-                                        <span class="layer-item-check"><i class="fa-solid fa-check"></i></span>
-                                        <span class="layer-item-name">Dark GIS</span>
-                                    </div>
-                                </div>
-                            </div>
 
                             <!-- Compact Floating Classification Legend (Bottom Left) -->
                             <div class="floating-map-legend compact-map-legend">

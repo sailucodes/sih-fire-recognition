@@ -73,6 +73,24 @@ function getApiBase() {
 let allEvents = [];
 let filteredEvents = [];
 let historicalArchiveEvents = [];
+
+if (typeof window !== "undefined") {
+    Object.defineProperty(window, "allEvents", {
+        get: () => allEvents,
+        set: (val) => { allEvents = val; },
+        configurable: true
+    });
+    Object.defineProperty(window, "filteredEvents", {
+        get: () => filteredEvents,
+        set: (val) => { filteredEvents = val; },
+        configurable: true
+    });
+    Object.defineProperty(window, "historicalArchiveEvents", {
+        get: () => historicalArchiveEvents,
+        set: (val) => { historicalArchiveEvents = val; },
+        configurable: true
+    });
+}
 let map = null;
 let markersLayer = null;
 let canvasRenderer = null;
@@ -207,6 +225,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     // 1. Immediately load pre-compiled ground truth dataset so dashboard KPIs, map, and alerts are NEVER empty
     try { loadInitialFallbackData(); } catch (e) { console.warn("[Startup] Fallback load error:", e); }
+    try { ensure30DayCatalogLoaded().catch(() => {}); } catch (_) {}
 
     // 2. Ensure map dimensions are recalculated
     setTimeout(() => { if (map) map.invalidateSize(); }, 200);
@@ -659,6 +678,257 @@ function setAnalyticsTimePeriod(days) {
 }
 window.setAnalyticsTimePeriod = setAnalyticsTimePeriod;
 
+
+/* ==========================================================================
+   GLOBAL FIRMS OBSERVATION DATASET CACHE & INSTANT SWITCHING
+   ========================================================================== */
+let global30DayFirmsCatalog = null;
+let global7DayFirmsCatalog = null;
+let is30DayCatalogLoaded = false;
+let pending30DayPromise = null;
+
+function formatObservationTimeAgo(dateObjOrString) {
+    if (!dateObjOrString) return null;
+    let d;
+    if (dateObjOrString instanceof Date) {
+        d = dateObjOrString;
+    } else if (typeof dateObjOrString === "string") {
+        let s = dateObjOrString.trim();
+        if (s.includes(" ") && !s.includes("T")) s = s.replace(" ", "T");
+        d = new Date(s);
+    } else if (typeof dateObjOrString === "number") {
+        d = new Date(dateObjOrString);
+    }
+    if (!d || isNaN(d.getTime())) return null;
+
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    if (diffMs < 0) {
+        return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+    }
+
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 60) return "just now";
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHours = Math.floor(diffMin / 60);
+    const remMin = diffMin % 60;
+    if (diffHours < 24) {
+        return remMin > 0 ? `${diffHours}h ${remMin}m ago` : `${diffHours}h ago`;
+    }
+    const diffDays = Math.floor(diffHours / 24);
+    const remHours = diffHours % 24;
+    if (diffDays < 7) {
+        return remHours > 0 ? `${diffDays}d ${remHours}h ago` : `${diffDays}d ago`;
+    }
+    return `${diffDays}d ago (${d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" })})`;
+}
+window.formatObservationTimeAgo = formatObservationTimeAgo;
+
+function updateLiveFirmsStatusPanel() {
+    const livePassCount = (window.__LAST_LIVE_SYNC_RESULT__ && typeof window.__LAST_LIVE_SYNC_RESULT__.liveCount === "number")
+        ? window.__LAST_LIVE_SYNC_RESULT__.liveCount
+        : 0;
+
+    const passBadge = document.getElementById("firms-pass-badge");
+    const passText = document.getElementById("firms-pass-text");
+    if (passBadge && passText) {
+        if (livePassCount > 0) {
+            passBadge.className = "firms-pass-badge active";
+            passText.innerText = `LIVE PASS: ${livePassCount} NEW DETECTIONS`;
+        } else {
+            passBadge.className = "firms-pass-badge zero";
+            passText.innerText = "LIVE PASS: 0 NEW DETECTIONS";
+        }
+    }
+
+    // Determine latest observation timestamp across currently loaded events or last sync
+    let latestObsDate = null;
+    if (window.__LAST_LIVE_SYNC_RESULT__ && window.__LAST_LIVE_SYNC_RESULT__.syncedAt) {
+        latestObsDate = window.__LAST_LIVE_SYNC_RESULT__.syncedAt;
+    }
+
+    const events = (Array.isArray(allEvents) && allEvents.length > 0) ? allEvents : [];
+    let maxEventTime = 0;
+    for (let i = 0; i < events.length; i++) {
+        const ev = events[i];
+        const rawDate = ev.last_detection || ev.acq_date || ev.created_at || ev.first_detection;
+        if (rawDate) {
+            const t = new Date(rawDate).getTime();
+            if (!isNaN(t) && t > maxEventTime) {
+                maxEventTime = t;
+            }
+        }
+    }
+
+    let timeAgoStr = null;
+    if (latestObsDate) {
+        timeAgoStr = formatObservationTimeAgo(latestObsDate);
+    } else if (maxEventTime > 0) {
+        timeAgoStr = formatObservationTimeAgo(new Date(maxEventTime));
+    }
+
+    const obsTimeText = document.getElementById("firms-obs-time-text");
+    if (obsTimeText) {
+        if (timeAgoStr) {
+            obsTimeText.innerText = timeAgoStr;
+        } else {
+            obsTimeText.innerText = "Last successful sync: unavailable";
+        }
+    }
+
+    const scopeLabel = document.getElementById("firms-data-scope-label");
+    if (scopeLabel) {
+        if (window.__DATASET_MODE__ === "LIVE" && livePassCount > 0) {
+            scopeLabel.innerText = "Showing live satellite pass";
+        } else {
+            scopeLabel.innerText = "Showing latest available FIRMS data";
+        }
+    }
+
+    const windowPill = document.getElementById("firms-current-window-badge");
+    if (windowPill) {
+        const savedPeriod = localStorage.getItem("thermal_selected_period") || "Past 7 Days";
+        windowPill.innerText = savedPeriod;
+    }
+}
+window.updateLiveFirmsStatusPanel = updateLiveFirmsStatusPanel;
+
+function derive7DaySubset(fullEvents) {
+    if (!Array.isArray(fullEvents) || fullEvents.length === 0) return [];
+
+    let latestTime = 0;
+    for (let i = 0; i < fullEvents.length; i++) {
+        const ev = fullEvents[i];
+        const rawDate = ev.last_detection || ev.acq_date || ev.created_at || ev.first_detection;
+        if (rawDate) {
+            const t = new Date(rawDate).getTime();
+            if (!isNaN(t) && t > latestTime) latestTime = t;
+        }
+    }
+
+    if (latestTime > 0) {
+        const cutoffTime = latestTime - (7 * 24 * 60 * 60 * 1000);
+        const subset = fullEvents.filter(ev => {
+            const rawDate = ev.last_detection || ev.acq_date || ev.created_at || ev.first_detection;
+            if (!rawDate) return (ev.max_active_days_7d && ev.max_active_days_7d > 0) || (ev.active_days && ev.active_days <= 7);
+            const t = new Date(rawDate).getTime();
+            return !isNaN(t) && t >= cutoffTime;
+        });
+        if (subset.length > 0) return subset;
+    }
+
+    const byActive = fullEvents.filter(ev => (ev.max_active_days_7d && ev.max_active_days_7d > 0) || (ev.active_days && ev.active_days <= 7));
+    if (byActive.length > 0) return byActive;
+
+    return fullEvents.slice(0, Math.min(563, fullEvents.length));
+}
+window.derive7DaySubset = derive7DaySubset;
+
+function mapRawSourceToEvent(s, idx, prefix = "FIRMS_") {
+    const lat = parseFloat(s.latitude);
+    const lng = parseFloat(s.longitude);
+    const type = normalizeType(s.predicted_event_type || s.event_type || "Other");
+    const conf = parseFloat(s.confidence || s.confidence_pct || 80.0);
+    const frp = parseFloat(s.mean_frp || s.frp || 15.0);
+    const maxFrp = parseFloat(s.max_frp || frp);
+    const persScore = parseFloat(s.persistence_score || (s.is_persistent ? 85.0 : 40.0));
+    const state = s.state || getNearestState(lat, lng);
+    const risk = s.risk_level || (type === "Industrial" && conf >= 85 ? "Critical" : (frp >= 25 ? "High" : "Medium"));
+
+    const normLc = normalizeLandcover(s.landcover_class || s.landcover || "Built-up");
+    const isPers = Boolean(s.is_persistent || s.persistent_flag == 1 || s.persistent_flag === "1");
+    const actDays = parseInt(s.active_days || 1, 10);
+    const obsSpan = parseInt(s.observation_span_days || s.observation_days || 1, 10);
+    const totDets = parseInt(s.total_detections || 1, 10);
+
+    return {
+        source_id: s.source_id || `${prefix}${String(idx + 1).padStart(4, "0")}`,
+        state: state,
+        latitude: lat,
+        longitude: lng,
+        predicted_event_type: type,
+        confidence: conf,
+        confidence_pct: conf,
+        persistence_score: persScore,
+        landcover: normLc,
+        landcover_class: normLc,
+        mean_frp: frp,
+        max_frp: maxFrp,
+        risk_level: risk,
+        risk_description: s.risk_description || "",
+        sih_alert_severity: s.sih_alert_severity || (risk === "Critical" ? "CRITICAL" : "LOW"),
+        nearest_facility_name: s.nearest_facility_name || "",
+        nearest_facility_type: s.nearest_facility_type || "",
+        total_detections: totDets,
+        active_days: actDays,
+        observation_span_days: obsSpan,
+        observation_days: obsSpan,
+        recurrence_rate: parseFloat(s.recurrence_rate !== undefined ? s.recurrence_rate : (actDays / Math.max(1, obsSpan)).toFixed(4)),
+        detections_per_span_day: parseFloat(s.detections_per_span_day || (totDets / Math.max(1, obsSpan)).toFixed(2)),
+        mean_gap_hours: parseFloat(s.mean_gap_hours || 0.0),
+        std_gap_hours: parseFloat(s.std_gap_hours || 0.0),
+        median_gap_hours: parseFloat(s.median_gap_hours || s.mean_gap_hours || 0.0),
+        min_gap_hours: parseFloat(s.min_gap_hours || 0.0),
+        max_gap_hours: parseFloat(s.max_gap_hours || 0.0),
+        temporal_regularity: parseFloat(s.temporal_regularity || 0.0),
+        max_active_days_7d: parseInt(s.max_active_days_7d || Math.min(actDays, 7), 10),
+        max_active_days_14d: parseInt(s.max_active_days_14d || Math.min(actDays, 14), 10),
+        max_active_days_30d: parseInt(s.max_active_days_30d || Math.min(actDays, 30), 10),
+        persistent_flag: isPers ? 1 : 0,
+        is_persistent: isPers,
+        is_flare_anomaly: Boolean(s.is_flare_anomaly),
+        is_live_pass: Boolean(s.is_live_pass),
+        first_detection: s.first_detection || "",
+        last_detection: s.last_detection || "",
+        acq_date: s.acq_date || (s.last_detection ? s.last_detection.split(" ")[0] : ""),
+        acq_time: s.acq_time || "09:30"
+    };
+}
+window.mapRawSourceToEvent = mapRawSourceToEvent;
+
+async function ensure30DayCatalogLoaded() {
+    if (is30DayCatalogLoaded && global30DayFirmsCatalog && global30DayFirmsCatalog.length > 0) {
+        return global30DayFirmsCatalog;
+    }
+    if (pending30DayPromise) {
+        return pending30DayPromise;
+    }
+
+    pending30DayPromise = (async () => {
+        try {
+            const apiBase = getApiBase();
+            // Fast retrieval of genuine indexed sources from SQLite (~1.5s)
+            const res = await fetch(`${apiBase}/api/v1/sources?limit=4000`);
+            if (res.ok) {
+                const data = await res.json();
+                const rawSources = data.sources || data.clusters || [];
+                if (Array.isArray(rawSources) && rawSources.length > 0) {
+                    global30DayFirmsCatalog = rawSources.map((s, idx) => mapRawSourceToEvent(s, idx, "SOURCE_"));
+                    is30DayCatalogLoaded = true;
+                    console.log(`[Cache] Pre-loaded ${global30DayFirmsCatalog.length} 30-day FIRMS observation sources.`);
+                    global7DayFirmsCatalog = derive7DaySubset(global30DayFirmsCatalog);
+                    return global30DayFirmsCatalog;
+                }
+            }
+        } catch (e) {
+            console.warn("[Cache] Fast 30-day sources fetch error:", e);
+        }
+
+        // Fallback: If sources endpoint fails, retain verified ground truth
+        if (!global30DayFirmsCatalog || global30DayFirmsCatalog.length === 0) {
+            if (Array.isArray(historicalArchiveEvents) && historicalArchiveEvents.length > 0) {
+                global30DayFirmsCatalog = [...historicalArchiveEvents];
+                global7DayFirmsCatalog = derive7DaySubset(global30DayFirmsCatalog);
+            }
+        }
+        return global30DayFirmsCatalog || [];
+    })();
+
+    return pending30DayPromise;
+}
+window.ensure30DayCatalogLoaded = ensure30DayCatalogLoaded;
+
 window.selectDatePreset = async function (presetName) {
     if (presetName === 'Custom Range') {
         openCustomRangeModal();
@@ -680,19 +950,91 @@ window.selectDatePreset = async function (presetName) {
         days = 1;
     }
 
-    // Persist to localStorage so page refresh preserves user's chosen view
     localStorage.setItem("thermal_selected_period", presetName);
     localStorage.setItem("thermal_selected_days", String(days));
     localStorage.removeItem("thermal_custom_from");
     localStorage.removeItem("thermal_custom_to");
 
-    showToast(`Loading satellite data for: ${presetName} (fetching NASA FIRMS ${days}-day telemetry via AI pipeline)...`, "info");
+    // CASE 1: Past 30 Days (Instant Switching - NO NASA FIRMS repeated lag)
+    if (days === 30) {
+        if (is30DayCatalogLoaded && global30DayFirmsCatalog && global30DayFirmsCatalog.length > 0) {
+            allEvents = [...global30DayFirmsCatalog];
+            filteredEvents = [...allEvents];
+            eventsCurrentPage = 1;
+            window.__DATASET_MODE__ = "INDEXED";
+            updateDashboard();
+            if (typeof renderAnalyticsCharts === "function") renderAnalyticsCharts();
+            updateLiveFirmsStatusPanel();
+            showToast(`Switched to Past 30 Days (${allEvents.length} genuine FIRMS observations loaded instantly)`, "success");
+            return;
+        } else {
+            showToast("Loading 30-Day NASA FIRMS observation dataset (first-time retrieval)...", "info");
+            try {
+                await ensure30DayCatalogLoaded();
+                if (global30DayFirmsCatalog && global30DayFirmsCatalog.length > 0) {
+                    allEvents = [...global30DayFirmsCatalog];
+                    filteredEvents = [...allEvents];
+                    eventsCurrentPage = 1;
+                    window.__DATASET_MODE__ = "INDEXED";
+                    updateDashboard();
+                    if (typeof renderAnalyticsCharts === "function") renderAnalyticsCharts();
+                    updateLiveFirmsStatusPanel();
+                    showToast(`Loaded Past 30 Days (${allEvents.length} genuine FIRMS observations)`, "success");
+                }
+            } catch (err) {
+                console.error("Error loading 30-day FIRMS data:", err);
+            }
+            return;
+        }
+    }
 
-    try {
-        const count = await syncBackendFirms(days, false);
-        showToast(`Loaded ${presetName}: ${count} real thermal sources classified by AI!`, "success");
-    } catch (err) {
-        console.error("Error loading date preset:", err);
+    // CASE 2: Past 7 Days (Instant Switching - derived from 30-day catalog or cached)
+    if (days === 7) {
+        if (global30DayFirmsCatalog && global30DayFirmsCatalog.length > 0) {
+            if (!global7DayFirmsCatalog || global7DayFirmsCatalog.length === 0) {
+                global7DayFirmsCatalog = derive7DaySubset(global30DayFirmsCatalog);
+            }
+            allEvents = [...global7DayFirmsCatalog];
+            filteredEvents = [...allEvents];
+            eventsCurrentPage = 1;
+            window.__DATASET_MODE__ = "INDEXED";
+            updateDashboard();
+            if (typeof renderAnalyticsCharts === "function") renderAnalyticsCharts();
+            updateLiveFirmsStatusPanel();
+            showToast(`Switched to Past 7 Days (${allEvents.length} genuine FIRMS observations derived instantly)`, "success");
+            return;
+        } else if (global7DayFirmsCatalog && global7DayFirmsCatalog.length > 0) {
+            allEvents = [...global7DayFirmsCatalog];
+            filteredEvents = [...allEvents];
+            eventsCurrentPage = 1;
+            window.__DATASET_MODE__ = "INDEXED";
+            updateDashboard();
+            if (typeof renderAnalyticsCharts === "function") renderAnalyticsCharts();
+            updateLiveFirmsStatusPanel();
+            showToast(`Switched to Past 7 Days (${allEvents.length} genuine FIRMS observations loaded instantly)`, "success");
+            return;
+        } else {
+            showToast("Loading 7-Day NASA FIRMS observation dataset...", "info");
+            try {
+                const count = await syncBackendFirms(7, false);
+                global7DayFirmsCatalog = [...allEvents];
+                showToast(`Loaded Past 7 Days (${count} verified thermal sources)`, "success");
+            } catch (err) {
+                console.error("Error loading 7-day FIRMS data:", err);
+            }
+            return;
+        }
+    }
+
+    // CASE 3: Live Satellite Pass (Today)
+    if (days === 1) {
+        showToast("Synchronizing Today's Live Satellite Pass from NASA FIRMS...", "info");
+        try {
+            await syncBackendFirms(1, false);
+        } catch (err) {
+            console.error("Error loading live pass:", err);
+        }
+        return;
     }
 };
 
@@ -701,29 +1043,7 @@ window.selectDatePreset = async function (presetName) {
    ========================================================================== */
 function loadInitialFallbackData() {
     if (typeof INITIAL_563_EVENTS !== "undefined" && Array.isArray(INITIAL_563_EVENTS) && INITIAL_563_EVENTS.length > 0) {
-        historicalArchiveEvents = INITIAL_563_EVENTS.map((item, idx) => ({
-            source_id: item.source_id || `GT_${idx + 1}`,
-            state: item.state || getNearestState(item.latitude, item.longitude),
-            latitude: parseFloat(item.latitude),
-            longitude: parseFloat(item.longitude),
-            predicted_event_type: normalizeType(item.predicted_event_type || item.event_type || "Industrial"),
-            confidence: parseFloat(item.confidence || 90.0),
-            confidence_pct: parseFloat(item.confidence || 90.0),
-            persistence_score: parseFloat(item.persistence_score || 85.0),
-            landcover: item.landcover || "Built-up",
-            landcover_class: item.landcover || "Built-up",
-            mean_frp: parseFloat(item.mean_frp || item.frp || 25.0),
-            max_frp: parseFloat(item.mean_frp || item.frp || 25.0),
-            brightness: parseFloat(item.brightness || 335.0),
-            risk_level: item.predicted_event_type === "Industrial" ? "Critical" : "High",
-            risk_description: "Ground truth database record",
-            sih_alert_severity: "LOW",
-            total_detections: 1,
-            active_days: 1,
-            is_persistent: false,
-            is_flare_anomaly: false,
-            acq_time: item.acq_time || "09:00"
-        }));
+        historicalArchiveEvents = INITIAL_563_EVENTS.map((item, idx) => mapRawSourceToEvent(item, idx, "GT_"));
     }
 
     if (historicalArchiveEvents.length === 0) {
@@ -732,8 +1052,20 @@ function loadInitialFallbackData() {
 
     allEvents = [...historicalArchiveEvents];
     filteredEvents = [...allEvents];
+
+    if (!global7DayFirmsCatalog || global7DayFirmsCatalog.length === 0) {
+        global7DayFirmsCatalog = [...allEvents];
+    }
+    if (!is30DayCatalogLoaded && (!global30DayFirmsCatalog || global30DayFirmsCatalog.length === 0)) {
+        global30DayFirmsCatalog = [...allEvents];
+    }
+
+    window.__DATASET_MODE__ = "INDEXED";
     updateDashboard();
+    updateLiveFirmsStatusPanel();
 }
+window.loadInitialFallbackData = loadInitialFallbackData;
+window.loadInitialData = loadInitialFallbackData;
 
 // Backward-compatible alias
 function loadInitialData() {
@@ -1006,7 +1338,9 @@ function syncBackendFirms(options = 1, isManual = false) {
                 eventsCurrentPage = 1;
                 window.__DATASET_MODE__ = "INDEXED";
                 updateDashboard();
+                window.__DATASET_MODE__ = "INDEXED";
                 updateSatelliteCoverageBanner(0, customLabel, timeStr);
+                updateLiveFirmsStatusPanel();
                 setText("nasa-last-update", "Synced with Backend AI (0 new anomalies)");
                 showToast("Satellite pass complete — 0 new detections. Displaying verified indexed sources.", "info");
                 return 0;
@@ -1076,7 +1410,11 @@ function syncBackendFirms(options = 1, isManual = false) {
                 eventsCurrentPage = 1;
                 window.__DATASET_MODE__ = "LIVE";
                 updateDashboard();
+                // Tag live pass detections clearly
+                allEvents.forEach(ev => { ev.is_live_pass = true; });
+                window.__DATASET_MODE__ = "LIVE";
                 updateSatelliteCoverageBanner(allEvents.length, customLabel, timeStr);
+                updateLiveFirmsStatusPanel();
                 setText("nasa-last-update", `Synced with Backend AI (${allEvents.length} clusters)`);
                 showToast(`Loaded ${customLabel}: ${allEvents.length} real thermal sources classified by AI!`, "success");
                 return allEvents.length;
@@ -1162,10 +1500,10 @@ function getEventPopupContent(ev) {
     const type = normalizeType(ev.predicted_event_type);
     const color = getEventColor(type);
     const risk = getEventRiskLevel(ev);
-    const isLive = window.__DATASET_MODE__ === "LIVE";
-    const statusBadge = isLive
-        ? `<span style="background: #dcfce7; color: #15803d; font-weight: 700; font-size: 10px; padding: 1px 6px; border-radius: 9999px;"><i class="fa-solid fa-satellite" style="font-size:9px;"></i> Live Pass</span>`
-        : `<span style="background: #f1f5f9; color: #475569; font-weight: 700; font-size: 10px; padding: 1px 6px; border-radius: 9999px;"><i class="fa-solid fa-database" style="font-size:9px;"></i> Previously Indexed</span>`;
+    const isLiveDetection = Boolean(ev.is_live_pass);
+    const statusBadge = isLiveDetection
+        ? `<span class="badge-pill" style="background: #dcfce7; color: #15803d; border: 1px solid #86efac; font-weight: 700; font-size: 10px; padding: 2px 7px; border-radius: 9999px;"><i class="fa-solid fa-satellite" style="font-size:9px;"></i> Live Pass Detection</span>`
+        : `<span class="badge-pill" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; font-weight: 700; font-size: 10px; padding: 2px 7px; border-radius: 9999px;"><i class="fa-solid fa-database" style="font-size:9px;"></i> Latest Available Indexed Source</span>`;
 
     return `
         <div style="font-family: 'Inter', sans-serif; font-size: 13px; line-height: 1.5; color: #1e293b; min-width: 240px; padding: 2px;">
@@ -3244,3 +3582,6 @@ function downloadActiveReport(format = "CSV") {
     }
 }
 window.downloadActiveReport = downloadActiveReport;
+
+window.renderAnalyticsCharts = renderAnalyticsCharts;
+window.updateDashboard = updateDashboard;

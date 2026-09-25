@@ -2534,3 +2534,177 @@ body.dark-mode .live-pass-indicator {
     margin-top: 3px;
     display: block;
 }
+
+
+/* ==========================================================================
+   LIVE FIRMS STATUS PANEL (COMPACT PROFESSIONAL HUD)
+   ========================================================================== */
+.firms-live-status-panel {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 18px;
+    margin-bottom: 16px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    flex-wrap: wrap;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.firms-status-brand-col {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.firms-status-emblem {
+    width: 38px;
+    height: 38px;
+    border-radius: 9px;
+    background: linear-gradient(135deg, #ef4444, #f97316);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+    box-shadow: 0 2px 6px rgba(239, 68, 68, 0.25);
+}
+
+.firms-status-brand-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    line-height: 1.2;
+}
+
+.firms-status-source-tag {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #2563eb;
+    background: rgba(37, 99, 235, 0.1);
+    padding: 2px 7px;
+    border-radius: 4px;
+    letter-spacing: 0.3px;
+}
+
+[data-theme="dark"] .firms-status-source-tag {
+    color: #60a5fa;
+    background: rgba(96, 165, 250, 0.15);
+}
+
+.firms-status-brand-sub {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.firms-status-metric-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+}
+
+.firms-pass-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 14px;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    transition: all 0.2s ease;
+}
+
+.firms-pass-badge.zero {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+}
+
+[data-theme="dark"] .firms-pass-badge.zero {
+    background: #1e293b;
+    color: #94a3b8;
+    border: 1px solid #334155;
+}
+
+.firms-pass-badge.active {
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #86efac;
+    animation: livePassPulse 2.5s infinite;
+}
+
+[data-theme="dark"] .firms-pass-badge.active {
+    background: rgba(22, 101, 52, 0.35);
+    color: #4ade80;
+    border: 1px solid #166534;
+}
+
+@keyframes livePassPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+    50% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+}
+
+.firms-status-detail-line {
+    font-size: 12px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.firms-dot-sep {
+    color: var(--text-muted);
+    opacity: 0.6;
+}
+
+.firms-status-action-col {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.firms-period-badge {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 11px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-hover);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+}
+
+.btn-firms-refresh {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--primary-color);
+    color: #ffffff;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 6px 14px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.btn-firms-refresh:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.btn-firms-refresh:active {
+    transform: translateY(0);
+}
