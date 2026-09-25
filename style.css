@@ -2026,3 +2026,84 @@ body.dark-mode .live-pass-indicator {
     gap: 10px;
     margin-top: auto;
 }
+
+
+/* Analytics Time Window Selector */
+.analytics-period-btn {
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+}
+
+.analytics-period-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-surface);
+}
+
+.analytics-period-btn.active {
+    color: var(--primary-color);
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-sm);
+    font-weight: 700;
+}
+
+/* Temporal Activity Panel */
+.analytics-temporal-panel {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 20px;
+    margin-top: 24px;
+    box-shadow: var(--shadow-sm);
+}
+
+.analytics-temporal-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-top: 14px;
+}
+
+@media (max-width: 900px) {
+    .analytics-temporal-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.temporal-metric-tile {
+    background: var(--bg-hover);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+}
+
+.temporal-metric-tile .temporal-label {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.temporal-metric-tile .temporal-val {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+    display: block;
+}
+
+.temporal-metric-tile .temporal-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 3px;
+    display: block;
+}

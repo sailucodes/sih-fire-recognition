@@ -544,32 +544,39 @@
                      4. ANALYTICS & INSIGHTS VIEW
                      ============================================================== -->
                 <section id="analytics-section" class="view-section">
-                    <div style="margin-bottom: 20px;">
-                        <h2 style="font-size: 20px; margin-bottom: 4px;">Analytics & Insights</h2>
-                        <p style="font-size: 13.5px; color: var(--text-muted);">Spatial distribution, temporal trends, and risk assessment breakdown</p>
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
+                        <div>
+                            <h2 style="font-size: 20px; margin-bottom: 4px;">Analytics & Insights</h2>
+                            <p style="font-size: 13.5px; color: var(--text-muted);" id="analytics-time-window-subtitle">Spatial distribution, temporal persistence, and risk assessment breakdown</p>
+                        </div>
+                        <div class="analytics-time-selector" style="display: flex; gap: 6px; background: var(--bg-hover); padding: 4px; border-radius: 8px; border: 1px solid var(--border-color);">
+                            <button class="analytics-period-btn active" id="btn-analytics-7d" data-days="7" onclick="setAnalyticsTimePeriod(7)"><i class="fa-solid fa-calendar-week" style="margin-right: 5px;"></i> Past 7 Days</button>
+                            <button class="analytics-period-btn" id="btn-analytics-30d" data-days="30" onclick="setAnalyticsTimePeriod(30)"><i class="fa-solid fa-calendar-days" style="margin-right: 5px;"></i> Past 30 Days</button>
+                            <button class="analytics-period-btn" id="btn-analytics-1d" data-days="1" onclick="setAnalyticsTimePeriod(1)"><i class="fa-solid fa-satellite" style="margin-right: 5px;"></i> Today (Live)</button>
+                        </div>
                     </div>
 
-                    <!-- 4 Summary Metric Cards with Comparison Trends -->
+                    <!-- 4 Summary Metric Cards with Dynamic Period Context -->
                     <div class="analytics-grid-row">
                         <div class="analytics-card-metric">
                             <span>Total Monitored Hotspots</span>
-                            <strong id="analytics-total-events">918</strong>
-                            <span class="stat-trend-pill positive"><i class="fa-solid fa-arrow-trend-up"></i> +12.4% vs last month</span>
+                            <strong id="analytics-total-events">--</strong>
+                            <span class="stat-trend-pill" id="analytics-total-period-badge"><i class="fa-solid fa-satellite-dish"></i> 7-day window</span>
                         </div>
                         <div class="analytics-card-metric">
                             <span>Persistent Industrial Sources</span>
-                            <strong id="analytics-persistent-sources">193</strong>
-                            <span class="stat-trend-pill negative"><i class="fa-solid fa-arrow-trend-up"></i> +4.1% vs baseline</span>
+                            <strong id="analytics-persistent-sources">--</strong>
+                            <span class="stat-trend-pill" id="analytics-persistent-badge"><i class="fa-solid fa-industry"></i> Verified Emitters</span>
                         </div>
                         <div class="analytics-card-metric">
                             <span>Average Model Confidence</span>
-                            <strong id="analytics-avg-conf">91.4%</strong>
-                            <span class="stat-trend-pill positive"><i class="fa-solid fa-check"></i> High Precision</span>
+                            <strong id="analytics-avg-conf">--</strong>
+                            <span class="stat-trend-pill" id="analytics-conf-badge"><i class="fa-solid fa-crosshairs"></i> Source Classifier</span>
                         </div>
                         <div class="analytics-card-metric">
                             <span>Critical / High Severity</span>
-                            <strong id="analytics-high-risk">24</strong>
-                            <span class="stat-trend-pill negative"><i class="fa-solid fa-shield-halved"></i> Active Escalations</span>
+                            <strong id="analytics-high-risk">--</strong>
+                            <span class="stat-trend-pill" id="analytics-risk-badge"><i class="fa-solid fa-shield-halved"></i> Active Alerts</span>
                         </div>
                     </div>
 
@@ -586,7 +593,7 @@
                         </div>
 
                         <div class="analytics-chart-panel">
-                            <h3><i class="fa-solid fa-chart-line" style="color: var(--color-critical); margin-right: 6px;"></i> Seasonal Monthly Trend (Flares vs Wildfires)</h3>
+                            <h3 id="chart-monthly-trend-title"><i class="fa-solid fa-chart-line" style="color: var(--color-critical); margin-right: 6px;"></i> Observation Timeline & Daily Distribution</h3>
                             <div id="chart-monthly-trend"></div>
                         </div>
 
@@ -596,10 +603,22 @@
                         </div>
                     </div>
 
+                    <!-- Dedicated Temporal Activity & Persistence Analytics Panel -->
+                    <div class="analytics-temporal-panel">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                            <h3 style="font-size: 15px; margin: 0;"><i class="fa-solid fa-clock-rotate-left" style="color: var(--primary-color); margin-right: 6px;"></i> Temporal Activity & Multi-Day Persistence Profile</h3>
+                            <span style="font-size: 12px; color: var(--text-muted);" id="analytics-temporal-status">Computed from source-level satellite recurrence features</span>
+                        </div>
+                        <div class="analytics-temporal-grid" id="analytics-temporal-metrics-grid">
+                            <!-- Populated dynamically with genuine features -->
+                        </div>
+                    </div>
+
                     <!-- State Risk Rankings Table -->
                     <div class="table-container-card" style="margin-top: 24px;">
-                        <div style="padding: 16px 20px; border-bottom: 1px solid var(--border-color);">
-                            <h3 style="font-size: 15px; margin: 0;">Top Indian States by Active Thermal Anomalies</h3>
+                        <div style="padding: 16px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                            <h3 style="font-size: 15px; margin: 0;"><i class="fa-solid fa-map-location-dot" style="color: var(--primary-color); margin-right: 6px;"></i> Top Indian States by Active Thermal Anomalies</h3>
+                            <span style="font-size: 12px; color: var(--text-muted);" id="analytics-state-count-label">Reconciled with active period</span>
                         </div>
                         <table class="custom-data-table">
                             <thead>
@@ -609,7 +628,7 @@
                                     <th>Total Hotspots</th>
                                     <th>Industrial Flares</th>
                                     <th>Forest Fires</th>
-                                    <th>Stubble Burning</th>
+                                    <th>Agricultural / Stubble</th>
                                     <th>State Status</th>
                                 </tr>
                             </thead>

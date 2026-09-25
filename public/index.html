@@ -2043,6 +2043,87 @@ body.dark-mode .live-pass-indicator {
     margin-top: auto;
 }
 
+
+/* Analytics Time Window Selector */
+.analytics-period-btn {
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+}
+
+.analytics-period-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-surface);
+}
+
+.analytics-period-btn.active {
+    color: var(--primary-color);
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-sm);
+    font-weight: 700;
+}
+
+/* Temporal Activity Panel */
+.analytics-temporal-panel {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 20px;
+    margin-top: 24px;
+    box-shadow: var(--shadow-sm);
+}
+
+.analytics-temporal-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-top: 14px;
+}
+
+@media (max-width: 900px) {
+    .analytics-temporal-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.temporal-metric-tile {
+    background: var(--bg-hover);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+}
+
+.temporal-metric-tile .temporal-label {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.temporal-metric-tile .temporal-val {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+    display: block;
+}
+
+.temporal-metric-tile .temporal-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 3px;
+    display: block;
+}
+
 </style>
 </head>
 <body>
@@ -2574,32 +2655,39 @@ body.dark-mode .live-pass-indicator {
                      4. ANALYTICS & INSIGHTS VIEW
                      ============================================================== -->
                 <section id="analytics-section" class="view-section">
-                    <div style="margin-bottom: 20px;">
-                        <h2 style="font-size: 20px; margin-bottom: 4px;">Analytics & Insights</h2>
-                        <p style="font-size: 13.5px; color: var(--text-muted);">Spatial distribution, temporal trends, and risk assessment breakdown</p>
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
+                        <div>
+                            <h2 style="font-size: 20px; margin-bottom: 4px;">Analytics & Insights</h2>
+                            <p style="font-size: 13.5px; color: var(--text-muted);" id="analytics-time-window-subtitle">Spatial distribution, temporal persistence, and risk assessment breakdown</p>
+                        </div>
+                        <div class="analytics-time-selector" style="display: flex; gap: 6px; background: var(--bg-hover); padding: 4px; border-radius: 8px; border: 1px solid var(--border-color);">
+                            <button class="analytics-period-btn active" id="btn-analytics-7d" data-days="7" onclick="setAnalyticsTimePeriod(7)"><i class="fa-solid fa-calendar-week" style="margin-right: 5px;"></i> Past 7 Days</button>
+                            <button class="analytics-period-btn" id="btn-analytics-30d" data-days="30" onclick="setAnalyticsTimePeriod(30)"><i class="fa-solid fa-calendar-days" style="margin-right: 5px;"></i> Past 30 Days</button>
+                            <button class="analytics-period-btn" id="btn-analytics-1d" data-days="1" onclick="setAnalyticsTimePeriod(1)"><i class="fa-solid fa-satellite" style="margin-right: 5px;"></i> Today (Live)</button>
+                        </div>
                     </div>
 
-                    <!-- 4 Summary Metric Cards with Comparison Trends -->
+                    <!-- 4 Summary Metric Cards with Dynamic Period Context -->
                     <div class="analytics-grid-row">
                         <div class="analytics-card-metric">
                             <span>Total Monitored Hotspots</span>
-                            <strong id="analytics-total-events">918</strong>
-                            <span class="stat-trend-pill positive"><i class="fa-solid fa-arrow-trend-up"></i> +12.4% vs last month</span>
+                            <strong id="analytics-total-events">--</strong>
+                            <span class="stat-trend-pill" id="analytics-total-period-badge"><i class="fa-solid fa-satellite-dish"></i> 7-day window</span>
                         </div>
                         <div class="analytics-card-metric">
                             <span>Persistent Industrial Sources</span>
-                            <strong id="analytics-persistent-sources">193</strong>
-                            <span class="stat-trend-pill negative"><i class="fa-solid fa-arrow-trend-up"></i> +4.1% vs baseline</span>
+                            <strong id="analytics-persistent-sources">--</strong>
+                            <span class="stat-trend-pill" id="analytics-persistent-badge"><i class="fa-solid fa-industry"></i> Verified Emitters</span>
                         </div>
                         <div class="analytics-card-metric">
                             <span>Average Model Confidence</span>
-                            <strong id="analytics-avg-conf">91.4%</strong>
-                            <span class="stat-trend-pill positive"><i class="fa-solid fa-check"></i> High Precision</span>
+                            <strong id="analytics-avg-conf">--</strong>
+                            <span class="stat-trend-pill" id="analytics-conf-badge"><i class="fa-solid fa-crosshairs"></i> Source Classifier</span>
                         </div>
                         <div class="analytics-card-metric">
                             <span>Critical / High Severity</span>
-                            <strong id="analytics-high-risk">24</strong>
-                            <span class="stat-trend-pill negative"><i class="fa-solid fa-shield-halved"></i> Active Escalations</span>
+                            <strong id="analytics-high-risk">--</strong>
+                            <span class="stat-trend-pill" id="analytics-risk-badge"><i class="fa-solid fa-shield-halved"></i> Active Alerts</span>
                         </div>
                     </div>
 
@@ -2616,7 +2704,7 @@ body.dark-mode .live-pass-indicator {
                         </div>
 
                         <div class="analytics-chart-panel">
-                            <h3><i class="fa-solid fa-chart-line" style="color: var(--color-critical); margin-right: 6px;"></i> Seasonal Monthly Trend (Flares vs Wildfires)</h3>
+                            <h3 id="chart-monthly-trend-title"><i class="fa-solid fa-chart-line" style="color: var(--color-critical); margin-right: 6px;"></i> Observation Timeline & Daily Distribution</h3>
                             <div id="chart-monthly-trend"></div>
                         </div>
 
@@ -2626,10 +2714,22 @@ body.dark-mode .live-pass-indicator {
                         </div>
                     </div>
 
+                    <!-- Dedicated Temporal Activity & Persistence Analytics Panel -->
+                    <div class="analytics-temporal-panel">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                            <h3 style="font-size: 15px; margin: 0;"><i class="fa-solid fa-clock-rotate-left" style="color: var(--primary-color); margin-right: 6px;"></i> Temporal Activity & Multi-Day Persistence Profile</h3>
+                            <span style="font-size: 12px; color: var(--text-muted);" id="analytics-temporal-status">Computed from source-level satellite recurrence features</span>
+                        </div>
+                        <div class="analytics-temporal-grid" id="analytics-temporal-metrics-grid">
+                            <!-- Populated dynamically with genuine features -->
+                        </div>
+                    </div>
+
                     <!-- State Risk Rankings Table -->
                     <div class="table-container-card" style="margin-top: 24px;">
-                        <div style="padding: 16px 20px; border-bottom: 1px solid var(--border-color);">
-                            <h3 style="font-size: 15px; margin: 0;">Top Indian States by Active Thermal Anomalies</h3>
+                        <div style="padding: 16px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                            <h3 style="font-size: 15px; margin: 0;"><i class="fa-solid fa-map-location-dot" style="color: var(--primary-color); margin-right: 6px;"></i> Top Indian States by Active Thermal Anomalies</h3>
+                            <span style="font-size: 12px; color: var(--text-muted);" id="analytics-state-count-label">Reconciled with active period</span>
                         </div>
                         <table class="custom-data-table">
                             <thead>
@@ -2639,7 +2739,7 @@ body.dark-mode .live-pass-indicator {
                                     <th>Total Hotspots</th>
                                     <th>Industrial Flares</th>
                                     <th>Forest Fires</th>
-                                    <th>Stubble Burning</th>
+                                    <th>Agricultural / Stubble</th>
                                     <th>State Status</th>
                                 </tr>
                             </thead>
@@ -27231,6 +27331,9 @@ const INITIAL_563_EVENTS = [
 ];
 
 </script>
+
+    <!-- Pre-compiled Ground Truth Database -->
+    <script src="initial_data.js"></script>
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <!-- Runtime Network Configuration -->
@@ -27856,6 +27959,21 @@ window.applyCustomDateRange = async function () {
     }
 };
 
+
+function setHtml(id, html) {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = html;
+}
+window.setHtml = setHtml;
+
+function setAnalyticsTimePeriod(days) {
+    const presetName = days === 7 ? "Past 7 Days" : (days === 30 ? "Past 30 Days" : "Today (Live Pass)");
+    if (typeof window.selectDatePreset === "function") {
+        window.selectDatePreset(presetName);
+    }
+}
+window.setAnalyticsTimePeriod = setAnalyticsTimePeriod;
+
 window.selectDatePreset = async function (presetName) {
     if (presetName === 'Custom Range') {
         openCustomRangeModal();
@@ -28220,6 +28338,12 @@ function syncBackendFirms(options = 1, isManual = false) {
                     const state = s.state || getNearestState(lat, lng);
                     const risk = s.risk_level || (type === "Industrial" && conf >= 85 ? "Critical" : (frp >= 25 ? "High" : "Medium"));
 
+                    const normLc = normalizeLandcover(s.landcover_class || s.landcover || "Built-up");
+                    const isPers = Boolean(s.is_persistent || s.persistent_flag == 1 || s.persistent_flag === "1");
+                    const actDays = parseInt(s.active_days || 1, 10);
+                    const obsSpan = parseInt(s.observation_span_days || s.observation_days || 1, 10);
+                    const totDets = parseInt(s.total_detections || 1, 10);
+
                     return {
                         source_id: s.source_id || `FIRMS_${String(idx + 1).padStart(4, "0")}`,
                         state: state,
@@ -28229,8 +28353,8 @@ function syncBackendFirms(options = 1, isManual = false) {
                         confidence: conf,
                         confidence_pct: conf,
                         persistence_score: persScore,
-                        landcover: s.landcover_class || s.landcover || "Built-up",
-                        landcover_class: s.landcover_class || s.landcover || "Built-up",
+                        landcover: normLc,
+                        landcover_class: normLc,
                         mean_frp: frp,
                         max_frp: maxFrp,
                         risk_level: risk,
@@ -28238,10 +28362,27 @@ function syncBackendFirms(options = 1, isManual = false) {
                         sih_alert_severity: s.sih_alert_severity || (risk === "Critical" ? "CRITICAL" : "LOW"),
                         nearest_facility_name: s.nearest_facility_name || "",
                         nearest_facility_type: s.nearest_facility_type || "",
-                        total_detections: parseInt(s.total_detections || 1, 10),
-                        active_days: parseInt(s.active_days || 1, 10),
-                        is_persistent: Boolean(s.is_persistent),
+                        total_detections: totDets,
+                        active_days: actDays,
+                        observation_span_days: obsSpan,
+                        observation_days: obsSpan,
+                        recurrence_rate: parseFloat(s.recurrence_rate !== undefined ? s.recurrence_rate : (actDays / Math.max(1, obsSpan)).toFixed(4)),
+                        detections_per_span_day: parseFloat(s.detections_per_span_day || (totDets / Math.max(1, obsSpan)).toFixed(2)),
+                        mean_gap_hours: parseFloat(s.mean_gap_hours || 0.0),
+                        std_gap_hours: parseFloat(s.std_gap_hours || 0.0),
+                        median_gap_hours: parseFloat(s.median_gap_hours || s.mean_gap_hours || 0.0),
+                        min_gap_hours: parseFloat(s.min_gap_hours || 0.0),
+                        max_gap_hours: parseFloat(s.max_gap_hours || 0.0),
+                        temporal_regularity: parseFloat(s.temporal_regularity || 0.0),
+                        max_active_days_7d: parseInt(s.max_active_days_7d || Math.min(actDays, 7), 10),
+                        max_active_days_14d: parseInt(s.max_active_days_14d || Math.min(actDays, 14), 10),
+                        max_active_days_30d: parseInt(s.max_active_days_30d || Math.min(actDays, 30), 10),
+                        persistent_flag: isPers ? 1 : 0,
+                        is_persistent: isPers,
                         is_flare_anomaly: Boolean(s.is_flare_anomaly),
+                        first_detection: s.first_detection || "",
+                        last_detection: s.last_detection || "",
+                        acq_date: s.acq_date || (s.last_detection ? s.last_detection.split(" ")[0] : ""),
                         acq_time: s.acq_time || "09:30"
                     };
                 });
@@ -29010,179 +29151,465 @@ function renderAnalyticsCharts() {
 
     if (!totalEl) return;
 
-    let total = filteredEvents.length;
+    // Detect currently selected window (defaults to 7 if unselected)
+    const currentDays = parseInt(localStorage.getItem("thermal_selected_days") || "7", 10);
+    const periodLabel = localStorage.getItem("thermal_selected_period") || `${currentDays}-Day Window`;
+
+    // Synchronize Analytics time selector buttons
+    document.querySelectorAll(".analytics-period-btn").forEach(btn => {
+        const d = parseInt(btn.dataset.days, 10);
+        btn.classList.toggle("active", d === currentDays);
+    });
+
+    const subTitleEl = document.getElementById("analytics-time-window-subtitle");
+    if (subTitleEl) {
+        subTitleEl.innerText = `Spatial distribution, temporal persistence, and risk assessment for ${periodLabel}`;
+    }
+
+    // Dataset for active period
+    const events = (Array.isArray(filteredEvents) && filteredEvents.length > 0) ? filteredEvents : allEvents;
+    const total = events.length;
+
+    // 1. KPI ACCUMULATORS
     let ind = 0, forest = 0, agri = 0, other = 0;
-    let persistentCount = 0;
+    let persIndCount = 0;
+    let persTotalCount = 0;
     let confSum = 0;
-    let highRiskCount = 0;
+    let validConfCount = 0;
+    let criticalCount = 0;
+    let highCount = 0;
+    let mediumCount = 0;
+    let lowCount = 0;
 
-    let landcoverCounts = { "Built-up / Industrial": 0, "Tree cover / Forest": 0, "Cropland / Stubble": 0, "Shrubland / Grass": 0, "Bare / Sparse Soil": 0 };
-    let stateAnomalyCounts = {};
+    // Genuine Landcover Classes defined by pipeline
+    const GENUINE_LC_CLASSES = [
+        "Tree cover / Forest",
+        "Cropland / Agricultural",
+        "Built-up / Industrial",
+        "Shrubland / Grassland",
+        "Bare / Sparse Soil",
+        "Permanent water bodies",
+        "Mangroves",
+        "Herbaceous wetland",
+        "Unclassified"
+    ];
+    const landcoverCounts = {};
+    GENUINE_LC_CLASSES.forEach(c => { landcoverCounts[c] = 0; });
 
-    filteredEvents.forEach(e => {
+    // Temporal Accumulators
+    let totalDetections = 0;
+    let totalActiveDays = 0;
+    let sumObsSpan = 0;
+    let sumRecurrence = 0;
+    let sumRegularity = 0;
+    let sumGapHours = 0;
+
+    // Daily distribution map for genuine temporal trend
+    const dailyCounts = {};
+    const stateAnomalyCounts = {};
+
+    events.forEach(e => {
         const type = normalizeType(e.predicted_event_type);
         if (type === "Industrial") ind++;
         else if (type === "Forest/Natural") forest++;
         else if (type === "Agricultural") agri++;
         else other++;
 
-        const conf = parseFloat(e.confidence) || 0;
-        confSum += conf;
+        // Confidence
+        const conf = parseFloat(e.confidence || e.confidence_pct);
+        if (!isNaN(conf) && conf > 0) {
+            confSum += conf;
+            validConfCount++;
+        }
 
+        // Severity / Risk
         const risk = getEventRiskLevel(e);
-        if (risk === "Critical" || risk === "High") highRiskCount++;
+        if (risk === "Critical") criticalCount++;
+        else if (risk === "High") highCount++;
+        else if (risk === "Medium") mediumCount++;
+        else lowCount++;
 
-        const pers = parseFloat(e.persistence_score) || 0;
-        if (pers >= 70) persistentCount++;
+        // Persistence: Persistent Industrial Sources must be persistent_flag == 1 AND Industrial
+        const isPers = Boolean(e.persistent_flag === 1 || e.is_persistent);
+        if (isPers) {
+            persTotalCount++;
+            if (type === "Industrial") persIndCount++;
+        }
 
-        const lc = e.landcover || "Built-up / Industrial";
-        if (landcoverCounts[lc] !== undefined) landcoverCounts[lc]++;
-        else landcoverCounts["Built-up / Industrial"]++;
+        // Landcover
+        const lcNorm = normalizeLandcover(e.landcover_class || e.landcover);
+        if (landcoverCounts[lcNorm] !== undefined) {
+            landcoverCounts[lcNorm]++;
+        } else {
+            landcoverCounts["Unclassified"]++;
+        }
 
+        // Temporal Metrics Accumulation
+        const dets = parseInt(e.total_detections || 1, 10);
+        const acts = parseInt(e.active_days || 1, 10);
+        const span = parseInt(e.observation_span_days || e.observation_days || 1, 10);
+        const recur = parseFloat(e.recurrence_rate !== undefined ? e.recurrence_rate : (acts / Math.max(1, span)));
+        const reg = parseFloat(e.temporal_regularity || 0.0);
+        const gap = parseFloat(e.mean_gap_hours || 0.0);
+
+        totalDetections += dets;
+        totalActiveDays += acts;
+        sumObsSpan += span;
+        sumRecurrence += recur;
+        sumRegularity += reg;
+        sumGapHours += gap;
+
+        // Observation Date grouping
+        let dStr = "";
+        if (e.last_detection) dStr = e.last_detection.split(" ")[0];
+        else if (e.acq_date) dStr = e.acq_date.split(" ")[0];
+        else if (e.first_detection) dStr = e.first_detection.split(" ")[0];
+
+        if (dStr && dStr.length >= 8) {
+            if (!dailyCounts[dStr]) dailyCounts[dStr] = { total: 0, ind: 0, nat: 0 };
+            dailyCounts[dStr].total++;
+            if (type === "Industrial") dailyCounts[dStr].ind++;
+            else dailyCounts[dStr].nat++;
+        }
+
+        // State grouping
         const st = e.state || "National";
         if (!stateAnomalyCounts[st]) {
-            stateAnomalyCounts[st] = { total: 0, ind: 0, forest: 0, agri: 0 };
+            stateAnomalyCounts[st] = { total: 0, ind: 0, forest: 0, agri: 0, critical: 0, high: 0 };
         }
         stateAnomalyCounts[st].total++;
         if (type === "Industrial") stateAnomalyCounts[st].ind++;
         else if (type === "Forest/Natural") stateAnomalyCounts[st].forest++;
         else if (type === "Agricultural") stateAnomalyCounts[st].agri++;
+        if (risk === "Critical") stateAnomalyCounts[st].critical++;
+        else if (risk === "High") stateAnomalyCounts[st].high++;
     });
 
+    // Populate Top 4 KPI Cards
     totalEl.innerText = total.toLocaleString();
-    persEl.innerText = persistentCount.toLocaleString();
-    avgConfEl.innerText = total > 0 ? (confSum / total).toFixed(1) + "%" : "0.0%";
-    highRiskEl.innerText = Math.min(24, Math.max(12, highRiskCount)).toString();
+    persEl.innerText = persIndCount.toLocaleString();
+    avgConfEl.innerText = validConfCount > 0 ? (confSum / validConfCount).toFixed(1) + "%" : "N/A";
+    const combinedHighRisk = criticalCount + highCount;
+    highRiskEl.innerText = combinedHighRisk.toLocaleString();
 
-    // 1. Events by Type Donut
+    // Badges: Genuine context without fake comparisons
+    setHtml("analytics-total-period-badge", `<i class="fa-solid fa-calendar-check" style="margin-right:4px;"></i> ${currentDays}-day window`);
+    setHtml("analytics-persistent-badge", total > 0 ? `<i class="fa-solid fa-industry" style="margin-right:4px;"></i> ${((persIndCount / total) * 100).toFixed(1)}% of total` : `<i class="fa-solid fa-industry" style="margin-right:4px;"></i> 0.0%`);
+    setHtml("analytics-conf-badge", validConfCount > 0 ? `<i class="fa-solid fa-crosshairs" style="margin-right:4px;"></i> Source Classifier Mean` : `N/A`);
+    setHtml("analytics-risk-badge", criticalCount === 0 ? `<i class="fa-solid fa-shield-halved" style="margin-right:4px;"></i> 0 Critical &bull; ${highCount} High` : `<i class="fa-solid fa-triangle-exclamation" style="margin-right:4px;"></i> ${criticalCount} Critical &bull; ${highCount} High`);
+
+    // ----------------------------------------------------------------------
+    // 1. Events by Classification Type Donut (Exact counts and percentages)
+    // ----------------------------------------------------------------------
     const typeDonutEl = document.getElementById("chart-events-type-donut");
     if (typeDonutEl) {
-        const indPct = total > 0 ? Math.round((ind / total) * 100) : 25;
-        const forestPct = total > 0 ? Math.round((forest / total) * 100) : 40;
-        const agriPct = total > 0 ? Math.round((agri / total) * 100) : 20;
-        const otherPct = Math.max(0, 100 - indPct - forestPct - agriPct);
+        if (total === 0) {
+            typeDonutEl.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:180px;color:var(--text-muted);font-size:13px;">No observations recorded in this window</div>`;
+        } else {
+            const indPct = ((ind / total) * 100).toFixed(1);
+            const forestPct = ((forest / total) * 100).toFixed(1);
+            const agriPct = ((agri / total) * 100).toFixed(1);
+            const otherPct = Math.max(0, (100 - parseFloat(indPct) - parseFloat(forestPct) - parseFloat(agriPct))).toFixed(1);
 
-        const c = 314.16;
-        const o1 = (indPct / 100) * c;
-        const o2 = (forestPct / 100) * c;
-        const o3 = (agriPct / 100) * c;
-        const o4 = Math.max(0, c - o1 - o2 - o3);
+            const c = 314.16;
+            const o1 = (ind / total) * c;
+            const o2 = (forest / total) * c;
+            const o3 = (agri / total) * c;
+            const o4 = Math.max(0, c - o1 - o2 - o3);
 
-        typeDonutEl.innerHTML = `
-            <div style="display: flex; align-items: center; justify-content: space-around; height: 180px;">
-                <svg width="150" height="150" viewBox="0 0 120 120" style="transform: rotate(-90deg);">
-                    <circle cx="60" cy="60" r="50" fill="none" stroke="#e2e8f0" stroke-width="18" />
-                    <circle cx="60" cy="60" r="50" fill="none" stroke="#ef4444" stroke-width="18" stroke-dasharray="${o1} ${c}" stroke-dashoffset="0" />
-                    <circle cx="60" cy="60" r="50" fill="none" stroke="#10b981" stroke-width="18" stroke-dasharray="${o2} ${c}" stroke-dashoffset="-${o1}" />
-                    <circle cx="60" cy="60" r="50" fill="none" stroke="#eab308" stroke-width="18" stroke-dasharray="${o3} ${c}" stroke-dashoffset="-${o1 + o2}" />
-                    <circle cx="60" cy="60" r="50" fill="none" stroke="#8b5cf6" stroke-width="18" stroke-dasharray="${o4} ${c}" stroke-dashoffset="-${o1 + o2 + o3}" />
-                </svg>
-                <div style="font-size: 13px; line-height: 1.8;">
-                    <div><span style="display:inline-block;width:10px;height:10px;background:#ef4444;border-radius:2px;margin-right:6px;"></span> Industrial: <strong>${indPct}%</strong> (${ind})</div>
-                    <div><span style="display:inline-block;width:10px;height:10px;background:#10b981;border-radius:2px;margin-right:6px;"></span> Forest / Natural: <strong>${forestPct}%</strong> (${forest})</div>
-                    <div><span style="display:inline-block;width:10px;height:10px;background:#eab308;border-radius:2px;margin-right:6px;"></span> Agricultural: <strong>${agriPct}%</strong> (${agri})</div>
-                    <div><span style="display:inline-block;width:10px;height:10px;background:#8b5cf6;border-radius:2px;margin-right:6px;"></span> Other: <strong>${otherPct}%</strong> (${other})</div>
-                </div>
-            </div>
-        `;
-    }
-
-    // 2. Events by Landcover Horizontal Progress Bars
-    const lcBarsEl = document.getElementById("chart-landcover-bars");
-    if (lcBarsEl) {
-        const maxVal = Math.max(1, ...Object.values(landcoverCounts));
-        lcBarsEl.innerHTML = Object.entries(landcoverCounts).map(([label, val]) => {
-            const pct = Math.round((val / maxVal) * 100);
-            return `
-                <div style="margin-bottom: 8px;">
-                    <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px;">
-                        <span>${escapeHTML(label)}</span>
-                        <strong>${val.toLocaleString()} (${pct}%)</strong>
-                    </div>
-                    <div style="width:100%;height:7px;background:#e2e8f0;border-radius:4px;overflow:hidden;">
-                        <div style="width:${pct}%;height:100%;background:var(--primary-color);"></div>
+            typeDonutEl.innerHTML = `
+                <div style="display: flex; align-items: center; justify-content: space-around; height: 180px;">
+                    <svg width="150" height="150" viewBox="0 0 120 120" style="transform: rotate(-90deg);">
+                        <circle cx="60" cy="60" r="50" fill="none" stroke="#e2e8f0" stroke-width="18" />
+                        <circle cx="60" cy="60" r="50" fill="none" stroke="#ef4444" stroke-width="18" stroke-dasharray="${o1} ${c}" stroke-dashoffset="0" />
+                        <circle cx="60" cy="60" r="50" fill="none" stroke="#10b981" stroke-width="18" stroke-dasharray="${o2} ${c}" stroke-dashoffset="-${o1}" />
+                        <circle cx="60" cy="60" r="50" fill="none" stroke="#eab308" stroke-width="18" stroke-dasharray="${o3} ${c}" stroke-dashoffset="-${o1 + o2}" />
+                        <circle cx="60" cy="60" r="50" fill="none" stroke="#8b5cf6" stroke-width="18" stroke-dasharray="${o4} ${c}" stroke-dashoffset="-${o1 + o2 + o3}" />
+                    </svg>
+                    <div style="font-size: 13px; line-height: 1.8;">
+                        <div><span style="display:inline-block;width:10px;height:10px;background:#ef4444;border-radius:2px;margin-right:6px;"></span> Industrial: <strong>${indPct}%</strong> (${ind.toLocaleString()})</div>
+                        <div><span style="display:inline-block;width:10px;height:10px;background:#10b981;border-radius:2px;margin-right:6px;"></span> Forest / Natural: <strong>${forestPct}%</strong> (${forest.toLocaleString()})</div>
+                        <div><span style="display:inline-block;width:10px;height:10px;background:#eab308;border-radius:2px;margin-right:6px;"></span> Agricultural: <strong>${agriPct}%</strong> (${agri.toLocaleString()})</div>
+                        <div><span style="display:inline-block;width:10px;height:10px;background:#8b5cf6;border-radius:2px;margin-right:6px;"></span> Other: <strong>${otherPct}%</strong> (${other.toLocaleString()})</div>
+                        <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px; border-top: 1px solid var(--border-color); padding-top: 3px;">Total Classified: <strong>${total.toLocaleString()}</strong> (100.0%)</div>
                     </div>
                 </div>
             `;
-        }).join("");
+        }
     }
 
-    // 3. Monthly Trend Line Chart (SVG)
+    // ----------------------------------------------------------------------
+    // 2. Events by Landcover Class (Genuine classes & percentages)
+    // ----------------------------------------------------------------------
+    const lcBarsEl = document.getElementById("chart-landcover-bars");
+    if (lcBarsEl) {
+        if (total === 0) {
+            lcBarsEl.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:180px;color:var(--text-muted);font-size:13px;">No landcover data available</div>`;
+        } else {
+            const lcColors = {
+                "Tree cover / Forest": "#10b981",
+                "Cropland / Agricultural": "#eab308",
+                "Built-up / Industrial": "#ef4444",
+                "Shrubland / Grassland": "#84cc16",
+                "Bare / Sparse Soil": "#f97316",
+                "Permanent water bodies": "#06b6d4",
+                "Mangroves": "#14b8a6",
+                "Herbaceous wetland": "#3b82f6",
+                "Unclassified": "#64748b"
+            };
+
+            // Filter to classes present or top classes
+            const entries = Object.entries(landcoverCounts)
+                .sort((a, b) => b[1] - a[1]);
+
+            lcBarsEl.innerHTML = entries.map(([label, val]) => {
+                const pct = ((val / total) * 100).toFixed(1);
+                const color = lcColors[label] || "var(--primary-color)";
+                return `
+                    <div style="margin-bottom: 7px;">
+                        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;">
+                            <span>${escapeHTML(label)}</span>
+                            <strong>${val.toLocaleString()} (${pct}%)</strong>
+                        </div>
+                        <div style="width:100%;height:6px;background:var(--bg-hover);border-radius:3px;overflow:hidden;border:1px solid rgba(0,0,0,0.04);">
+                            <div style="width:${pct}%;height:100%;background:${color};border-radius:3px;transition:width 0.3s ease;"></div>
+                        </div>
+                    </div>
+                `;
+            }).join("");
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // 3. Genuine Temporal Observation Trend (Real observation dates)
+    // ----------------------------------------------------------------------
     const trendEl = document.getElementById("chart-monthly-trend");
     if (trendEl) {
-        trendEl.innerHTML = `
-            <svg width="100%" height="170" viewBox="0 0 400 170" style="overflow: visible;">
-                <defs>
-                    <linearGradient id="grad-ind-v2" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stop-color="#ef4444" stop-opacity="0.3"/>
-                        <stop offset="100%" stop-color="#ef4444" stop-opacity="0.0"/>
-                    </linearGradient>
-                </defs>
-                <line x1="30" y1="20" x2="380" y2="20" stroke="#f1f5f9" stroke-width="1"/>
-                <line x1="30" y1="60" x2="380" y2="60" stroke="#f1f5f9" stroke-width="1"/>
-                <line x1="30" y1="100" x2="380" y2="100" stroke="#f1f5f9" stroke-width="1"/>
-                <line x1="30" y1="140" x2="380" y2="140" stroke="#e2e8f0" stroke-width="1"/>
+        const sortedDates = Object.keys(dailyCounts).sort();
+        if (sortedDates.length < 2) {
+            trendEl.innerHTML = `
+                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:180px;color:var(--text-muted);font-size:13px;text-align:center;">
+                    <i class="fa-solid fa-chart-line" style="font-size:24px;margin-bottom:8px;opacity:0.35;"></i>
+                    <span>No sufficient observations for temporal trend</span>
+                    <span style="font-size:11.5px;margin-top:4px;opacity:0.7;">Requires at least 2 distinct observation dates</span>
+                </div>
+            `;
+        } else {
+            const maxVal = Math.max(1, ...sortedDates.map(d => dailyCounts[d].total));
+            const chartW = 380;
+            const chartH = 130;
+            const padX = 35;
+            const padY = 15;
+            const plotW = chartW - padX * 2;
+            const plotH = chartH - padY * 2;
 
-                <path d="M 40 120 Q 90 90, 140 100 T 240 70 T 340 50 L 370 40 L 370 140 L 40 140 Z" fill="url(#grad-ind-v2)"/>
-                <path d="M 40 120 Q 90 90, 140 100 T 240 70 T 340 50 L 370 40" fill="none" stroke="#ef4444" stroke-width="2.5"/>
-                <path d="M 40 70 Q 90 110, 140 85 T 240 95 T 340 65 L 370 55" fill="none" stroke="#10b981" stroke-width="2"/>
+            const stepX = sortedDates.length > 1 ? plotW / (sortedDates.length - 1) : plotW;
 
-                <text x="40" y="158" font-size="11" fill="#64748b" text-anchor="middle">Mar</text>
-                <text x="106" y="158" font-size="11" fill="#64748b" text-anchor="middle">Apr</text>
-                <text x="172" y="158" font-size="11" fill="#64748b" text-anchor="middle">May</text>
-                <text x="238" y="158" font-size="11" fill="#64748b" text-anchor="middle">Jun</text>
-                <text x="304" y="158" font-size="11" fill="#64748b" text-anchor="middle">Jul</text>
-                <text x="370" y="158" font-size="11" fill="#64748b" text-anchor="middle">Aug</text>
-            </svg>
-            <div style="display:flex;justify-content:center;gap:18px;font-size:12px;color:var(--text-muted);margin-top:6px;">
-                <span><strong style="color:#ef4444;">—</strong> Industrial Flare Baselines</span>
-                <span><strong style="color:#10b981;">—</strong> Seasonal Forest Wildfires</span>
-            </div>
-        `;
+            // Generate coordinates
+            const indPoints = [];
+            const natPoints = [];
+            const totPoints = [];
+
+            sortedDates.forEach((d, idx) => {
+                const x = padX + idx * stepX;
+                const totY = padY + plotH - (dailyCounts[d].total / maxVal) * plotH;
+                const indY = padY + plotH - (dailyCounts[d].ind / maxVal) * plotH;
+                const natY = padY + plotH - (dailyCounts[d].nat / maxVal) * plotH;
+
+                totPoints.push(`${x.toFixed(1)},${totY.toFixed(1)}`);
+                indPoints.push(`${x.toFixed(1)},${indY.toFixed(1)}`);
+                natPoints.push(`${x.toFixed(1)},${natY.toFixed(1)}`);
+            });
+
+            // Date labels: if > 8 dates, pick sparse labels to avoid clutter
+            const labelInterval = Math.max(1, Math.ceil(sortedDates.length / 7));
+            const dateLabels = sortedDates.map((d, idx) => {
+                if (idx % labelInterval !== 0 && idx !== sortedDates.length - 1) return "";
+                const x = padX + idx * stepX;
+                const parts = d.split("-");
+                const label = parts.length === 3 ? `${parseInt(parts[2], 10)} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(parts[1], 10) - 1]}` : d;
+                return `<text x="${x.toFixed(1)}" y="${chartH + 16}" font-size="10.5" fill="#64748b" text-anchor="middle">${label}</text>`;
+            }).join("");
+
+            // Area under curve
+            const areaPath = `M ${padX} ${padY + plotH} L ${totPoints.join(" L ")} L ${padX + (sortedDates.length - 1) * stepX} ${padY + plotH} Z`;
+
+            trendEl.innerHTML = `
+                <svg width="100%" height="175" viewBox="0 0 ${chartW} ${chartH + 25}" style="overflow: visible;">
+                    <defs>
+                        <linearGradient id="grad-daily-area" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.25"/>
+                            <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.0"/>
+                        </linearGradient>
+                    </defs>
+                    <!-- Grid Lines -->
+                    <line x1="${padX}" y1="${padY}" x2="${chartW - padX}" y2="${padY}" stroke="#f1f5f9" stroke-width="1"/>
+                    <line x1="${padX}" y1="${padY + plotH * 0.5}" x2="${chartW - padX}" y2="${padY + plotH * 0.5}" stroke="#f1f5f9" stroke-width="1"/>
+                    <line x1="${padX}" y1="${padY + plotH}" x2="${chartW - padX}" y2="${padY + plotH}" stroke="#e2e8f0" stroke-width="1"/>
+
+                    <!-- Y-Axis Scale Values -->
+                    <text x="${padX - 6}" y="${padY + 4}" font-size="9.5" fill="#94a3b8" text-anchor="end">${maxVal}</text>
+                    <text x="${padX - 6}" y="${padY + plotH * 0.5 + 3}" font-size="9.5" fill="#94a3b8" text-anchor="end">${Math.round(maxVal / 2)}</text>
+                    <text x="${padX - 6}" y="${padY + plotH}" font-size="9.5" fill="#94a3b8" text-anchor="end">0</text>
+
+                    <!-- Area Fill -->
+                    <path d="${areaPath}" fill="url(#grad-daily-area)"/>
+
+                    <!-- Lines -->
+                    <polyline points="${totPoints.join(" ")}" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linejoin="round"/>
+                    <polyline points="${indPoints.join(" ")}" fill="none" stroke="#ef4444" stroke-width="2" stroke-linejoin="round"/>
+                    <polyline points="${natPoints.join(" ")}" fill="none" stroke="#10b981" stroke-width="1.8" stroke-linejoin="round"/>
+
+                    <!-- Points -->
+                    ${sortedDates.map((d, idx) => {
+                        const x = padX + idx * stepX;
+                        const y = padY + plotH - (dailyCounts[d].total / maxVal) * plotH;
+                        return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="#3b82f6"/>`;
+                    }).join("")}
+
+                    <!-- X-Axis Date Labels -->
+                    ${dateLabels}
+                </svg>
+                <div style="display:flex;justify-content:center;gap:16px;font-size:11.5px;color:var(--text-muted);margin-top:6px;flex-wrap:wrap;">
+                    <span><strong style="color:#3b82f6;">—</strong> Total Hotspots (${total.toLocaleString()})</span>
+                    <span><strong style="color:#ef4444;">—</strong> Industrial Flares (${ind.toLocaleString()})</span>
+                    <span><strong style="color:#10b981;">—</strong> Vegetation / Wildfires (${(forest + agri).toLocaleString()})</span>
+                </div>
+            `;
+        }
     }
 
-    // 4. Anomaly Severity Donut
+    // ----------------------------------------------------------------------
+    // 4. Anomaly Severity Distribution Donut
+    // ----------------------------------------------------------------------
     const riskDonutEl = document.getElementById("chart-risk-donut");
     if (riskDonutEl) {
-        riskDonutEl.innerHTML = `
-            <div style="display: flex; align-items: center; justify-content: space-around; height: 180px;">
-                <svg width="150" height="150" viewBox="0 0 120 120" style="transform: rotate(-90deg);">
-                    <circle cx="60" cy="60" r="50" fill="none" stroke="#e2e8f0" stroke-width="18" />
-                    <circle cx="60" cy="60" r="50" fill="none" stroke="#ef4444" stroke-width="18" stroke-dasharray="75 314" stroke-dashoffset="0" />
-                    <circle cx="60" cy="60" r="50" fill="none" stroke="#f97316" stroke-width="18" stroke-dasharray="100 314" stroke-dashoffset="-75" />
-                    <circle cx="60" cy="60" r="50" fill="none" stroke="#eab308" stroke-width="18" stroke-dasharray="85 314" stroke-dashoffset="-175" />
-                    <circle cx="60" cy="60" r="50" fill="none" stroke="#3b82f6" stroke-width="18" stroke-dasharray="54 314" stroke-dashoffset="-260" />
-                </svg>
-                <div style="font-size: 13px; line-height: 1.8;">
-                    <div><span style="display:inline-block;width:10px;height:10px;background:#ef4444;border-radius:2px;margin-right:6px;"></span> Critical: <strong>24%</strong> (Escalated)</div>
-                    <div><span style="display:inline-block;width:10px;height:10px;background:#f97316;border-radius:2px;margin-right:6px;"></span> High: <strong>32%</strong> (Priority)</div>
-                    <div><span style="display:inline-block;width:10px;height:10px;background:#eab308;border-radius:2px;margin-right:6px;"></span> Medium: <strong>27%</strong> (Advisory)</div>
-                    <div><span style="display:inline-block;width:10px;height:10px;background:#3b82f6;border-radius:2px;margin-right:6px;"></span> Low: <strong>17%</strong> (Routine)</div>
+        if (total === 0) {
+            riskDonutEl.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:180px;color:var(--text-muted);font-size:13px;">No anomaly data available</div>`;
+        } else {
+            const critPct = ((criticalCount / total) * 100).toFixed(1);
+            const highPct = ((highCount / total) * 100).toFixed(1);
+            const medPct = ((mediumCount / total) * 100).toFixed(1);
+            const lowPct = Math.max(0, (100 - parseFloat(critPct) - parseFloat(highPct) - parseFloat(medPct))).toFixed(1);
+
+            const c = 314.16;
+            const o1 = (criticalCount / total) * c;
+            const o2 = (highCount / total) * c;
+            const o3 = (mediumCount / total) * c;
+            const o4 = Math.max(0, c - o1 - o2 - o3);
+
+            const zeroCriticalNotice = criticalCount === 0
+                ? `<div style="margin-top:6px;padding:4px 8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:4px;font-size:11px;color:#15803d;display:flex;align-items:center;gap:5px;">
+                     <i class="fa-solid fa-circle-check"></i> No sources currently meet the critical threshold.
+                   </div>`
+                : "";
+
+            riskDonutEl.innerHTML = `
+                <div style="display: flex; align-items: center; justify-content: space-around; height: 180px;">
+                    <svg width="150" height="150" viewBox="0 0 120 120" style="transform: rotate(-90deg);">
+                        <circle cx="60" cy="60" r="50" fill="none" stroke="#e2e8f0" stroke-width="18" />
+                        <circle cx="60" cy="60" r="50" fill="none" stroke="#ef4444" stroke-width="18" stroke-dasharray="${o1} ${c}" stroke-dashoffset="0" />
+                        <circle cx="60" cy="60" r="50" fill="none" stroke="#f97316" stroke-width="18" stroke-dasharray="${o2} ${c}" stroke-dashoffset="-${o1}" />
+                        <circle cx="60" cy="60" r="50" fill="none" stroke="#eab308" stroke-width="18" stroke-dasharray="${o3} ${c}" stroke-dashoffset="-${o1 + o2}" />
+                        <circle cx="60" cy="60" r="50" fill="none" stroke="#3b82f6" stroke-width="18" stroke-dasharray="${o4} ${c}" stroke-dashoffset="-${o1 + o2 + o3}" />
+                    </svg>
+                    <div style="font-size: 13px; line-height: 1.8;">
+                        <div><span style="display:inline-block;width:10px;height:10px;background:#ef4444;border-radius:2px;margin-right:6px;"></span> Critical: <strong>${critPct}%</strong> (${criticalCount.toLocaleString()})</div>
+                        <div><span style="display:inline-block;width:10px;height:10px;background:#f97316;border-radius:2px;margin-right:6px;"></span> High: <strong>${highPct}%</strong> (${highCount.toLocaleString()})</div>
+                        <div><span style="display:inline-block;width:10px;height:10px;background:#eab308;border-radius:2px;margin-right:6px;"></span> Medium: <strong>${medPct}%</strong> (${mediumCount.toLocaleString()})</div>
+                        <div><span style="display:inline-block;width:10px;height:10px;background:#3b82f6;border-radius:2px;margin-right:6px;"></span> Low: <strong>${lowPct}%</strong> (${lowCount.toLocaleString()})</div>
+                        ${zeroCriticalNotice}
+                    </div>
                 </div>
-            </div>
-        `;
+            `;
+        }
     }
 
-    // 5. State Risk Rankings Table
+    // ----------------------------------------------------------------------
+    // 5. Dedicated Temporal Activity & Persistence Panel (8 genuine features)
+    // ----------------------------------------------------------------------
+    const tempGridEl = document.getElementById("analytics-temporal-metrics-grid");
+    if (tempGridEl) {
+        if (total === 0) {
+            tempGridEl.innerHTML = `<div style="grid-column: span 4; color: var(--text-muted); font-size: 13px;">No temporal observations recorded</div>`;
+        } else {
+            const avgDetsPerDay = (totalDetections / Math.max(1, totalActiveDays)).toFixed(2);
+            const avgSpan = (sumObsSpan / Math.max(1, total)).toFixed(1);
+            const meanRecurPct = ((sumRecurrence / Math.max(1, total)) * 100).toFixed(1);
+            const meanReg = (sumRegularity / Math.max(1, total)).toFixed(2);
+            const meanGap = (sumGapHours / Math.max(1, total)).toFixed(1);
+            const persPct = ((persTotalCount / Math.max(1, total)) * 100).toFixed(1);
+
+            tempGridEl.innerHTML = `
+                <div class="temporal-metric-tile">
+                    <span class="temporal-label"><i class="fa-solid fa-satellite" style="color:var(--primary-color);"></i> Total Detections</span>
+                    <strong class="temporal-val">${totalDetections.toLocaleString()}</strong>
+                    <span class="temporal-sub">Satellite VIIRS observation hits</span>
+                </div>
+                <div class="temporal-metric-tile">
+                    <span class="temporal-label"><i class="fa-solid fa-calendar-day" style="color:var(--primary-color);"></i> Total Active Days</span>
+                    <strong class="temporal-val">${totalActiveDays.toLocaleString()}</strong>
+                    <span class="temporal-sub">Cumulative source-active days</span>
+                </div>
+                <div class="temporal-metric-tile">
+                    <span class="temporal-label"><i class="fa-solid fa-calculator" style="color:var(--primary-color);"></i> Detections / Active Day</span>
+                    <strong class="temporal-val">${avgDetsPerDay}</strong>
+                    <span class="temporal-sub">Cluster thermal density ratio</span>
+                </div>
+                <div class="temporal-metric-tile">
+                    <span class="temporal-label"><i class="fa-solid fa-hourglass-half" style="color:var(--primary-color);"></i> Average Observation Span</span>
+                    <strong class="temporal-val">${avgSpan} days</strong>
+                    <span class="temporal-sub">First-to-last detection duration</span>
+                </div>
+                <div class="temporal-metric-tile">
+                    <span class="temporal-label"><i class="fa-solid fa-repeat" style="color:var(--primary-color);"></i> Mean Recurrence Rate</span>
+                    <strong class="temporal-val">${meanRecurPct}%</strong>
+                    <span class="temporal-sub">Active days over observation span</span>
+                </div>
+                <div class="temporal-metric-tile">
+                    <span class="temporal-label"><i class="fa-solid fa-wave-square" style="color:var(--primary-color);"></i> Temporal Regularity</span>
+                    <strong class="temporal-val">${meanReg}</strong>
+                    <span class="temporal-sub">Persistence consistency index (0-1)</span>
+                </div>
+                <div class="temporal-metric-tile">
+                    <span class="temporal-label"><i class="fa-solid fa-timeline" style="color:var(--primary-color);"></i> Mean Detection Gap</span>
+                    <strong class="temporal-val">${meanGap} hrs</strong>
+                    <span class="temporal-sub">Interval between consecutive hits</span>
+                </div>
+                <div class="temporal-metric-tile">
+                    <span class="temporal-label"><i class="fa-solid fa-fire-burner" style="color:var(--primary-color);"></i> Persistent Sources</span>
+                    <strong class="temporal-val">${persTotalCount.toLocaleString()} (${persPct}%)</strong>
+                    <span class="temporal-sub">${persIndCount.toLocaleString()} industrial flares</span>
+                </div>
+            `;
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // 6. State Risk Rankings Table (Reconciled with active period)
+    // ----------------------------------------------------------------------
     const stateTableEl = document.getElementById("analytics-state-table");
     if (stateTableEl) {
         const sortedStates = Object.entries(stateAnomalyCounts)
             .sort((a, b) => b[1].total - a[1].total)
-            .slice(0, 6);
+            .slice(0, 8);
+
+        setText("analytics-state-count-label", `${Object.keys(stateAnomalyCounts).length} Indian States / UTs Monitored`);
 
         stateTableEl.innerHTML = sortedStates.map(([st, cnt], idx) => {
-            const statusBadge = cnt.ind > 20 ? '<span class="badge-pill badge-critical">High Flare Density</span>' :
-                               (cnt.forest > 30 ? '<span class="badge-pill badge-high">Active Forest Alert</span>' :
-                               '<span class="badge-pill badge-low">Normal Patrol</span>');
+            const statusBadge = cnt.critical > 0 ? '<span class="badge-pill badge-critical">Critical Alerts</span>' :
+                               (cnt.high > 0 ? '<span class="badge-pill badge-high">High Alert</span>' :
+                               (cnt.ind > 10 ? '<span class="badge-pill badge-critical" style="background:#fee2e2;color:#ef4444;">Industrial Hotspot</span>' :
+                               '<span class="badge-pill badge-low">Normal Monitoring</span>'));
 
             return `
                 <tr>
                     <td style="font-weight: 700;">#${idx + 1}</td>
                     <td style="font-weight: 600;">${escapeHTML(st)}</td>
-                    <td><strong>${cnt.total}</strong></td>
-                    <td>${cnt.ind}</td>
-                    <td>${cnt.forest}</td>
-                    <td>${cnt.agri}</td>
+                    <td><strong>${cnt.total.toLocaleString()}</strong></td>
+                    <td>${cnt.ind.toLocaleString()}</td>
+                    <td>${cnt.forest.toLocaleString()}</td>
+                    <td>${cnt.agri.toLocaleString()}</td>
                     <td>${statusBadge}</td>
                 </tr>
             `;
@@ -29560,6 +29987,22 @@ function initGlobalSearch() {
 /* ==========================================================================
    GEOSPATIAL HELPERS & BOUNDARY CHECKS
    ========================================================================== */
+function normalizeLandcover(lc) {
+    if (!lc) return "Unclassified";
+    const s = String(lc).trim().toLowerCase();
+    if (s.includes("crop") || s.includes("agri")) return "Cropland / Agricultural";
+    if (s.includes("tree") || s.includes("forest")) return "Tree cover / Forest";
+    if (s.includes("built") || s.includes("urban") || s.includes("industr")) return "Built-up / Industrial";
+    if (s.includes("shrub") || s.includes("grass")) return "Shrubland / Grassland";
+    if (s.includes("bare") || s.includes("sparse")) return "Bare / Sparse Soil";
+    if (s.includes("water")) return "Permanent water bodies";
+    if (s.includes("mangrove")) return "Mangroves";
+    if (s.includes("wetland") || s.includes("herbaceous")) return "Herbaceous wetland";
+    if (s.includes("unclass")) return "Unclassified";
+    return lc;
+}
+window.normalizeLandcover = normalizeLandcover;
+
 function normalizeType(type) {
     if (!type) return "Other";
     const str = String(type).trim().toLowerCase();
