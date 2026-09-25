@@ -13,8 +13,7 @@
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <!-- Main Stylesheet -->
-    <style>
-/* ==========================================================================
+    <style>\n/* ==========================================================================
    THERMAL-AI ENTERPRISE DESIGN SYSTEM
    Modern, crisp, high-readability GIS Dashboard
    Supports Light Mode (Default) and Dark Mode
@@ -2725,7 +2724,92 @@ body.dark-mode .live-pass-indicator {
     transform: translateY(0);
 }
 
-</style>
+
+/* ==========================================================================
+   AUTHENTICATION TABS, REGISTRATION & SUCCESS STYLING
+   ========================================================================== */
+.auth-tabs-nav {
+    display: flex;
+    background: var(--bg-hover);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 4px;
+    gap: 4px;
+    margin-bottom: 18px;
+}
+
+.auth-tab-btn {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-family: inherit;
+}
+
+.auth-tab-btn.active {
+    background: var(--bg-surface);
+    color: var(--text-main);
+    box-shadow: var(--shadow-sm);
+    font-weight: 700;
+}
+
+.auth-switch-prompt {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.btn-text-link {
+    background: none;
+    border: none;
+    color: var(--primary-color);
+    font-weight: 700;
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 0;
+    font-size: 13px;
+    font-family: inherit;
+}
+
+.btn-text-link:hover {
+    opacity: 0.85;
+}
+
+.auth-success-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: #ecfdf5;
+    color: #047857;
+    border: 1px solid #a7f3d0;
+    border-radius: var(--radius-sm);
+    font-size: 12.5px;
+    margin-bottom: 14px;
+    font-weight: 600;
+    text-align: left;
+}
+
+[data-theme="dark"] .auth-success-banner {
+    background: rgba(6, 78, 59, 0.4);
+    color: #34d399;
+    border: 1px solid #065f46;
+}
+\n</style>
 </head>
 <body>
     <div class="app-container">
@@ -3727,68 +3811,140 @@ body.dark-mode .live-pass-indicator {
          AUTHENTICATION OVERLAY (F.A.S.T. ACCESS PORTAL)
          ========================================================================== -->
     <div class="auth-overlay-view" id="auth-overlay-view">
-        <div class="auth-card-box">
+                <div class="auth-card-box">
             <div class="auth-emblem-badge">
                 <i class="fa-solid fa-fire-flame-curved"></i>
             </div>
             <h1 class="auth-title">F.A.S.T.</h1>
             <span class="auth-tagline">Fire Alert & Safety Technology</span>
-            <p class="auth-desc">Space-Borne Thermal Intelligence & Industrial Anomaly Detection</p>
+            <p class="auth-desc" id="auth-header-desc">Space-Borne Thermal Intelligence & Industrial Anomaly Detection</p>
+
+            <!-- Mode Switch Tabs: [Sign In] [Create Account] -->
+            <div class="auth-tabs-nav" id="auth-tabs-nav">
+                <button type="button" class="auth-tab-btn active" id="tab-auth-login" onclick="switchAuthMode('login')">
+                    <i class="fa-solid fa-arrow-right-to-bracket"></i> Sign In
+                </button>
+                <button type="button" class="auth-tab-btn" id="tab-auth-register" onclick="switchAuthMode('register')">
+                    <i class="fa-solid fa-user-plus"></i> Create Account
+                </button>
+            </div>
 
             <!-- Inline Validation Error Box -->
-            <div id="auth-error-box" class="auth-error-banner">
+            <div id="auth-error-box" class="auth-error-banner" style="display: none;">
                 <i class="fa-solid fa-circle-exclamation"></i>
-                <span id="auth-error-text">Invalid email or password.</span>
+                <span id="auth-error-text"></span>
             </div>
 
-            <!-- Form -->
-            <form onsubmit="event.preventDefault(); executeUserLogin();">
-                <div class="auth-field-group">
-                    <label class="auth-label">Email Address</label>
-                    <div class="auth-input-wrapper">
-                        <i class="fa-regular fa-envelope auth-input-icon"></i>
-                        <input type="email" id="auth-input-email" class="auth-input" placeholder="analyst@sih.gov.in" autocomplete="username">
+            <!-- Inline Success Box -->
+            <div id="auth-success-box" class="auth-success-banner" style="display: none;">
+                <i class="fa-solid fa-circle-check"></i>
+                <span id="auth-success-text"></span>
+            </div>
+
+            <!-- LOGIN VIEW -->
+            <div id="auth-view-login">
+                <form onsubmit="event.preventDefault(); executeUserLogin();">
+                    <div class="auth-field-group">
+                        <label class="auth-label">Email Address</label>
+                        <div class="auth-input-wrapper">
+                            <i class="fa-regular fa-envelope auth-input-icon"></i>
+                            <input type="email" id="auth-input-email" class="auth-input" placeholder="Enter your email" autocomplete="username">
+                        </div>
                     </div>
+
+                    <div class="auth-field-group">
+                        <label class="auth-label">Password</label>
+                        <div class="auth-input-wrapper">
+                            <i class="fa-solid fa-lock auth-input-icon"></i>
+                            <input type="password" id="auth-input-pass" class="auth-input" placeholder="Enter password" autocomplete="current-password">
+                            <button type="button" class="auth-pw-toggle" onclick="togglePasswordVisibility('auth-input-pass', 'auth-pw-eye')" title="Toggle visibility">
+                                <i class="fa-regular fa-eye" id="auth-pw-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-auth-submit" id="btn-auth-submit">
+                        <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                        <span id="btn-auth-label">Sign In to Dashboard</span>
+                    </button>
+                </form>
+
+                <div class="auth-switch-prompt">
+                    <span>Don't have an account?</span>
+                    <button type="button" class="btn-text-link" onclick="switchAuthMode('register')">Create Account</button>
                 </div>
 
-                <div class="auth-field-group">
-                    <label class="auth-label">Password</label>
-                    <div class="auth-input-wrapper">
-                        <i class="fa-solid fa-lock auth-input-icon"></i>
-                        <input type="password" id="auth-input-pass" class="auth-input" placeholder="Enter account password" autocomplete="current-password">
-                        <button type="button" class="auth-pw-toggle" onclick="togglePasswordVisibility()" title="Toggle visibility">
-                            <i class="fa-regular fa-eye" id="auth-pw-eye"></i>
-                        </button>
-                    </div>
+                <div class="auth-divider">
+                    <span>OR</span>
                 </div>
 
-                <button type="submit" class="btn-auth-submit" id="btn-auth-submit">
-                    <i class="fa-solid fa-arrow-right-to-bracket"></i>
-                    <span id="btn-auth-label">Sign In to Dashboard</span>
+                <!-- Explicit Evaluator Sandbox Demo Access -->
+                <button type="button" class="btn-demo-access" onclick="executeDemoAccess()">
+                    <i class="fa-solid fa-flask" style="color: var(--primary-color);"></i>
+                    <span>Quick Demo Access (Evaluator Sandbox)</span>
                 </button>
-            </form>
-
-            <div class="auth-divider">
-                <span>OR</span>
             </div>
 
-            <!-- Explicit Sandbox Demo Access -->
-            <button type="button" class="btn-demo-access" onclick="executeDemoAccess()">
-                <i class="fa-solid fa-flask" style="color: var(--primary-color);"></i>
-                <span>Quick Demo Access (Evaluator Sandbox)</span>
-            </button>
+            <!-- REGISTER VIEW -->
+            <div id="auth-view-register" style="display: none;">
+                <div style="font-size: 14px; font-weight: 700; color: var(--text-main); margin-bottom: 12px; text-align: left;">
+                    Create your account
+                </div>
+                <form onsubmit="event.preventDefault(); executeUserRegister();">
+                    <div class="auth-field-group">
+                        <label class="auth-label">Full Name</label>
+                        <div class="auth-input-wrapper">
+                            <i class="fa-regular fa-user auth-input-icon"></i>
+                            <input type="text" id="reg-input-name" class="auth-input" placeholder="Enter your full name" autocomplete="name">
+                        </div>
+                    </div>
 
-            <div class="auth-footer-notes">
-                <div style="margin-bottom: 4px;"><strong>Sandbox / Presentation Access:</strong></div>
-                <div>Use Quick Demo Access or registered credentials (e.g. <code>analyst@sih.gov.in</code> / <code>Analyst@123</code>).</div>
+                    <div class="auth-field-group">
+                        <label class="auth-label">Email Address</label>
+                        <div class="auth-input-wrapper">
+                            <i class="fa-regular fa-envelope auth-input-icon"></i>
+                            <input type="email" id="reg-input-email" class="auth-input" placeholder="Enter your email" autocomplete="email">
+                        </div>
+                    </div>
+
+                    <div class="auth-field-group">
+                        <label class="auth-label">Password</label>
+                        <div class="auth-input-wrapper">
+                            <i class="fa-solid fa-lock auth-input-icon"></i>
+                            <input type="password" id="reg-input-pass" class="auth-input" placeholder="Create FAST application password" autocomplete="new-password">
+                            <button type="button" class="auth-pw-toggle" onclick="togglePasswordVisibility('reg-input-pass', 'reg-pw-eye')" title="Toggle visibility">
+                                <i class="fa-regular fa-eye" id="reg-pw-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="auth-field-group">
+                        <label class="auth-label">Confirm Password</label>
+                        <div class="auth-input-wrapper">
+                            <i class="fa-solid fa-shield-halved auth-input-icon"></i>
+                            <input type="password" id="reg-input-pass-confirm" class="auth-input" placeholder="Confirm application password" autocomplete="new-password">
+                            <button type="button" class="auth-pw-toggle" onclick="togglePasswordVisibility('reg-input-pass-confirm', 'reg-pw-eye-confirm')" title="Toggle visibility">
+                                <i class="fa-regular fa-eye" id="reg-pw-eye-confirm"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-auth-submit" id="btn-reg-submit">
+                        <i class="fa-solid fa-user-plus"></i>
+                        <span id="btn-reg-label">Create Account</span>
+                    </button>
+                </form>
+
+                <div class="auth-switch-prompt">
+                    <span>Already have an account?</span>
+                    <button type="button" class="btn-text-link" onclick="switchAuthMode('login')">Sign In</button>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- Toast Notifications Container -->
-    <div id="toast-container"></div>
-
-    <!-- Pre-compiled Ground Truth Database -->
+    <div id="toast-container"></div>\n\n    <!-- Pre-compiled Ground Truth Database -->
     <script>
 /* PRE-LOADED 563 GROUND-TRUTH NASA FIRMS / OSM CLUSTERED SOURCES */
 const INITIAL_563_EVENTS = [
@@ -28012,8 +28168,7 @@ const INITIAL_563_EVENTS = [
     <!-- Runtime Network Configuration -->
     <script src="config.js"></script>
     <!-- Application Logic -->
-    <script>
-/**
+    <script>\n/**
  * THERMAL-AI Enterprise Multi-View Application Logic
  * Comprehensive updates addressing all user requirements:
  * - Smooth friction-free map zooming
@@ -31039,11 +31194,36 @@ function saveProfileSettings() {
 window.saveProfileSettings = saveProfileSettings;
 
 /* ==========================================================================
-   AUTHENTICATION & LOGOUT HANDLERS
+   AUTHENTICATION, MULTI-USER REGISTRATION & SESSION MANAGEMENT
    ========================================================================== */
-function togglePasswordVisibility() {
-    const passInput = document.getElementById("auth-input-pass");
-    const eyeIcon = document.getElementById("auth-pw-eye");
+function switchAuthMode(mode) {
+    hideAuthMessages();
+    const loginView = document.getElementById("auth-view-login");
+    const regView = document.getElementById("auth-view-register");
+    const tabLogin = document.getElementById("tab-auth-login");
+    const tabReg = document.getElementById("tab-auth-register");
+
+    if (mode === "register") {
+        if (loginView) loginView.style.display = "none";
+        if (regView) regView.style.display = "block";
+        if (tabLogin) tabLogin.classList.remove("active");
+        if (tabReg) tabReg.classList.add("active");
+        const nameInput = document.getElementById("reg-input-name");
+        if (nameInput) setTimeout(() => nameInput.focus(), 50);
+    } else {
+        if (loginView) loginView.style.display = "block";
+        if (regView) regView.style.display = "none";
+        if (tabLogin) tabLogin.classList.add("active");
+        if (tabReg) tabReg.classList.remove("active");
+        const emailInput = document.getElementById("auth-input-email");
+        if (emailInput) setTimeout(() => emailInput.focus(), 50);
+    }
+}
+window.switchAuthMode = switchAuthMode;
+
+function togglePasswordVisibility(inputId = "auth-input-pass", eyeId = "auth-pw-eye") {
+    const passInput = document.getElementById(inputId);
+    const eyeIcon = document.getElementById(eyeId);
     if (!passInput) return;
     if (passInput.type === "password") {
         passInput.type = "text";
@@ -31056,6 +31236,7 @@ function togglePasswordVisibility() {
 window.togglePasswordVisibility = togglePasswordVisibility;
 
 function showAuthError(message) {
+    hideAuthSuccess();
     const errorBox = document.getElementById("auth-error-box");
     const errorText = document.getElementById("auth-error-text");
     if (errorBox && errorText) {
@@ -31063,40 +31244,76 @@ function showAuthError(message) {
         errorBox.style.display = "flex";
     }
 }
+window.showAuthError = showAuthError;
 
 function hideAuthError() {
     const errorBox = document.getElementById("auth-error-box");
     if (errorBox) errorBox.style.display = "none";
 }
+window.hideAuthError = hideAuthError;
+
+function showAuthSuccess(message) {
+    hideAuthError();
+    const successBox = document.getElementById("auth-success-box");
+    const successText = document.getElementById("auth-success-text");
+    if (successBox && successText) {
+        successText.innerText = message;
+        successBox.style.display = "flex";
+    }
+}
+window.showAuthSuccess = showAuthSuccess;
+
+function hideAuthSuccess() {
+    const successBox = document.getElementById("auth-success-box");
+    if (successBox) successBox.style.display = "none";
+}
+window.hideAuthSuccess = hideAuthSuccess;
+
+function hideAuthMessages() {
+    hideAuthError();
+    hideAuthSuccess();
+}
+window.hideAuthMessages = hideAuthMessages;
 
 function executeDemoAccess() {
-    hideAuthError();
+    hideAuthMessages();
     const demoUser = {
-        email: "analyst.sandbox@fast-grid.in",
-        name: "Evaluation Analyst",
-        role: "State Emergency Analyst (Sandbox)",
+        email: "evaluator.sandbox@sih.gov.in",
+        name: "SIH Evaluator (Sandbox)",
+        role: "SIH Grand Finale Evaluator",
+        organization: "Smart India Hackathon 2026",
         is_demo: true
     };
     sessionStorage.setItem("aerothermal_auth_user", JSON.stringify(demoUser));
     applyAuthenticatedUser(demoUser);
     const authOverlay = document.getElementById("auth-overlay-view");
     if (authOverlay) authOverlay.classList.remove("active");
-    showToast("Signed in with Evaluator Sandbox Profile", "info");
+    showToast("Signed in as SIH Evaluator (Sandbox Mode)", "info");
 }
 window.executeDemoAccess = executeDemoAccess;
 window.executeDemoGoogleLogin = executeDemoAccess;
 
-async function executeUserLogin() {
-    hideAuthError();
-    const emailInput = document.getElementById("auth-input-email");
-    const passInput = document.getElementById("auth-input-pass");
-    const submitBtn = document.getElementById("btn-auth-submit");
-    const labelSpan = document.getElementById("btn-auth-label");
+async function executeUserRegister() {
+    hideAuthMessages();
+    const nameInput = document.getElementById("reg-input-name");
+    const emailInput = document.getElementById("reg-input-email");
+    const passInput = document.getElementById("reg-input-pass");
+    const confirmInput = document.getElementById("reg-input-pass-confirm");
+    const submitBtn = document.getElementById("btn-reg-submit");
+    const labelSpan = document.getElementById("btn-reg-label");
 
-    const email = emailInput ? emailInput.value.trim() : "";
-    const password = passInput ? passInput.value.trim() : "";
+    const name = nameInput ? nameInput.value.trim() : "";
+    const email = emailInput ? emailInput.value.trim().toLowerCase() : "";
+    const password = passInput ? passInput.value : "";
+    const confirmPassword = confirmInput ? confirmInput.value : "";
 
-    // 1. Client-side Format Validation
+    // 1. Client-side Validations
+    if (!name) {
+        showAuthError("Please enter your full name.");
+        if (nameInput) nameInput.focus();
+        return;
+    }
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email || !emailRegex.test(email)) {
         showAuthError("Please enter a valid email address.");
@@ -31106,6 +31323,86 @@ async function executeUserLogin() {
 
     if (!password || password.length < 6) {
         showAuthError("Password must be at least 6 characters.");
+        if (passInput) passInput.focus();
+        return;
+    }
+
+    if (password !== confirmPassword) {
+        showAuthError("Passwords do not match.");
+        if (confirmInput) {
+            confirmInput.value = "";
+            confirmInput.focus();
+        }
+        return;
+    }
+
+    // 2. Set Button Loading State
+    if (submitBtn) submitBtn.disabled = true;
+    if (labelSpan) labelSpan.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating Account...';
+
+    try {
+        const apiBase = getApiBase();
+        const res = await fetch(`${apiBase}/api/v1/auth/register`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, email, password, role: "Emergency Analyst", organization: "FAST Operational Node" })
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+            // Clear registration inputs
+            if (passInput) passInput.value = "";
+            if (confirmInput) confirmInput.value = "";
+
+            // Switch to Login tab with success message and prefilled email
+            switchAuthMode("login");
+            const loginEmailInput = document.getElementById("auth-input-email");
+            if (loginEmailInput) loginEmailInput.value = email;
+            const loginPassInput = document.getElementById("auth-input-pass");
+            if (loginPassInput) loginPassInput.value = "";
+
+            showAuthSuccess("Account created successfully. You can now sign in.");
+            if (loginPassInput) loginPassInput.focus();
+            showToast("Account created successfully. You can now sign in.", "success");
+        } else {
+            const errStr = (data.error || data.detail || "").toLowerCase();
+            if (errStr.includes("already exists") || res.status === 400) {
+                showAuthError("An account with this email already exists.");
+            } else {
+                showAuthError(data.error || data.detail || "Registration failed. Please try again.");
+            }
+            if (emailInput) emailInput.focus();
+        }
+    } catch (err) {
+        console.error("Registration error:", err);
+        showAuthError("Authentication service unreachable. Please check network connection.");
+    } finally {
+        if (submitBtn) submitBtn.disabled = false;
+        if (labelSpan) labelSpan.innerHTML = 'Create Account';
+    }
+}
+window.executeUserRegister = executeUserRegister;
+
+async function executeUserLogin() {
+    hideAuthMessages();
+    const emailInput = document.getElementById("auth-input-email");
+    const passInput = document.getElementById("auth-input-pass");
+    const submitBtn = document.getElementById("btn-auth-submit");
+    const labelSpan = document.getElementById("btn-auth-label");
+
+    const email = emailInput ? emailInput.value.trim().toLowerCase() : "";
+    const password = passInput ? passInput.value : "";
+
+    // 1. Client-side Format Validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRegex.test(email)) {
+        showAuthError("Please enter a valid email address.");
+        if (emailInput) emailInput.focus();
+        return;
+    }
+
+    if (!password) {
+        showAuthError("Please enter your password.");
         if (passInput) passInput.focus();
         return;
     }
@@ -31124,15 +31421,15 @@ async function executeUserLogin() {
 
         const data = await res.json();
         if (res.ok && data.success) {
-            // Authentic login verified by backend
+            // Authentic login verified by backend SQLite
             const user = data.user || {};
             const userName = user.name || email.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, l => l.toUpperCase());
-            const userRole = user.role || "Emergency Analyst";
+            const userRole = user.role || "Emergency Operations Analyst";
             const userSession = {
                 email: email,
                 name: userName,
                 role: userRole,
-                organization: user.organization || "National Thermal Monitoring Grid",
+                organization: user.organization || "FAST Operational Node",
                 token: data.token || "session_token",
                 is_demo: false
             };
@@ -31144,8 +31441,14 @@ async function executeUserLogin() {
             if (authOverlay) authOverlay.classList.remove("active");
             showToast(`Welcome, ${userName}! Signed in to FAST Console.`, "success");
         } else {
-            const err = data.error || data.detail || "Invalid email or password. Please verify credentials.";
-            showAuthError(err);
+            const rawErr = (data.error || data.detail || "").toLowerCase();
+            if (rawErr.includes("invalid password") || rawErr.includes("incorrect password")) {
+                showAuthError("Incorrect password.");
+            } else if (rawErr.includes("invalid email") || rawErr.includes("no account") || rawErr.includes("credentials")) {
+                showAuthError("No account found with this email.");
+            } else {
+                showAuthError(data.error || data.detail || "Authentication failed. Please verify credentials.");
+            }
             if (passInput) {
                 passInput.value = "";
                 passInput.focus();
@@ -31180,9 +31483,14 @@ window.confirmUserLogout = function () {
     sessionStorage.removeItem("aerothermal_auth_user");
     const emailInput = document.getElementById("auth-input-email");
     const passInput = document.getElementById("auth-input-pass");
+    const regPass = document.getElementById("reg-input-pass");
+    const regPassConf = document.getElementById("reg-input-pass-confirm");
     if (emailInput) emailInput.value = "";
     if (passInput) passInput.value = "";
-    hideAuthError();
+    if (regPass) regPass.value = "";
+    if (regPassConf) regPassConf.value = "";
+    hideAuthMessages();
+    switchAuthMode("login");
     const authOverlay = document.getElementById("auth-overlay-view");
     if (authOverlay) authOverlay.classList.add("active");
     showToast("Signed out of session. Please sign in to continue.", "info");
@@ -31600,7 +31908,6 @@ window.downloadActiveReport = downloadActiveReport;
 
 window.renderAnalyticsCharts = renderAnalyticsCharts;
 window.updateDashboard = updateDashboard;
-
-</script>
+\n</script>
 </body>
 </html>

@@ -3024,11 +3024,36 @@ function saveProfileSettings() {
 window.saveProfileSettings = saveProfileSettings;
 
 /* ==========================================================================
-   AUTHENTICATION & LOGOUT HANDLERS
+   AUTHENTICATION, MULTI-USER REGISTRATION & SESSION MANAGEMENT
    ========================================================================== */
-function togglePasswordVisibility() {
-    const passInput = document.getElementById("auth-input-pass");
-    const eyeIcon = document.getElementById("auth-pw-eye");
+function switchAuthMode(mode) {
+    hideAuthMessages();
+    const loginView = document.getElementById("auth-view-login");
+    const regView = document.getElementById("auth-view-register");
+    const tabLogin = document.getElementById("tab-auth-login");
+    const tabReg = document.getElementById("tab-auth-register");
+
+    if (mode === "register") {
+        if (loginView) loginView.style.display = "none";
+        if (regView) regView.style.display = "block";
+        if (tabLogin) tabLogin.classList.remove("active");
+        if (tabReg) tabReg.classList.add("active");
+        const nameInput = document.getElementById("reg-input-name");
+        if (nameInput) setTimeout(() => nameInput.focus(), 50);
+    } else {
+        if (loginView) loginView.style.display = "block";
+        if (regView) regView.style.display = "none";
+        if (tabLogin) tabLogin.classList.add("active");
+        if (tabReg) tabReg.classList.remove("active");
+        const emailInput = document.getElementById("auth-input-email");
+        if (emailInput) setTimeout(() => emailInput.focus(), 50);
+    }
+}
+window.switchAuthMode = switchAuthMode;
+
+function togglePasswordVisibility(inputId = "auth-input-pass", eyeId = "auth-pw-eye") {
+    const passInput = document.getElementById(inputId);
+    const eyeIcon = document.getElementById(eyeId);
     if (!passInput) return;
     if (passInput.type === "password") {
         passInput.type = "text";
@@ -3041,6 +3066,7 @@ function togglePasswordVisibility() {
 window.togglePasswordVisibility = togglePasswordVisibility;
 
 function showAuthError(message) {
+    hideAuthSuccess();
     const errorBox = document.getElementById("auth-error-box");
     const errorText = document.getElementById("auth-error-text");
     if (errorBox && errorText) {
@@ -3048,40 +3074,76 @@ function showAuthError(message) {
         errorBox.style.display = "flex";
     }
 }
+window.showAuthError = showAuthError;
 
 function hideAuthError() {
     const errorBox = document.getElementById("auth-error-box");
     if (errorBox) errorBox.style.display = "none";
 }
+window.hideAuthError = hideAuthError;
+
+function showAuthSuccess(message) {
+    hideAuthError();
+    const successBox = document.getElementById("auth-success-box");
+    const successText = document.getElementById("auth-success-text");
+    if (successBox && successText) {
+        successText.innerText = message;
+        successBox.style.display = "flex";
+    }
+}
+window.showAuthSuccess = showAuthSuccess;
+
+function hideAuthSuccess() {
+    const successBox = document.getElementById("auth-success-box");
+    if (successBox) successBox.style.display = "none";
+}
+window.hideAuthSuccess = hideAuthSuccess;
+
+function hideAuthMessages() {
+    hideAuthError();
+    hideAuthSuccess();
+}
+window.hideAuthMessages = hideAuthMessages;
 
 function executeDemoAccess() {
-    hideAuthError();
+    hideAuthMessages();
     const demoUser = {
-        email: "analyst.sandbox@fast-grid.in",
-        name: "Evaluation Analyst",
-        role: "State Emergency Analyst (Sandbox)",
+        email: "evaluator.sandbox@sih.gov.in",
+        name: "SIH Evaluator (Sandbox)",
+        role: "SIH Grand Finale Evaluator",
+        organization: "Smart India Hackathon 2026",
         is_demo: true
     };
     sessionStorage.setItem("aerothermal_auth_user", JSON.stringify(demoUser));
     applyAuthenticatedUser(demoUser);
     const authOverlay = document.getElementById("auth-overlay-view");
     if (authOverlay) authOverlay.classList.remove("active");
-    showToast("Signed in with Evaluator Sandbox Profile", "info");
+    showToast("Signed in as SIH Evaluator (Sandbox Mode)", "info");
 }
 window.executeDemoAccess = executeDemoAccess;
 window.executeDemoGoogleLogin = executeDemoAccess;
 
-async function executeUserLogin() {
-    hideAuthError();
-    const emailInput = document.getElementById("auth-input-email");
-    const passInput = document.getElementById("auth-input-pass");
-    const submitBtn = document.getElementById("btn-auth-submit");
-    const labelSpan = document.getElementById("btn-auth-label");
+async function executeUserRegister() {
+    hideAuthMessages();
+    const nameInput = document.getElementById("reg-input-name");
+    const emailInput = document.getElementById("reg-input-email");
+    const passInput = document.getElementById("reg-input-pass");
+    const confirmInput = document.getElementById("reg-input-pass-confirm");
+    const submitBtn = document.getElementById("btn-reg-submit");
+    const labelSpan = document.getElementById("btn-reg-label");
 
-    const email = emailInput ? emailInput.value.trim() : "";
-    const password = passInput ? passInput.value.trim() : "";
+    const name = nameInput ? nameInput.value.trim() : "";
+    const email = emailInput ? emailInput.value.trim().toLowerCase() : "";
+    const password = passInput ? passInput.value : "";
+    const confirmPassword = confirmInput ? confirmInput.value : "";
 
-    // 1. Client-side Format Validation
+    // 1. Client-side Validations
+    if (!name) {
+        showAuthError("Please enter your full name.");
+        if (nameInput) nameInput.focus();
+        return;
+    }
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email || !emailRegex.test(email)) {
         showAuthError("Please enter a valid email address.");
@@ -3091,6 +3153,86 @@ async function executeUserLogin() {
 
     if (!password || password.length < 6) {
         showAuthError("Password must be at least 6 characters.");
+        if (passInput) passInput.focus();
+        return;
+    }
+
+    if (password !== confirmPassword) {
+        showAuthError("Passwords do not match.");
+        if (confirmInput) {
+            confirmInput.value = "";
+            confirmInput.focus();
+        }
+        return;
+    }
+
+    // 2. Set Button Loading State
+    if (submitBtn) submitBtn.disabled = true;
+    if (labelSpan) labelSpan.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating Account...';
+
+    try {
+        const apiBase = getApiBase();
+        const res = await fetch(`${apiBase}/api/v1/auth/register`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, email, password, role: "Emergency Analyst", organization: "FAST Operational Node" })
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+            // Clear registration inputs
+            if (passInput) passInput.value = "";
+            if (confirmInput) confirmInput.value = "";
+
+            // Switch to Login tab with success message and prefilled email
+            switchAuthMode("login");
+            const loginEmailInput = document.getElementById("auth-input-email");
+            if (loginEmailInput) loginEmailInput.value = email;
+            const loginPassInput = document.getElementById("auth-input-pass");
+            if (loginPassInput) loginPassInput.value = "";
+
+            showAuthSuccess("Account created successfully. You can now sign in.");
+            if (loginPassInput) loginPassInput.focus();
+            showToast("Account created successfully. You can now sign in.", "success");
+        } else {
+            const errStr = (data.error || data.detail || "").toLowerCase();
+            if (errStr.includes("already exists") || res.status === 400) {
+                showAuthError("An account with this email already exists.");
+            } else {
+                showAuthError(data.error || data.detail || "Registration failed. Please try again.");
+            }
+            if (emailInput) emailInput.focus();
+        }
+    } catch (err) {
+        console.error("Registration error:", err);
+        showAuthError("Authentication service unreachable. Please check network connection.");
+    } finally {
+        if (submitBtn) submitBtn.disabled = false;
+        if (labelSpan) labelSpan.innerHTML = 'Create Account';
+    }
+}
+window.executeUserRegister = executeUserRegister;
+
+async function executeUserLogin() {
+    hideAuthMessages();
+    const emailInput = document.getElementById("auth-input-email");
+    const passInput = document.getElementById("auth-input-pass");
+    const submitBtn = document.getElementById("btn-auth-submit");
+    const labelSpan = document.getElementById("btn-auth-label");
+
+    const email = emailInput ? emailInput.value.trim().toLowerCase() : "";
+    const password = passInput ? passInput.value : "";
+
+    // 1. Client-side Format Validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRegex.test(email)) {
+        showAuthError("Please enter a valid email address.");
+        if (emailInput) emailInput.focus();
+        return;
+    }
+
+    if (!password) {
+        showAuthError("Please enter your password.");
         if (passInput) passInput.focus();
         return;
     }
@@ -3109,15 +3251,15 @@ async function executeUserLogin() {
 
         const data = await res.json();
         if (res.ok && data.success) {
-            // Authentic login verified by backend
+            // Authentic login verified by backend SQLite
             const user = data.user || {};
             const userName = user.name || email.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, l => l.toUpperCase());
-            const userRole = user.role || "Emergency Analyst";
+            const userRole = user.role || "Emergency Operations Analyst";
             const userSession = {
                 email: email,
                 name: userName,
                 role: userRole,
-                organization: user.organization || "National Thermal Monitoring Grid",
+                organization: user.organization || "FAST Operational Node",
                 token: data.token || "session_token",
                 is_demo: false
             };
@@ -3129,8 +3271,14 @@ async function executeUserLogin() {
             if (authOverlay) authOverlay.classList.remove("active");
             showToast(`Welcome, ${userName}! Signed in to FAST Console.`, "success");
         } else {
-            const err = data.error || data.detail || "Invalid email or password. Please verify credentials.";
-            showAuthError(err);
+            const rawErr = (data.error || data.detail || "").toLowerCase();
+            if (rawErr.includes("invalid password") || rawErr.includes("incorrect password")) {
+                showAuthError("Incorrect password.");
+            } else if (rawErr.includes("invalid email") || rawErr.includes("no account") || rawErr.includes("credentials")) {
+                showAuthError("No account found with this email.");
+            } else {
+                showAuthError(data.error || data.detail || "Authentication failed. Please verify credentials.");
+            }
             if (passInput) {
                 passInput.value = "";
                 passInput.focus();
@@ -3165,9 +3313,14 @@ window.confirmUserLogout = function () {
     sessionStorage.removeItem("aerothermal_auth_user");
     const emailInput = document.getElementById("auth-input-email");
     const passInput = document.getElementById("auth-input-pass");
+    const regPass = document.getElementById("reg-input-pass");
+    const regPassConf = document.getElementById("reg-input-pass-confirm");
     if (emailInput) emailInput.value = "";
     if (passInput) passInput.value = "";
-    hideAuthError();
+    if (regPass) regPass.value = "";
+    if (regPassConf) regPassConf.value = "";
+    hideAuthMessages();
+    switchAuthMode("login");
     const authOverlay = document.getElementById("auth-overlay-view");
     if (authOverlay) authOverlay.classList.add("active");
     showToast("Signed out of session. Please sign in to continue.", "info");
