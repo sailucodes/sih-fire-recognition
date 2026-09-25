@@ -160,12 +160,39 @@ let recentReportsList = [
 /* ==========================================================================
    INITIALIZATION
    ========================================================================== */
+function applyAuthenticatedUser(user) {
+    if (!user) return;
+    const name = user.name || "Evaluation Analyst";
+    const email = user.email || "analyst.sandbox@fast-grid.in";
+    const initials = name.split(" ").map(p => p[0]).filter(Boolean).join("").toUpperCase().substring(0, 2) || "EA";
+
+    setText("header-user-name", name);
+    setText("header-avatar-initials", initials);
+    setText("settings-display-name", name);
+    setText("settings-display-email", email);
+
+    const nameInput = document.getElementById("settings-input-name");
+    if (nameInput) nameInput.value = name;
+    const emailInput = document.getElementById("settings-input-email");
+    if (emailInput) emailInput.value = email;
+
+    const avatar = document.getElementById("settings-avatar-icon");
+    if (avatar) avatar.innerText = initials;
+}
+window.applyAuthenticatedUser = applyAuthenticatedUser;
+
 function checkStartupAuthentication() {
-    const userSession = sessionStorage.getItem("aerothermal_auth_user");
+    const raw = sessionStorage.getItem("aerothermal_auth_user");
     const authOverlay = document.getElementById("auth-overlay-view");
-    if (!userSession && authOverlay) {
-        authOverlay.classList.add("active");
+    if (raw) {
+        try {
+            const user = typeof raw === "string" && raw.startsWith("{") ? JSON.parse(raw) : { email: raw, name: "Evaluation Analyst" };
+            applyAuthenticatedUser(user);
+            if (authOverlay) authOverlay.classList.remove("active");
+            return;
+        } catch (_) {}
     }
+    if (authOverlay) authOverlay.classList.add("active");
 }
 
 document.addEventListener("DOMContentLoaded", async function () {
@@ -2400,107 +2427,387 @@ window.downloadActiveModalReport = function () {
 };
 
 /* ==========================================================================
-   SETTINGS (CLEANED - NO API KEYS)
+   F.A.S.T. PROFESSIONAL SYSTEM SETTINGS
    ========================================================================== */
 function showSettingsTab(tabName, btnEl) {
-window.showSettingsTab = showSettingsTab;
     if (btnEl) {
-        const btns = btnEl.parentElement.querySelectorAll(".nav-link-item");
+        const btns = btnEl.parentElement.querySelectorAll(".settings-nav-btn, .nav-link-item");
         btns.forEach(b => b.classList.remove("active"));
         btnEl.classList.add("active");
+    } else {
+        const targetBtn = document.getElementById(`tab-btn-${tabName}`);
+        if (targetBtn) {
+            const btns = targetBtn.parentElement.querySelectorAll(".settings-nav-btn, .nav-link-item");
+            btns.forEach(b => b.classList.remove("active"));
+            targetBtn.classList.add("active");
+        }
     }
 
     const pane = document.getElementById("settings-content-pane");
     if (!pane) return;
 
+    // Get current session data
+    let currentName = "Evaluation Analyst";
+    let currentEmail = "analyst.sandbox@fast-grid.in";
+    let isDemo = true;
+    try {
+        const raw = sessionStorage.getItem("aerothermal_auth_user");
+        if (raw) {
+            const u = JSON.parse(raw);
+            currentName = u.name || currentName;
+            currentEmail = u.email || currentEmail;
+            isDemo = Boolean(u.is_demo);
+        }
+    } catch (_) {}
+
+    const initials = currentName.split(" ").map(p => p[0]).filter(Boolean).join("").toUpperCase().substring(0, 2) || "EA";
+
     if (tabName === "profile") {
         pane.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 22px;">
-                <div class="user-avatar-circle" id="settings-avatar-icon" style="width: 52px; height: 52px; font-size: 19px;">SS</div>
-                <div>
-                    <strong style="font-size: 16px; display: block;" id="settings-display-name">Sailaja S.</strong>
-                    <span style="font-size: 13px; color: var(--text-muted);" id="settings-display-email">sailaja.s@example.com</span>
+            <div class="settings-card-header">
+                <h3 class="settings-card-title"><i class="fa-regular fa-user" style="color: var(--primary-color);"></i> Operator Profile</h3>
+                <p class="settings-card-sub">Active session credentials and analyst profile details</p>
+            </div>
+
+            <div class="settings-profile-badge-row">
+                <div class="user-avatar-circle" id="settings-avatar-icon" style="width: 54px; height: 54px; font-size: 20px;">${initials}</div>
+                <div style="flex: 1;">
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <strong style="font-size: 16px;" id="settings-display-name">${escapeHTML(currentName)}</strong>
+                        <span id="settings-profile-badge">
+                            ${isDemo
+                                ? '<span class="badge-pill" style="background:#f1f5f9; color:#475569;"><i class="fa-solid fa-flask" style="font-size:10px;"></i> Evaluator Sandbox Profile</span>'
+                                : '<span class="badge-pill" style="background:#dbeafe; color:#1d4ed8;"><i class="fa-solid fa-user-check" style="font-size:10px;"></i> Authenticated Account</span>'}
+                        </span>
+                    </div>
+                    <span style="font-size: 13px; color: var(--text-muted); display: block; margin-top: 3px;" id="settings-display-email">${escapeHTML(currentEmail)}</span>
                 </div>
             </div>
-            <div class="filter-field-group" style="margin-bottom: 12px;">
-                <label>Officer Full Name</label>
-                <input type="text" id="settings-input-name" value="Sailaja S.">
+
+            <div class="settings-field">
+                <label class="settings-label">Analyst Display Name</label>
+                <input type="text" id="settings-input-name" class="settings-input" value="${escapeHTML(currentName)}">
+                <div class="settings-desc">Name displayed across intelligence briefs and dispatch records</div>
             </div>
-            <div class="filter-field-group" style="margin-bottom: 16px;">
-                <label>Registered Government Email Address</label>
-                <input type="email" id="settings-input-email" value="sailaja.s@example.com">
+
+            <div class="settings-field">
+                <label class="settings-label">Registered Contact Email</label>
+                <input type="email" id="settings-input-email" class="settings-input" value="${escapeHTML(currentEmail)}">
+                <div class="settings-desc">Used for incident notifications and dispatch confirmations</div>
             </div>
-            <button class="btn-apply-filters" style="width: 170px;" onclick="saveProfileSettings()">
-                Save Profile Changes
-            </button>
+
+            <div class="settings-field">
+                <label class="settings-label">Operational Role</label>
+                <input type="text" class="settings-input" value="${isDemo ? 'Evaluation Analyst (SIH Presentation Mode)' : 'State Emergency Operations Analyst'}" disabled style="opacity: 0.75; cursor: not-allowed;">
+                <div class="settings-desc">Assigned by the sovereign geospatial grid administrator</div>
+            </div>
+
+            <div style="margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border-color); display: flex; gap: 12px;">
+                <button class="btn-apply-filters" style="width: auto; padding: 0 20px;" onclick="saveProfileSettings()">
+                    <i class="fa-solid fa-floppy-disk" style="margin-right: 6px;"></i> Save Profile Changes
+                </button>
+            </div>
         `;
     } else if (tabName === "preferences") {
         pane.innerHTML = `
-            <h3 style="font-size: 16px; margin-bottom: 14px;">Operational Preferences</h3>
-            <div style="display: flex; flex-direction: column; gap: 12px; font-size: 13.5px;">
-                <label style="display: flex; align-items: center; gap: 8px;">
-                    <input type="checkbox" checked> Auto-sync NASA FIRMS VIIRS feeds every 60 seconds
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px;">
-                    <input type="checkbox" checked> Audio siren alerts for Critical anomaly detections
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px;">
-                    <input type="checkbox" checked> Smooth map transitions and high-resolution satellite tiles
-                </label>
+            <div class="settings-card-header">
+                <h3 class="settings-card-title"><i class="fa-solid fa-sliders" style="color: var(--primary-color);"></i> Operational Preferences</h3>
+                <p class="settings-card-sub">Configure live telemetry polling, audio warnings, and map performance</p>
             </div>
-            <button class="btn-apply-filters" style="margin-top: 18px; width: 170px;" onclick="showToast('Operational preferences saved', 'success')">
-                Save Preferences
-            </button>
+
+            <div class="settings-toggle-row">
+                <input type="checkbox" id="pref-auto-sync" checked>
+                <div>
+                    <label for="pref-auto-sync" class="settings-label" style="cursor: pointer; margin-bottom: 2px;">Automatic NASA FIRMS Polling</label>
+                    <div class="settings-desc">Query backend VIIRS telemetry in background every 60 seconds without refreshing the page</div>
+                </div>
+            </div>
+
+            <div class="settings-toggle-row">
+                <input type="checkbox" id="pref-audio-alerts" checked>
+                <div>
+                    <label for="pref-audio-alerts" class="settings-label" style="cursor: pointer; margin-bottom: 2px;">Audio Siren for Critical Flare Anomalies</label>
+                    <div class="settings-desc">Play discrete acoustic alert chime when a verified Critical anomaly is detected</div>
+                </div>
+            </div>
+
+            <div class="settings-toggle-row">
+                <input type="checkbox" id="pref-smooth-tiles" checked>
+                <div>
+                    <label for="pref-smooth-tiles" class="settings-label" style="cursor: pointer; margin-bottom: 2px;">Hardware Accelerated GIS Map Tiles</label>
+                    <div class="settings-desc">Enable GPU-accelerated Leaflet map rendering with high-resolution satellite tiles</div>
+                </div>
+            </div>
+
+            <div class="settings-field" style="margin-top: 18px;">
+                <label class="settings-label">Default Observation Window</label>
+                <select id="pref-default-window" class="settings-input" style="max-width: 320px;">
+                    <option value="7" selected>Past 7 Days (Standard Operational View)</option>
+                    <option value="30">Past 30 Days (Extended Regional Audit)</option>
+                    <option value="1">Today (24h Live Satellite Pass)</option>
+                </select>
+                <div class="settings-desc">Time span loaded upon opening the dashboard</div>
+            </div>
+
+            <div style="margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border-color);">
+                <button class="btn-apply-filters" style="width: auto; padding: 0 20px;" onclick="saveOperationalPreferences()">
+                    <i class="fa-solid fa-check" style="margin-right: 6px;"></i> Save Preferences
+                </button>
+            </div>
         `;
     } else if (tabName === "notifications") {
         pane.innerHTML = `
-            <h3 style="font-size: 16px; margin-bottom: 14px;">Automated Notification Dispatch</h3>
-            <div style="display: flex; flex-direction: column; gap: 12px; font-size: 13.5px;">
-                <label style="display: flex; align-items: center; gap: 8px;">
-                    <input type="checkbox" checked> Immediate SMS to Designated State Forest Officers
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px;">
-                    <input type="checkbox" checked> Daily High-Priority Morning Digest (08:00 AM IST)
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px;">
-                    <input type="checkbox" checked> Push Web Notifications for Flare Escalations
-                </label>
+            <div class="settings-card-header">
+                <h3 class="settings-card-title"><i class="fa-regular fa-bell" style="color: var(--primary-color);"></i> Automated Notification Routing</h3>
+                <p class="settings-card-sub">Manage emergency escalation dispatch and briefing delivery channels</p>
             </div>
-            <button class="btn-apply-filters" style="margin-top: 18px; width: 170px;" onclick="showToast('Notification settings saved', 'success')">
-                Save Notification Settings
-            </button>
+
+            <div class="settings-toggle-row">
+                <input type="checkbox" id="notif-sms-active" checked>
+                <div>
+                    <label for="notif-sms-active" class="settings-label" style="cursor: pointer; margin-bottom: 2px;">State Disaster Management SMS Dispatch</label>
+                    <div class="settings-desc">Route high-priority SMS alerts directly to state emergency response cell duty officers</div>
+                </div>
+            </div>
+
+            <div class="settings-toggle-row">
+                <input type="checkbox" id="notif-digest-active" checked>
+                <div>
+                    <label for="notif-digest-active" class="settings-label" style="cursor: pointer; margin-bottom: 2px;">Daily Morning Situation Digest (08:00 IST)</label>
+                    <div class="settings-desc">Automated compilation and dispatch of 24h thermal anomaly intelligence PDF brief</div>
+                </div>
+            </div>
+
+            <div class="settings-toggle-row">
+                <input type="checkbox" id="notif-browser-push" checked>
+                <div>
+                    <label for="notif-browser-push" class="settings-label" style="cursor: pointer; margin-bottom: 2px;">Browser Push Alerts</label>
+                    <div class="settings-desc">Show desktop notifications whenever new thermal hotspots are classified by AI</div>
+                </div>
+            </div>
+
+            <div class="settings-field" style="margin-top: 18px;">
+                <label class="settings-label">Primary Dispatch Notification Email</label>
+                <input type="email" id="notif-dispatch-email" class="settings-input" value="alerts@fast-grid.in" placeholder="emergency@organization.gov.in">
+                <div class="settings-desc">Official email address receiving automated incident intelligence reports</div>
+            </div>
+
+            <div style="margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border-color);">
+                <button class="btn-apply-filters" style="width: auto; padding: 0 20px;" onclick="showToast('Notification routing configuration saved', 'success')">
+                    <i class="fa-solid fa-paper-plane" style="margin-right: 6px;"></i> Save Notification Settings
+                </button>
+            </div>
         `;
     } else if (tabName === "appearance") {
         pane.innerHTML = `
-            <h3 style="font-size: 16px; margin-bottom: 10px;">Display Theme & Appearance</h3>
-            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">Toggle between Light mode for daylight operations and Dark contrast mode.</p>
-            <div style="display: flex; gap: 12px;">
-                <button class="btn-apply-filters" style="width: 140px; background: #2563eb;" onclick="if(isDarkMode) toggleDarkTheme();">Light Mode (Default)</button>
-                <button class="btn-export-outline" style="width: 140px;" onclick="if(!isDarkMode) toggleDarkTheme();">Dark Contrast</button>
+            <div class="settings-card-header">
+                <h3 class="settings-card-title"><i class="fa-solid fa-palette" style="color: var(--primary-color);"></i> Display Theme & Appearance</h3>
+                <p class="settings-card-sub">Customize interface styling and GIS contrast for day/night operations</p>
+            </div>
+
+            <div class="settings-label">Color Theme</div>
+            <div class="theme-choice-grid">
+                <div class="theme-card ${!isDarkMode ? 'active' : ''}" onclick="setExplicitTheme(false)">
+                    <div class="theme-preview-box" style="background: #f8fafc; border: 1px solid #e2e8f0; color: #0f172a;">
+                        <i class="fa-regular fa-sun" style="color: #f59e0b;"></i>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <strong style="font-size: 13.5px; display: block;">Light Mode</strong>
+                            <span style="font-size: 12px; color: var(--text-muted);">Standard Daylight View</span>
+                        </div>
+                        ${!isDarkMode ? '<i class="fa-solid fa-circle-check" style="color: var(--primary-color);"></i>' : ''}
+                    </div>
+                </div>
+
+                <div class="theme-card ${isDarkMode ? 'active' : ''}" onclick="setExplicitTheme(true)">
+                    <div class="theme-preview-box" style="background: #0f172a; border: 1px solid #334155; color: #f8fafc;">
+                        <i class="fa-regular fa-moon" style="color: #60a5fa;"></i>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <strong style="font-size: 13.5px; display: block;">Dark GIS Contrast</strong>
+                            <span style="font-size: 12px; color: var(--text-muted);">Low-Light Night Monitoring</span>
+                        </div>
+                        ${isDarkMode ? '<i class="fa-solid fa-circle-check" style="color: var(--primary-color);"></i>' : ''}
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-field" style="margin-top: 24px;">
+                <label class="settings-label">Default Basemap Style</label>
+                <select id="pref-map-style" class="settings-input" style="max-width: 320px;" onchange="setMapBaseLayer(this.value)">
+                    <option value="satellite" ${(typeof currentBaseLayer !== 'undefined' ? currentBaseLayer : 'satellite') === 'satellite' ? 'selected' : ''}>High-Resolution Satellite (Esri World Imagery)</option>
+                    <option value="standard" ${(typeof currentBaseLayer !== 'undefined' ? currentBaseLayer : 'satellite') === 'standard' ? 'selected' : ''}>Standard Street & Terrain (OpenStreetMap)</option>
+                    <option value="dark" ${(typeof currentBaseLayer !== 'undefined' ? currentBaseLayer : 'satellite') === 'dark' ? 'selected' : ''}>Dark Matter GIS (CartoDB High-Contrast)</option>
+                </select>
+                <div class="settings-desc">Initial map background loaded on startup</div>
             </div>
         `;
     }
-};
+}
+window.showSettingsTab = showSettingsTab;
 
-window.saveProfileSettings = function () {
-    const name = document.getElementById("settings-input-name")?.value || "Sailaja S.";
-    const email = document.getElementById("settings-input-email")?.value || "sailaja.s@example.com";
-    const initials = name.split(" ").map(p => p[0]).join("").toUpperCase().substring(0, 2);
+function setExplicitTheme(dark) {
+    if (dark !== isDarkMode) {
+        toggleDarkTheme();
+    }
+    showSettingsTab('appearance');
+}
+window.setExplicitTheme = setExplicitTheme;
 
-    setText("header-user-name", name);
-    setText("header-avatar-initials", initials);
-    setText("settings-display-name", name);
-    setText("settings-display-email", email);
+function saveOperationalPreferences() {
+    const defaultWindow = document.getElementById("pref-default-window")?.value;
+    if (defaultWindow) {
+        localStorage.setItem("thermal_default_window", defaultWindow);
+    }
+    showToast("Operational preferences saved successfully", "success");
+}
+window.saveOperationalPreferences = saveOperationalPreferences;
 
-    const sAvatar = document.getElementById("settings-avatar-icon");
-    if (sAvatar) sAvatar.innerText = initials;
+function saveProfileSettings() {
+    const nameInput = document.getElementById("settings-input-name");
+    const emailInput = document.getElementById("settings-input-email");
+    const name = nameInput ? nameInput.value.trim() || "Evaluation Analyst" : "Evaluation Analyst";
+    const email = emailInput ? emailInput.value.trim() || "analyst.sandbox@fast-grid.in" : "analyst.sandbox@fast-grid.in";
 
-    showToast("Profile updated successfully", "success");
-};
+    let sessionObj = { name, email, role: "State Emergency Analyst", is_demo: true };
+    try {
+        const raw = sessionStorage.getItem("aerothermal_auth_user");
+        if (raw) {
+            sessionObj = { ...JSON.parse(raw), name, email };
+        }
+    } catch (_) {}
+
+    sessionStorage.setItem("aerothermal_auth_user", JSON.stringify(sessionObj));
+    applyAuthenticatedUser(sessionObj);
+    showToast("Profile details updated successfully", "success");
+}
+window.saveProfileSettings = saveProfileSettings;
 
 /* ==========================================================================
-   AUTHENTICATION & LOGOUT MODAL
+   AUTHENTICATION & LOGOUT HANDLERS
    ========================================================================== */
+function togglePasswordVisibility() {
+    const passInput = document.getElementById("auth-input-pass");
+    const eyeIcon = document.getElementById("auth-pw-eye");
+    if (!passInput) return;
+    if (passInput.type === "password") {
+        passInput.type = "text";
+        if (eyeIcon) eyeIcon.className = "fa-regular fa-eye-slash";
+    } else {
+        passInput.type = "password";
+        if (eyeIcon) eyeIcon.className = "fa-regular fa-eye";
+    }
+}
+window.togglePasswordVisibility = togglePasswordVisibility;
+
+function showAuthError(message) {
+    const errorBox = document.getElementById("auth-error-box");
+    const errorText = document.getElementById("auth-error-text");
+    if (errorBox && errorText) {
+        errorText.innerText = message;
+        errorBox.style.display = "flex";
+    }
+}
+
+function hideAuthError() {
+    const errorBox = document.getElementById("auth-error-box");
+    if (errorBox) errorBox.style.display = "none";
+}
+
+function executeDemoAccess() {
+    hideAuthError();
+    const demoUser = {
+        email: "analyst.sandbox@fast-grid.in",
+        name: "Evaluation Analyst",
+        role: "State Emergency Analyst (Sandbox)",
+        is_demo: true
+    };
+    sessionStorage.setItem("aerothermal_auth_user", JSON.stringify(demoUser));
+    applyAuthenticatedUser(demoUser);
+    const authOverlay = document.getElementById("auth-overlay-view");
+    if (authOverlay) authOverlay.classList.remove("active");
+    showToast("Signed in with Evaluator Sandbox Profile", "info");
+}
+window.executeDemoAccess = executeDemoAccess;
+window.executeDemoGoogleLogin = executeDemoAccess;
+
+async function executeUserLogin() {
+    hideAuthError();
+    const emailInput = document.getElementById("auth-input-email");
+    const passInput = document.getElementById("auth-input-pass");
+    const submitBtn = document.getElementById("btn-auth-submit");
+    const labelSpan = document.getElementById("btn-auth-label");
+
+    const email = emailInput ? emailInput.value.trim() : "";
+    const password = passInput ? passInput.value.trim() : "";
+
+    // 1. Client-side Format Validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRegex.test(email)) {
+        showAuthError("Please enter a valid email address.");
+        if (emailInput) emailInput.focus();
+        return;
+    }
+
+    if (!password || password.length < 6) {
+        showAuthError("Password must be at least 6 characters.");
+        if (passInput) passInput.focus();
+        return;
+    }
+
+    // 2. Set Button to Loading State
+    if (submitBtn) submitBtn.disabled = true;
+    if (labelSpan) labelSpan.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Authenticating...';
+
+    try {
+        const apiBase = getApiBase();
+        const res = await fetch(`${apiBase}/api/v1/auth/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password })
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+            // Authentic login verified by backend
+            const user = data.user || {};
+            const userName = user.name || email.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, l => l.toUpperCase());
+            const userRole = user.role || "Emergency Analyst";
+            const userSession = {
+                email: email,
+                name: userName,
+                role: userRole,
+                organization: user.organization || "National Thermal Monitoring Grid",
+                token: data.token || "session_token",
+                is_demo: false
+            };
+
+            sessionStorage.setItem("aerothermal_auth_user", JSON.stringify(userSession));
+            applyAuthenticatedUser(userSession);
+
+            const authOverlay = document.getElementById("auth-overlay-view");
+            if (authOverlay) authOverlay.classList.remove("active");
+            showToast(`Welcome, ${userName}! Signed in to FAST Console.`, "success");
+        } else {
+            const err = data.error || data.detail || "Invalid email or password. Please verify credentials.";
+            showAuthError(err);
+            if (passInput) {
+                passInput.value = "";
+                passInput.focus();
+            }
+        }
+    } catch (err) {
+        console.error("Login verification error:", err);
+        showAuthError("Authentication service unreachable. Please check network connection or use Quick Demo Access.");
+    } finally {
+        if (submitBtn) submitBtn.disabled = false;
+        if (labelSpan) labelSpan.innerHTML = 'Sign In to Dashboard';
+    }
+}
+window.executeUserLogin = executeUserLogin;
+
 window.openLogoutModal = function () {
     const modal = document.getElementById("logout-modal");
     if (modal) modal.classList.add("active");
@@ -2518,24 +2825,14 @@ window.closeLogoutModalOnBackdrop = function (e) {
 window.confirmUserLogout = function () {
     closeLogoutModal();
     sessionStorage.removeItem("aerothermal_auth_user");
+    const emailInput = document.getElementById("auth-input-email");
+    const passInput = document.getElementById("auth-input-pass");
+    if (emailInput) emailInput.value = "";
+    if (passInput) passInput.value = "";
+    hideAuthError();
     const authOverlay = document.getElementById("auth-overlay-view");
     if (authOverlay) authOverlay.classList.add("active");
-    showToast("Logged out of session. Please sign in to continue.", "info");
-};
-
-window.executeUserLogin = function () {
-    const email = document.getElementById("auth-input-email")?.value || "sailaja.s@example.com";
-    sessionStorage.setItem("aerothermal_auth_user", email);
-    const authOverlay = document.getElementById("auth-overlay-view");
-    if (authOverlay) authOverlay.classList.remove("active");
-    showToast(`Signed in successfully as ${email}`, "success");
-};
-
-window.executeDemoGoogleLogin = function () {
-    sessionStorage.setItem("aerothermal_auth_user", "sailaja.s@example.com");
-    const authOverlay = document.getElementById("auth-overlay-view");
-    if (authOverlay) authOverlay.classList.remove("active");
-    showToast("Signed in as Officer Sailaja S.", "success");
+    showToast("Signed out of session. Please sign in to continue.", "info");
 };
 
 /* ==========================================================================

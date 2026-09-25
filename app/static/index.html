@@ -814,29 +814,29 @@
                 <!-- ==============================================================
                      7. SETTINGS VIEW (CLEANED WITHOUT API KEYS)
                      ============================================================== -->
-                <section id="settings-section" class="view-section">
+                                <section id="settings-section" class="view-section">
                     <div style="margin-bottom: 20px;">
                         <h2 style="font-size: 20px; margin-bottom: 4px;">System Settings</h2>
-                        <p style="font-size: 13.5px; color: var(--text-muted);">Manage your profile, preferences, and automated dispatch channels</p>
+                        <p style="font-size: 13.5px; color: var(--text-muted);">Manage operator profile, system preferences, notification routing, and display theme</p>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 240px 1fr; gap: 24px;">
-                        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px; height: fit-content;">
-                            <button class="nav-link-item active" style="width: 100%; text-align: left; margin-bottom: 4px;" onclick="showSettingsTab('profile', this)">
+                    <div class="settings-layout-grid">
+                        <div class="settings-nav-card">
+                            <button class="settings-nav-btn active" id="tab-btn-profile" onclick="showSettingsTab('profile', this)">
                                 <i class="fa-regular fa-user"></i> <span>Profile</span>
                             </button>
-                            <button class="nav-link-item" style="width: 100%; text-align: left; margin-bottom: 4px;" onclick="showSettingsTab('preferences', this)">
+                            <button class="settings-nav-btn" id="tab-btn-preferences" onclick="showSettingsTab('preferences', this)">
                                 <i class="fa-solid fa-sliders"></i> <span>Preferences</span>
                             </button>
-                            <button class="nav-link-item" style="width: 100%; text-align: left; margin-bottom: 4px;" onclick="showSettingsTab('notifications', this)">
+                            <button class="settings-nav-btn" id="tab-btn-notifications" onclick="showSettingsTab('notifications', this)">
                                 <i class="fa-regular fa-bell"></i> <span>Notifications</span>
                             </button>
-                            <button class="nav-link-item" style="width: 100%; text-align: left;" onclick="showSettingsTab('appearance', this)">
+                            <button class="settings-nav-btn" id="tab-btn-appearance" onclick="showSettingsTab('appearance', this)">
                                 <i class="fa-solid fa-palette"></i> <span>Appearance</span>
                             </button>
                         </div>
 
-                        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 28px; box-shadow: var(--shadow-sm);" id="settings-content-pane">
+                        <div class="settings-panel-card" id="settings-content-pane">
                             <!-- Populated dynamically via JS -->
                         </div>
                     </div>
@@ -971,32 +971,64 @@
         </div>
     </div>
 
-    <!-- ==========================================================================
-         AUTH OVERLAY / LOGIN PORTAL SCREEN
+        <!-- ==========================================================================
+         AUTHENTICATION OVERLAY (F.A.S.T. ACCESS PORTAL)
          ========================================================================== -->
     <div class="auth-overlay-view" id="auth-overlay-view">
         <div class="auth-card-box">
-            <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #ef4444, #f97316); color: #ffffff; display: inline-flex; align-items: center; justify-content: center; font-size: 22px; margin-bottom: 14px;">
-                <i class="fa-solid fa-satellite"></i>
+            <div class="auth-emblem-badge">
+                <i class="fa-solid fa-fire-flame-curved"></i>
             </div>
-            <h2 style="font-size: 22px; margin-bottom: 4px;">F.A.S.T. Console</h2>
-            <p style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 24px;">Fire Alert & Safety Technology — Indian Sovereign Thermal Intelligence Grid</p>
+            <h1 class="auth-title">F.A.S.T.</h1>
+            <span class="auth-tagline">Fire Alert & Safety Technology</span>
+            <p class="auth-desc">Space-Borne Thermal Intelligence & Industrial Anomaly Detection</p>
 
-            <div class="filters-form-grid" style="text-align: left;">
-                <div class="filter-field-group">
-                    <label>Official Email Address</label>
-                    <input type="email" id="auth-input-email" value="sailaja.s@example.com">
+            <!-- Inline Validation Error Box -->
+            <div id="auth-error-box" class="auth-error-banner">
+                <i class="fa-solid fa-circle-exclamation"></i>
+                <span id="auth-error-text">Invalid email or password.</span>
+            </div>
+
+            <!-- Form -->
+            <form onsubmit="event.preventDefault(); executeUserLogin();">
+                <div class="auth-field-group">
+                    <label class="auth-label">Email Address</label>
+                    <div class="auth-input-wrapper">
+                        <i class="fa-regular fa-envelope auth-input-icon"></i>
+                        <input type="email" id="auth-input-email" class="auth-input" placeholder="analyst@sih.gov.in" autocomplete="username">
+                    </div>
                 </div>
-                <div class="filter-field-group">
-                    <label>Password</label>
-                    <input type="password" id="auth-input-pass" value="••••••••••••">
+
+                <div class="auth-field-group">
+                    <label class="auth-label">Password</label>
+                    <div class="auth-input-wrapper">
+                        <i class="fa-solid fa-lock auth-input-icon"></i>
+                        <input type="password" id="auth-input-pass" class="auth-input" placeholder="Enter account password" autocomplete="current-password">
+                        <button type="button" class="auth-pw-toggle" onclick="togglePasswordVisibility()" title="Toggle visibility">
+                            <i class="fa-regular fa-eye" id="auth-pw-eye"></i>
+                        </button>
+                    </div>
                 </div>
-                <button class="btn-apply-filters" style="margin-top: 8px;" onclick="executeUserLogin()">
-                    Sign In to Dashboard
+
+                <button type="submit" class="btn-auth-submit" id="btn-auth-submit">
+                    <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                    <span id="btn-auth-label">Sign In to Dashboard</span>
                 </button>
-                <button class="btn-export-outline" style="justify-content: center; margin-top: 6px;" onclick="executeDemoGoogleLogin()">
-                    <i class="fa-brands fa-google" style="color: #ea4335;"></i> Continue with Demo Account (Sailaja S.)
-                </button>
+            </form>
+
+            <div class="auth-divider">
+                <span>OR</span>
+            </div>
+
+            <!-- Explicit Sandbox Demo Access -->
+            <button type="button" class="btn-demo-access" onclick="executeDemoAccess()">
+                <i class="fa-solid fa-flask" style="color: var(--primary-color);"></i>
+                <span>Quick Demo Access (Evaluator Sandbox)</span>
+            </button>
+
+            <div class="auth-footer-notes">
+                <div style="margin-bottom: 4px;"><strong>Sandbox / Presentation Access:</strong></div>
+                <div>Use Quick Demo Access or registered credentials (e.g. <code>analyst@sih.gov.in</code> / <code>Analyst@123</code>).</div>
             </div>
         </div>
     </div>
